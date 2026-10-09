@@ -98,6 +98,22 @@ Phase 0 steps 1 and 3 were done on 2026-10-09 (metadata, fields, join keys). Det
 6. **Write up:** record findings in `docs/data-sources.md`; update the "Verified" column and section 6.
 7. **CSBLatvia repo:** read `CSBLatvia/postgresql-open-data-lv` as a structural reference. It has **no licence**, so do not copy its code unless the authors grant one.
 
+
+### 2.5 ETL rules (Phase 2)
+
+These come from the CSBLatvia reference (`docs/data-sources.md` §2b) and our own sample findings. Each rule has a test (T-E*n*) that must pass in CI before Phase 2 is done.
+
+| # | Rule | Test |
+|---|---|---|
+| E1 | **Resource URLs are resolved from `package_show` on every run**, never hard-coded in `etl/` (filenames contain dates, e.g. BIS `…09.10.2026.csv`). `etl/discovery/` is exempt | **T-E1:** with a mocked `package_show` that returns a re-dated resource URL, the import fetches the new file; a static check finds no `/resource/…/download/` URLs in `etl/` outside `etl/discovery/` |
+| E2 | **Codes are text; restore lost leading zeros.** Designations, VARIS codes, reg. numbers and ATVK are read as strings. A digits-only value one digit short of its expected length (11 / 14 / 15 / 17) gets a leading `0` and the flag `leading_zero_restored` (VZD's own `pirmsregistretas-buves` CSV has 6,996 such values) | **T-E2:** fixture rows `1000040006002` / `1000040006` import as `01000040006002` / `01000040006` with the flag; no code column is numeric in the DB schema |
+| E3 | **CSV through a real CSV parser** with `"` quoting and `""` escaping; UTF-8 with BOM handled; **the file wins over the declared metadata encoding** (VZD metadata says ISO-8859-1, the files are UTF-8) | **T-E3:** VARIS fixture fields written in the file as `"""4"""` and `"""Elektriķi 2"""` import as the values `"4"` and `"Elektriķi 2"` (quotes kept) and round-trip byte-exactly; a UTF-8 BOM file whose metadata says ISO-8859-1 imports without replacement characters |
+| E4 | **XML: namespace-agnostic parsing; text fields normalised.** CR, LF and tab become single spaces and values are trimmed; backslashes are kept as data and escaped only on export | **T-E4:** the same fixture with and without `xmlns` gives identical rows; a building name containing a carriage return, a line feed, a tab and a backslash is stored normalised and round-trips through the Excel export |
+| E5 | **Geometry normalisation**, in this order: assign the source CRS explicitly (VARIS and DAP `.prj` files have no EPSG code) → `make_valid` → **keep polygon parts only** → **union per key** (`CODE`; servitudes `CODE` + `PARCELCODE`) → `MultiPolygon` → transform to EPSG:10306 (EPSG:10838 grid) → check validity | **T-E5:** a fixture with a self-intersecting ring, a bow-tie that `make_valid` turns into polygon + line, and two pieces with the same `CODE` gives one valid MultiPolygon per key with no non-polygon parts and area within 0.01 %; after the pilot import, every geometry is valid and of type `MULTIPOLYGON` (`POINT` for addresses), and `(CODE, PARCELCODE)` is unique for servitudes |
+| E6 | **Object kind from `OBJECTCODE` first digit**: 5 = building, 6 = engineering structure, 7 = parcel / parcel part / servitude. Any other digit stops the import | **T-E6:** the Jelgava sample imports with all `KKBuilding` = 5, engineering structures = 6, parcels / parts / servitudes = 7; a fixture row with first digit 9 fails loudly |
+| E7 | **Version dates come from the source** (`dataset_version.version_date` = CKAN resource `last_modified`, or the file's own date such as XML `PreparedDate` / CSV `Data`), **never the run date**. Same checksum = same version | **T-E7:** importing the same fixture on two simulated run dates gives one version with the source date; a changed file gives a new version |
+| E8 | **Storage:** full `dataset_version` snapshots for the pilot area. Per-object history (as in CSBLatvia) is reconsidered in Phase 9 for whole-country scale | — (reviewed in Phase 9) |
+
 ---
 
 ## 3. Architecture
@@ -169,6 +185,11 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 1. Match `EKS` addresses first, on the current text and then on earlier texts of the same code from `aw_eka_his` (renamed streets, reforms). If the address matches **only** through an earlier text, the current address is returned with warning **"atrasts pēc agrākā nosaukuma; pašreizējā adrese: <current>"**, where `<current>` is the current full address (`STD`).
 2. Only if no `EKS` address matches: match a `DEL` address and return it with warning **"vēsturiska adrese"**, plus the current `EKS` address(es) if VARIS links one through `aw_eka_his.KODS_HIS` (either direction; about 3% of `DEL` addresses; several = split, list all). With no link, the result says "pašreizējā adrese nav zināma" and the object is not resolved automatically.
 3. **`ERR` addresses are never matched.**
+
+**Phase 3 candidate: deleted-address coordinates.**
+- VZD's open dataset [`dzesto-adresu-koordinatas`](https://data.gov.lv/dati/lv/dataset/dzesto-adresu-koordinatas) (annual, CC-BY-4.0) gives code, end date, X/Y and full text of deleted addresses.
+- For a `DEL` match **without** a `KODS_HIS` link (about 97% of `DEL` addresses), the point could locate the parcel or building there now and suggest its current address. That suggestion would be match type **"probable"**, with warning "vēsturiska adrese; iespējamā pašreizējā adrese pēc atrašanās vietas: <current>", never resolved automatically.
+- **Before adopting it in Phase 3:** check the CRS of X/Y (LKS-92 or LKS-2020), the coverage of the 32,453 `DEL` addresses, and hit rates against `KODS_HIS` links where both exist. Until then, step 2 applies unchanged.
 
 **Excel leading zeros:** a value that is 1 digit short of 11, 14 or 17 gets a `0` added at the front and the flag "leading zero restored". The fix also handles scientific notation and a trailing `.0`.
 
@@ -353,14 +374,14 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 |---|---|---|
 | 0. Discovery | `docs/data-sources.md`, completed availability table, manual-time baseline, 14–20 test projects, operating-context answers (section 1) | Every MVP source verified or explicitly dropped |
 | 1. Foundation | Repo, Docker Compose, PostGIS, CI, `CLAUDE.md`, `sources.yaml`, `rules.yaml` skeleton. **Custom DB Dockerfile `FROM postgis/postgis:18-3.6`** that bundles `lv_lgia_lks92to2020.tif` (from cdn.proj.org, CC-BY 4.0, checksum pinned) into the PROJ data directory (D9) | `docker compose up` gives an empty DB + API health check. **CRS test (in CI)**: fails if the grid file is missing, if PROJ < 9.8 or SRID 10306 is unknown, or if the EPSG sample point Odukalns 56.8283960°N 24.2727688°E (LKS-92) does not transform to 56.8283967°N 24.2727679°E (LKS-2020) **within 1 cm** |
-| 2. ETL | Pilot area (Jelgava, Jūrmala, Daugavpils): VARIS, cadastre, admin boundaries, flood (if a vector source is confirmed), nature, cadastre encumbrances, BIS; transform 3059 sources to 10306; dataset versions; schema checks | Row counts match the sources; re-runs are idempotent; a changed schema fails loudly |
+| 2. ETL | Pilot area (Jelgava, Jūrmala, Daugavpils): VARIS, cadastre, admin boundaries, flood (if a vector source is confirmed), nature, cadastre encumbrances, BIS; transform 3059 sources to 10306; dataset versions; schema checks | Row counts match the sources; re-runs are idempotent; a changed schema fails loudly; **ETL rule tests T-E1 to T-E7 (§2.5) pass in CI** |
 | 3. Resolution | `/suggest`, `/resolve`, property units; leading-zero repair | Test-set inputs resolve correctly, including ambiguous ones |
 | 4. Check engine v1 | Modules 1–6, spatial rules, risk rules v1, stored runs and results | The test set's findings match the colleagues' manual answers, with differences explained by data dates |
 | 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report | **Pilot with 2–3 colleagues; measured time per object vs the baseline** |
 | 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list | UI criteria pass for the pilot area |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in) | UI criteria pass |
 | 8. Applicant & funding | Modules 7 and 9–14, and 17 | Each module verified on the test set |
-| 9. Whole country + performance | Full import, vector tiles, MapLibre decision | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
+| 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history) | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
 | 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, D3 final: shared hosting, sign-in (required before sharing), security review, retention, maintenance, legal wording; deployment behind sign-in | A refresh runs unattended; a failed import alerts the owner |
 
 **Pilot area (decided 2026-10-09): the cities of Jelgava (ATVK 0003000), Jūrmala (0004000) and Daugavpils (0002000).** Together they cover all seed examples (§2.4) and have 10-year flood coverage of 15.9%, 10.2% and 8.0% of their area (`docs/data-sources.md` §2a). Samples were inspected for Jelgava; Jūrmala and Daugavpils use the same source formats. Final check against the test set (step 5) later.

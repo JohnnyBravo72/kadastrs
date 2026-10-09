@@ -146,7 +146,13 @@ VARIS runs daily on workdays via cron; the cadastre runs weekly. **Resource URLs
 6. **Storage:** per-object diffs are much smaller than full snapshots. Our full `dataset_version` snapshots are simpler and fine for the pilot area; revisit for whole-country scale (Phase 9).
 
 **Two more VZD open datasets they use** (both on data.gov.lv, CC-BY-4.0; metadata checked via `ckan_discover.py show`):
-- **[`pirmsregistretas-buves`](https://data.gov.lv/dati/lv/dataset/pirmsregistretas-buves)** (quarterly, CSV/XLSX): pre-registered buildings with building designation, **parcel designation**, address, floors, built-up area, wall material and registration date. **No geometry.** It confirms the parcel link for pre-registered buildings, the largest no-geometry group (2,064 in Jelgava), which the parcel-geometry fallback in PLAN §6.3 needs.
+- **[`pirmsregistretas-buves`](https://data.gov.lv/dati/lv/dataset/pirmsregistretas-buves)** (quarterly, CSV/XLSX): pre-registered buildings with building designation, parcel designation, address, floors, built-up area, wall material and registration date. **No geometry.**
+  - **Sample checked** (`20260803_pirmreg_buves.csv`, 16.9 MB, 87,872 rows, data date 2026-08-03; UTF-8 with BOM although its metadata says ISO-8859-1; the metadata also lists a column `JnBuiDateFrom` that the file calls `BuiRegDate`).
+  - **6,996 rows have lost a leading zero** in VZD's own file (`BuiCadNr` 13 instead of 14 digits, `ParCadNr` 10 instead of 11), so zero-padding is required (PLAN §2.5 E2).
+  - **Small value for the no-geometry fallback:**
+    - Jelgava's cadastre text marks 3,328 buildings as pre-registered; this dataset has 1,225 of them, and where both exist the parcel agrees with the cadastre link in 1,224 of 1,224.
+    - Of the **2,072** pre-registered Jelgava buildings without geometry, **all 2,072 already have their parcel link in `building.xml`**, and only **18** are in this dataset.
+    - **The cadastre text is the source for the fallback.** This dataset is at most a cross-check. Earlier text here overstated its role.
 - **[`dzesto-adresu-koordinatas`](https://data.gov.lv/dati/lv/dataset/dzesto-adresu-koordinatas)** (annual, CSV/XLSX): code, end date, X/Y coordinates and full text of **deleted addresses**. For a `DEL` address without a `KODS_HIS` link (about 97%), the point could locate the parcel or building there now and suggest a "probable" current address. Not yet in PLAN; a candidate for Phase 3. The coordinate CRS was not checked.
 
 Not relevant here: their LAD (field blocks), forest register, NĪTIS (market transactions) and postal-code Voronoi scripts.
