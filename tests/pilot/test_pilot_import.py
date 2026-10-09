@@ -260,3 +260,38 @@ def test_seed_resolves_to_parcel_with_geometry(db_conn, live, seed):
     ).fetchall()
     assert parcels, f"{seed} resolves to no parcel"
     assert any(has_geom for _, has_geom in parcels), f"{seed}: parcels {parcels} have no geometry"
+
+
+# --- objects outside the pilot cities --------------------------------------------
+
+
+def test_registered_objects_are_never_outside_the_pilot(db_conn, live):
+    text_parcels = one(
+        db_conn,
+        "SELECT count(*) FROM ref.parcel WHERE dataset_version_id = %s",
+        live["cadastre_text"],
+    )
+    assert one(db_conn, "SELECT count(*) FROM ref.parcel_current WHERE in_register") == text_parcels
+    assert (
+        one(
+            db_conn,
+            "SELECT count(*) FROM ref.map_outside_pilot m JOIN ref.parcel p"
+            " ON p.code = m.code AND p.dataset_version_id = %s",
+            live["cadastre_text"],
+        )
+        == 0
+    )
+
+
+def test_outside_pilot_objects_lie_outside_their_city(db_conn, live):
+    """Every excluded object is unregistered and its interior point is outside its
+    city; today they all come from the Daugavpils zip (group 4460, §5.2)."""
+    rows = db_conn.execute(
+        "SELECT m.kind, m.zip_atvk, ST_Within(ST_PointOnSurface(m.geom), c.geom)"
+        " FROM ref.map_outside_pilot m JOIN ref.pilot_city c ON c.atvk = m.zip_atvk"
+    ).fetchall()
+    assert rows, "expected the Daugavpils neighbouring-territory parcels to be flagged"
+    assert not any(inside for _, _, inside in rows)
+    assert one(db_conn, "SELECT count(*) FROM ref.map_outside_pilot WHERE kind = 'parcel'") == one(
+        db_conn, "SELECT count(*) FROM ref.parcel_current_all WHERE outside_pilot"
+    )

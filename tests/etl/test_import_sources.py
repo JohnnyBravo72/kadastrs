@@ -129,3 +129,74 @@ def test_seed_parcel_resolves_with_geometry_after_full_import(run, server, q):
         assert run(sid).status == "succeeded"
     row = q("SELECT in_register, has_geometry FROM ref.parcel_current WHERE code = '09000360220'")
     assert row == [(True, True)]
+
+
+def test_map_objects_outside_the_pilot_are_flagged(run, server, q):
+    """outside_pilot = no cadastre text record AND interior point outside the
+    city boundary; such objects are left out of the pilot views."""
+    publish_all(server)
+    city_x, city_y = 480000, 270000  # Jelgava in fakes.admin_zip(): 1 km square
+    rec = fakes.kk_rec
+    server.publish(
+        "cadastre_spatial",
+        "0003000",
+        "0003000_kk_shp.zip",
+        fakes.kk_zip(
+            {
+                "KKParcel": [
+                    (
+                        rec("09000360220", "7201060310"),
+                        [fakes.square(city_x, city_y)],
+                    ),  # registered, inside
+                    (
+                        rec("09000000777", "7201060310"),
+                        [fakes.square(city_x + 500, city_y)],
+                    ),  # map-only, inside
+                    (
+                        rec("44600000001", "7201060310"),
+                        [fakes.square(city_x - 5000, city_y)],
+                    ),  # map-only, outside
+                    (
+                        rec("09000000888", "7201060310"),
+                        [fakes.square(city_x + 5000, city_y)],
+                    ),  # registered, outside
+                ],
+                "KKBuilding": [
+                    (
+                        rec("44600000001001", "5201011110", "44600000001"),
+                        [fakes.square(city_x - 4998, city_y + 2, 2)],
+                    )
+                ],
+                "KKWayRestriction": [
+                    (
+                        rec("73150000000000000001", "7401060310", "44600000001"),
+                        [fakes.square(city_x - 5000, city_y, 3)],
+                    )
+                ],
+            }
+        ),
+    )
+    docs = fakes.default_text_docs("parcel")
+    docs["0003000"] = fakes.xml_doc(
+        "parcel", "0003000", [fakes.parcel_item("09000360220"), fakes.parcel_item("09000000888")]
+    )
+    server.publish("cadastre_text", "parcel", "parcel.zip", fakes.text_zip("parcel", docs))
+    for sid in ("admin_boundaries", "cadastre_spatial", "cadastre_text"):
+        assert run(sid).status == "succeeded"
+
+    pilot = {
+        r[0]
+        for r in q(
+            "SELECT code FROM ref.parcel_current WHERE code LIKE '0900%' OR code LIKE '4460%'"
+        )
+    }
+    assert pilot == {"09000360220", "09000000777", "09000000888"}
+    assert q("SELECT kind, code FROM ref.map_outside_pilot ORDER BY kind") == [
+        ("building", "44600000001001"),
+        ("parcel", "44600000001"),
+        ("servitude", "73150000000000000001"),
+    ]
+    assert q("SELECT count(*) FROM ref.building_current WHERE code = '44600000001001'") == [(0,)]
+    assert q("SELECT outside_pilot FROM ref.parcel_current_all WHERE code = '44600000001'") == [
+        (True,)
+    ]

@@ -486,7 +486,9 @@ Checked before any import code was written (CLAUDE.md rule 2): `package_show` fo
 | `KKEngineeringStructurePoly` | 194 | 272 | 434 |
 | `KKWayRestriction` | 1,482 | 714 | 177 |
 
-- **The Daugavpils zip also holds cadastral groups `4460…`** (2,132 parcels), which are not in the Daugavpils parcel XML (only one `4460…` parcel is). The map is imported as delivered; these parcels have geometry but no text record in the pilot. Jelgava: 2 map-only parcels and 1 text-only parcel (known since Phase 0). Jūrmala: map and text agree.
+- **The Daugavpils zip also holds cadastral group `4460…`** (2,132 parcels), which is not in the Daugavpils parcel XML (only one `4460…` parcel is). The zip's own group list (`CadGroups_AT_0002000/KKCadastralGroup`) includes the group, so it cannot decide what is in the city. The map is imported as delivered.
+  - **`outside_pilot` (views, migration `20261009190000`):** a map object with **no cadastre text record** whose **interior point lies outside its city's VARIS boundary**. On the 2026-10 data: 2,134 parcels (2,131 of group `4460`, 3 of group `0500`), 4,390 buildings, 3 parcel parts, 44 servitudes, all from the Daugavpils zip. The one registered `4460…` parcel lies inside Daugavpils and stays. A registered Jūrmala parcel (group `1340`) lies outside the VARIS boundary and stays, because registered objects are never excluded; Jelgava's 2 map-only parcels lie inside the city and stay.
+  - `ref.*_current` are the pilot views (flagged objects left out); `ref.*_current_all` keep every row with the flag; `ref.map_outside_pilot` lists the excluded objects. Jelgava: 2 map-only parcels and 1 text-only parcel (known since Phase 0). Jūrmala: map and text agree.
 - `KKEngineeringStructureLine` (line geometry) is not imported (rule E5 keeps polygons only); those structures get `no_geometry`.
 
 ### 5.3 Cadastre text (XML)
