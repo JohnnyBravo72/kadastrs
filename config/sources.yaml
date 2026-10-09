@@ -23,3 +23,60 @@ sources: []
 #       dataset_id: "<CKAN package name>"
 #       resource_ids: ["<CKAN resource id>"]
 #     licence: "<licence from CKAN package_show>"
+
+# Agency-hosted resources allowed under decision D1 (docs/decisions.md).
+# Same ids and same list as the D1 table there; keep both in sync.
+# Only `status: allowed` entries may be used by the ETL.
+allowed_external_resources:
+  - id: E1
+    name: "De minimis atbalsta uzskaites sistēmas eksports"
+    url: "https://deminimis.fm.gov.lv/public/mekletajs/export_csv"
+    host: deminimis.fm.gov.lv
+    datagov_dataset: pieskirtais-de-minimis-atbalsts-latvija
+    status: allowed
+  - id: E2
+    name: "IUB paziņojumu un līgumu dati (JSON)"
+    url: "https://open.iub.gov.lv/data/notice"
+    host: open.iub.gov.lv
+    datagov_dataset: [ligumi, publisko-iepirkumu-pazinojumi]
+    status: allowed
+  - id: E3
+    name: "DAP OZOLS dabas datu ArcGIS REST"
+    url: "https://ozols.gov.lv/arcgis/rest/services/OZOLS_DABASDATI_PUB_DATU_APMAINA/FeatureServer"
+    host: ozols.gov.lv
+    datagov_dataset: dabas-vertibu-geotelpiskie-dati
+    status: allowed
+  - id: E4
+    name: "TAPIS WFS/WMS (via DPPS proxy)"
+    url:
+      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_454_4DUoZx/e4ab2161-88bf-4f35-85b8-f1ca8dd5ebb3"
+      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_451_GKJOzb/96f059e4-9ed2-479c-976f-dcbed668972f"
+    host: geo-dpps.viss.gov.lv
+    datagov_dataset: teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati
+    status: allowed
+  - id: E5
+    name: "Plūdu WMTS/WMS (map images only)"
+    url:
+      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Pludu_risk_443_Dv50WI/5acd43d2-15bf-4fb6-b163-6628576c15cb"
+      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/3._cikla_L_556_karVbb/cc6f2ed3-dbfb-42d0-98e1-4d9f10f57fea"
+      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/3._cikla_L_557_7iFPTq/b7ad025f-833a-4b4f-a845-d5cec9d24092"
+      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/3._cikla_L_558_jIS73E/3322e012-8cb3-4a4c-8acf-a467e25a17b3"
+    host: geo-dpps.viss.gov.lv
+    datagov_dataset: [pldu-riska-karu-atvrtie-dati-un-servisi1, 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1]
+    status: allowed
+  - id: E6
+    name: "ĢEOLatvija plūdu produkti 309, 361 (SHP)"
+    url:
+      - "https://geolatvija.lv/main?geoProductId=309"
+      - "https://geolatvija.lv/main?geoProductId=361"
+    host: geolatvija.lv
+    datagov_dataset: [pldu-riska-karu-atvrtie-dati-un-servisi, 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes]
+    status: allowed
+    note: "Stable file download URL not verified."
+  - id: E7
+    name: "LVĢMC ArcGIS Pavasara_pludu_kartes_3_cikls (layers 0, 1 = 10-year)"
+    url: "https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer"
+    host: geodata.lvgmc.lv
+    datagov_dataset: null
+    status: pending
+    note: "Not named on a data.gov.lv page; needs owner confirmation under D1."

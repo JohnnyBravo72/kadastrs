@@ -1,18 +1,64 @@
 # Decisions
 
-Open decisions from PLAN.md §10. Update the status and add the outcome, date and who decided when each one is settled.
+Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, the date and who decided.
 
 | # | Decision | Needed by | Status | Outcome | Decided by / date |
 |---|---|---|---|---|---|
-| D1 | Agency-hosted resources listed on data.gov.lv count as data.gov.lv? | Phase 0 | open | | |
+| D1 | Agency-hosted resources listed on data.gov.lv count as data.gov.lv? | Phase 0 | **decided** | Yes, see [D1](#d1-agency-hosted-resources) | Janis, 2026-10-09 |
 | D2 | Basemap: OSM or plain | Phase 6 | open | | |
 | D3 | Hosting, sign-in, security review (PLAN.md §1) | Phase 1 | open | | |
 | D4 | Risk rules v1, agreed with the team leads | Phase 4 | open | | |
 | D5 | Ownership module: build or not (DPO) | Phase 8 | open | | |
-| D6 | Sanctions: named exception or out of scope | Phase 8 | open | | |
+| D6 | Sanctions: legal entities only, or out of scope (DPO / legal) | Phase 8 | open | Data exists on data.gov.lv (see docs/data-sources.md §3.17); proposal in PLAN.md §6.1 | |
 | D7 | Contents of Avoti and Žurnāls | Phase 6 | open | | |
 | D8 | Project number format (free text for now) | Phase 7 | open | | |
+| D9 | Storage and analysis CRS | Phase 1 | **decided** | EPSG:10306 (LKS-2020 / Latvia TM), see [D9](#d9-storage-and-analysis-crs) | Janis, 2026-10-09 |
 
-## Named data exceptions
+## D1: agency-hosted resources
 
-Datasets used from outside data.gov.lv with the project owner's written approval (PLAN.md §2.1). None so far.
+**Decision:** an official agency resource counts as an allowed source when it is referenced as a resource, or in the description, of a data.gov.lv dataset page. "Referenced" means a link or a service address on that page, or a service the referenced address itself points to. Each such resource is listed below **and** in `config/sources.yaml` (`allowed_external_resources`). Nothing that is missing from both lists may be used.
+
+| # | Resource | Host | Referenced from (data.gov.lv dataset) | Used for | Status |
+|---|---|---|---|---|---|
+| E1 | De minimis export (CSV/XLSX) `https://deminimis.fm.gov.lv/public/mekletajs/export_csv` | deminimis.fm.gov.lv (FM) | `pieskirtais-de-minimis-atbalsts-latvija` (resource URL) | Module 11 | allowed |
+| E2 | IUB notices/contracts JSON `https://open.iub.gov.lv/data/notice` | open.iub.gov.lv (IUB) | `ligumi`, `publisko-iepirkumu-pazinojumi` (resource URL) | Module 13 | allowed |
+| E3 | DAP nature ArcGIS REST `https://ozols.gov.lv/arcgis/rest/services/OZOLS_DABASDATI_PUB_DATU_APMAINA/MapServer` and `/FeatureServer` | ozols.gov.lv (DAP) | `dabas-vertibu-geotelpiskie-dati` (resource); DAP nature datasets (description) | Module 3 (backup for the SHP files on data.gov.lv) | allowed |
+| E4 | TAPIS WFS/WMS `https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_454_4DUoZx/e4ab2161-88bf-4f35-85b8-f1ca8dd5ebb3` (WFS), `…/Teritorija_451_GKJOzb/96f059e4-9ed2-479c-976f-dcbed668972f` (WMS) | geo-dpps.viss.gov.lv → tapis.gov.lv (VARAM/VRAA) | `teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati` (resource URLs) | Module 8, zoning layer | allowed |
+| E5 | Flood WMTS/WMS (spring 10-year WMTS `…/Pludu_risk_443_Dv50WI/…`; 3rd cycle WMS `…/3._cikla_L_556/557/558…`) | geo-dpps.viss.gov.lv → geodata.lvgmc.lv (LVĢMC) | `pldu-riska-karu-atvrtie-dati-un-servisi1`, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1` (resource URLs) | Plūdi map layer only (images) | allowed |
+| E6 | geolatvija.lv flood products 309 and 361 (SHP) `https://geolatvija.lv/main?geoProductId=309`, `…=361` | geolatvija.lv (VRAA) | `pldu-riska-karu-atvrtie-dati-un-servisi`, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes` (description) | Module 4 (if a stable file URL exists) | allowed; download URL **not verified** |
+| E7 | LVĢMC ArcGIS MapServer `https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer` (layers 0, 1: 10-year) | geodata.lvgmc.lv (LVĢMC) | **Not named on any data.gov.lv page.** The same server (`…/Atvertie_dati/Pavasara_pali_010/MapServer/WMTS`) is named in the capabilities of E5's WMTS. The 3rd-cycle WMS (E5, resource 557) has the same 4 layers, but the proxy hides its backend | Module 4 vectors | **pending**: needs the owner's confirmation that it falls under D1 |
+
+## D9: storage and analysis CRS
+
+**Decision:** store and analyse in **EPSG:10306 (LKS-2020 / Latvia TM)**. Sources still in EPSG:3059 (LKS-92 / Latvia TM) are transformed to EPSG:10306 on import. GeoJSON is still served in EPSG:4326.
+
+**Why:**
+- LKS-2020 replaced LKS-92 as Latvia's official system on 2026-10-01 ([LĢIA: "2026. gada 1. oktobrī notiks pāreja uz LKS-2020"](https://www.lgia.gov.lv/lv/lks-2020); the EPSG remark on CRS 10305 reads "Replaces LKS-92 (CRS code 4661) from 2026-10-01").
+- VZD has already switched its open data:
+  - **VARIS:** change log in the VZD dataset description on data.gov.lv ([`varis-atvertie-dati`](https://data.gov.lv/dati/lv/dataset/varis-atvertie-dati)): "07.10.2026 – transformētas koordinātas no LKS-92 TM uz LKS -2020 TM".
+  - **Cadastre map:** the VZD description of [`kadastra-informacijas-sistemas-atverti-telpiskie-dati`](https://data.gov.lv/dati/lv/dataset/kadastra-informacijas-sistemas-atverti-telpiskie-dati) says "Kadastra kartes taisnleņķa koordinātu tīkls atbilst … LKS–2020 TM". The `.prj` in `0007000_kk_shp.zip` (checked 2026-10-09) is `LKS_2020_Latvia_TM … AUTHORITY[EPSG,10306]`.
+  - VZD's page [Pāreja uz LKS-2020](https://www.vzd.gov.lv/lv/pareja-uz-lks-2020) covers only municipal ADTI databases and gives no date for VARIS or the cadastre.
+- Cadastre and addresses are the core tables, so keeping them untransformed avoids error in the most-used geometries.
+- Still in LKS-92 / EPSG:3059: DAP nature data (per its descriptions), the TAPIS WFS and the LVĢMC flood service.
+
+**PROJ check (2026-10-09; read from the published source, not run, because Docker is not installed on the dev machine):**
+
+| Image | Base | PROJ | EPSG db | EPSG:10306 | LKS-92 → LKS-2020 transformation |
+|---|---|---|---|---|---|
+| `postgis/postgis:16-3.5` | Debian bullseye | 7.2.1 | v10.008 | **no** | **no** |
+| (Debian bookworm) | | 9.1.1 | v10.076 | no | no |
+| (Debian trixie, distro package) | | 9.6.0 | v12.004 | yes | **no** |
+| `postgis/postgis:18-3.6` | `postgres:18-trixie` + apt.postgresql.org | **9.8.1** (`libproj25 9.8.1-1.pgdg13+1`) | v12.029 | **yes** | **yes: EPSG:10838 "LKS-92 to LKS-2020 (1)"**, NTv2 grid, ~1 cm |
+
+Sources:
+- the `Dockerfile`s in `github.com/postgis/docker-postgis`;
+- Debian madison;
+- the apt.postgresql.org `trixie-pgdg` package index;
+- `data/sql/*.sql` at PROJ tags 7.2.1, 9.1.1, 9.6.0 and 9.8.1.
+
+**Consequences:**
+- **Use `postgis/postgis:18-3.6` (PostgreSQL 18), not 16-3.5.** PLAN.md said PostgreSQL 16, but the PG16 image's PROJ does not know EPSG:10306. Phase 1 must confirm inside the running container:
+  - `SELECT postgis_full_version();` shows PROJ ≥ 9.8;
+  - `SELECT proj4text FROM spatial_ref_sys WHERE srid = 10306;` returns a row. PostGIS's `spatial_ref_sys` may need the row added from PROJ.
+- **EPSG:10838 needs the grid file `lv_lgia_lks92to2020.tif`** (20 KB, CC-BY 4.0, LĢIA, from `https://cdn.proj.org/lv_lgia_lks92to2020.tif`). Without it, PROJ falls back to a less accurate path without a clear error. The image must contain the file in the PROJ data directory (copied at build time, not downloaded at run time). Phase 1 test: transform the EPSG sample point Odukalns, 56.8283960°N 24.2727688°E (LKS-92) → 56.8283967°N 24.2727679°E (LKS-2020).
+- Transformations happen in the ETL, once, on import. The check engine only sees EPSG:10306.
