@@ -1,0 +1,45 @@
+# Dev stack (local only, D3 interim). Started from the repo root via compose.yaml:
+#   docker compose up -d --build
+# Credentials are dev-only defaults; ports are bound to 127.0.0.1.
+# Override with environment variables KADASTRS_DB_PASSWORD, KADASTRS_DB_PORT, KADASTRS_API_PORT.
+
+x-db-url: &db-url postgresql://kadastrs:${KADASTRS_DB_PASSWORD:-kadastrs-dev}@db:5432/kadastrs
+
+services:
+  db:
+    build: ./db
+    image: kadastrs-db:dev
+    environment:
+      POSTGRES_DB: kadastrs
+      POSTGRES_USER: kadastrs
+      POSTGRES_PASSWORD: ${KADASTRS_DB_PASSWORD:-kadastrs-dev}
+    ports:
+      - "127.0.0.1:${KADASTRS_DB_PORT:-5432}:5432"
+    volumes:
+      # PostgreSQL 18 images keep PGDATA under /var/lib/postgresql/18/docker.
+      - dbdata:/var/lib/postgresql
+    healthcheck:
+      # TCP, not the socket: during initdb the server listens on the socket only.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "kadastrs", "-d", "kadastrs"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  # Applies infra/migrations (plain SQL, dbmate), then exits.
+  migrate:
+    image: ghcr.io/amacneil/dbmate:2.36.0
+    environment:
+      DATABASE_URL: postgres://kadastrs:${KADASTRS_DB_PASSWORD:-kadastrs-dev}@db:5432/kadastrs?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: /migrations
+      DBMATE_NO_DUMP_SCHEMA: "true"
+      DBMATE_WAIT: "true"
+    volumes:
+      - ./migrations:/migrations:ro
+    command: ["up"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  dbdata:

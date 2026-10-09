@@ -1,0 +1,6 @@
+# Entry point so `docker compose` works from the repo root.
+# The stack itself is defined in infra/docker-compose.yml.
+name: kadastrs
+
+include:
+  - infra/docker-compose.yml

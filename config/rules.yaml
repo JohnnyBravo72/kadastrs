@@ -1,0 +1,19 @@
+# Risk rules (PLAN.md §6.4). The only place risk levels come from (CLAUDE.md rule 4).
+# Rule set v1 is decision D4: agreed with the team leads in Phase 4.
+# The rule-set version is printed on every report.
+
+version: "0.0.0"
+
+# Spatial thresholds (PLAN.md §6.3), listed on the report's "Avoti" sheet.
+thresholds:
+  inward_buffer_m: 0.5       # parcel geometry buffered inward before intersecting
+  min_overlap_m2: 1.0        # a finding needs >= 1 m2 overlap ...
+  min_overlap_share: 0.001   # ... or >= 0.1 % of the parcel
+
+# Entries (Phase 4), e.g.:
+#   - id: nature_microreserve_overlap
+#     module: 3
+#     condition: "..."
+#     level: high            # high | medium | low | none | unknown
+#     text_lv: "..."
+rules: []

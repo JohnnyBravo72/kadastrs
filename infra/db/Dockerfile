@@ -24,4 +24,8 @@ RUN v="$(dpkg-query -W -f='${Version}' libproj25)" \
 # Grids come only from the image, never downloaded at run time.
 ENV PROJ_NETWORK=OFF
 
+# Replace the base image's init script (it also installs the US TIGER geocoder,
+# topology and fuzzystrmatch, plus a template_postgis DB); ours enables only
+# postgis, pg_trgm and unaccent.
+RUN rm /docker-entrypoint-initdb.d/10_postgis.sh
 COPY initdb/ /docker-entrypoint-initdb.d/
