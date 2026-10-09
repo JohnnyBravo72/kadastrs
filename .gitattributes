@@ -1,0 +1,16 @@
+# Text files: always LF
+*.md   text eol=lf
+*.py   text eol=lf
+*.yaml text eol=lf
+*.sql  text eol=lf
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.json text eol=lf
+*.sh   text eol=lf
+
+# Binary files: no diff, no line-ending conversion
+*.xlsx binary
+*.png  binary
+*.shp  binary
+*.dbf  binary
+*.gpkg binary
