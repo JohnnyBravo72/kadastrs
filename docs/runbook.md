@@ -122,6 +122,10 @@ docker compose exec db psql -U kadastrs -d kadastrs
 
 For a GUI client (QGIS, DBeaver), use `127.0.0.1:5432`, database and user `kadastrs`, password `kadastrs-dev`.
 
+## Settings and overrides
+
+Without a `.env`, the stack uses the dev-only defaults in `infra/docker-compose.yml`. To change a port or the password, copy `.env.example` to `.env` (git-ignored) and edit it, or set the variables in the shell (see Troubleshooting). The values in `.env.example` are for local development only.
+
 ## Troubleshooting
 
 - **Port already in use:** choose other host ports for this shell, then start again:
