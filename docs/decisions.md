@@ -78,3 +78,7 @@ Sources:
   - `SELECT proj4text FROM spatial_ref_sys WHERE srid = 10306;` returns a row. PostGIS's `spatial_ref_sys` may need the row added from PROJ.
 - **EPSG:10838 needs the grid file `lv_lgia_lks92to2020.tif`** (20 KB, CC-BY 4.0, LĢIA, from `https://cdn.proj.org/lv_lgia_lks92to2020.tif`). Without it, PROJ falls back to a less accurate path without a clear error. The image must contain the file in the PROJ data directory (copied at build time, not downloaded at run time). Phase 1 test: transform the EPSG sample point Odukalns, 56.8283960°N 24.2727688°E (LKS-92) → 56.8283967°N 24.2727679°E (LKS-2020).
 - Transformations happen in the ETL, once, on import. The check engine only sees EPSG:10306.
+- **Local test (2026-10-09, pyproj 3.8.0 / PROJ 9.8.1, the same PROJ as the target image)** on the EPSG sample point:
+  - **without** the grid, PROJ silently uses "LKS-92 to WGS 84 (1) + inverse LKS-2020 to WGS 84 (1)" and is off by **9.5 cm**;
+  - **with** `lv_lgia_lks92to2020.tif`, it is off by **0.13 cm**.
+  - Grid SHA-256: `6be363d4796bb3038e751da00e2344593edbb149ed193fc31b9c200688b31498` (20,235 bytes); pin it in the Dockerfile.
