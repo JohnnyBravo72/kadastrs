@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: \.(tif|xlsx)$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      # CLAUDE.md rule 9: never disable TLS verification.
+      - id: no-tls-verify-off
+        name: TLS verification must stay on
+        language: pygrep
+        entry: 'verify\s*=\s*False|CURL_SSL_NO_VERIFY|_create_unverified_context|CERT_NONE'
+        types_or: [python, shell, yaml, dockerfile]
+        exclude: ^\.pre-commit-config\.yaml$

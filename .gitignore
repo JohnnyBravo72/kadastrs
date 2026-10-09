@@ -2,3 +2,7 @@ etl/discovery/out/
 __pycache__/
 /data/
 .venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.env

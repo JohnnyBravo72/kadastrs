@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kadastrs"
+version = "0.1.0"
+description = "Kadastra pārbaude: checks cadastre objects against open data from data.gov.lv"
+# One Python minor everywhere: host venv, api image and CI (see .python-version).
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "fastapi>=0.120",
+    "uvicorn[standard]>=0.38",
+    "psycopg[binary,pool]>=3.2",
+    "pydantic>=2.12",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4",
+    "httpx>=0.28",
+    "ruff>=0.14",
+    "pre-commit>=4.3",
+]
+
+[tool.setuptools.packages.find]
+include = ["api*", "etl*", "engine*"]
+exclude = ["etl.discovery*", "*.tests*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+# Phase 0 discovery scripts are kept as they were run.
+extend-exclude = ["etl/discovery", "tests/data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
+ignore = ["S101"]  # assert is how pytest works
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "api/tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "stack: needs the running docker compose stack (db + api)",
+    "docker: starts extra throwaway containers (slower)",
+]

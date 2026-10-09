@@ -1,4 +1,6 @@
-# Text files: always LF
+# Text files: always LF (default for anything git detects as text,
+# incl. Dockerfile, shell scripts and .toml; containers need LF)
+* text=auto eol=lf
 *.md   text eol=lf
 *.py   text eol=lf
 *.yaml text eol=lf
@@ -15,3 +17,4 @@
 *.shp  binary
 *.dbf  binary
 *.gpkg binary
+*.tif  binary
