@@ -1,0 +1,39 @@
+name: Pilot import
+
+# Real import of the pilot cities from data.gov.lv (~700 MB of downloads),
+# twice, then the full test suite including the `pilot` tests (row counts
+# against the source files, geometry, seed objects, second run unchanged).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * 1"   # Mondays 05:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pilot-import
+  cancel-in-progress: false
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and start db, migrate, api
+        run: docker compose up -d --build --wait
+      - name: Import all (first run)
+        run: docker compose run --rm etl import all
+      - name: Import all (second run, must create no new versions)
+        run: docker compose run --rm etl import all
+      - name: Status
+        run: docker compose run --rm etl status
+      - name: Run all tests including pilot
+        run: docker compose --profile test run --rm tests
+      - name: Service logs
+        if: failure()
+        run: docker compose --profile test logs --no-color
+      - name: Stop
+        if: always()
+        run: docker compose --profile test --profile etl down -v

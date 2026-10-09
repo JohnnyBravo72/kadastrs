@@ -32,8 +32,9 @@ Output: an Excel report per object (MVP), later an interactive map and dashboard
 ## Run and test
 Full details in [docs/runbook.md](docs/runbook.md). From the repo root (PowerShell):
 - **Start:** `docker compose up -d --build --wait`, then check `http://127.0.0.1:8000/health`.
-- **Stop:** `docker compose --profile test down`. **Reset the DB:** add `-v`.
-- **Tests:** `docker compose --profile test run --rm tests`. Tests run in a container because Smart App Control blocks psycopg's DLL on the host; CI does the same.
+- **Stop:** `docker compose --profile test --profile etl down`. **Reset the DB:** add `-v`.
+- **Import data:** `docker compose run --rm etl import all` (or source ids), `docker compose run --rm etl status`.
+- **Tests:** `docker compose --profile test run --rm tests`. Tests run in a container because Smart App Control blocks psycopg's DLL on the host; CI does the same. The `pilot` tests need a real import (twice) in the dev DB; without it use `-m "not pilot"`.
 - **Lint:** `pre-commit run --all-files`.
 - **Load the source registry:** `docker compose exec api python -m etl.sources load`.
 - **Migrations:** plain SQL in `infra/migrations` (dbmate), applied by the `migrate` service on start.

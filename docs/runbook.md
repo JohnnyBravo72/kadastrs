@@ -9,6 +9,8 @@ All commands are for **PowerShell**, run from the repo root (`C:\Users\PC\Downlo
 | `api` | FastAPI | `http://127.0.0.1:8000` (`/health`, `/docs`) |
 | `tests` | pytest runner (profile `test`) | — |
 | `db-nogrid` | same DB image **without** the grid, for negative CRS tests (profile `test`) | — |
+| `migrate-test` | creates and migrates the `kadastrs_test` database used by the ETL tests (profile `test`) | — |
+| `etl` | imports from data.gov.lv (profile `etl`); raw files of live versions in volume `kadastrs_etl_raw` | — |
 
 ## One-time setup
 
@@ -50,19 +52,19 @@ docker compose logs migrate
 ## Stop
 
 ```powershell
-docker compose --profile test down
+docker compose --profile test --profile etl down
 ```
 
-This keeps the data (volume `kadastrs_dbdata`). `--profile test` also stops `db-nogrid`, which a plain `docker compose down` leaves running.
+This keeps the data (volumes `kadastrs_dbdata` and `kadastrs_etl_raw`). `--profile test` also stops `db-nogrid`, which a plain `docker compose down` leaves running.
 
 ## Reset the DB (delete all data)
 
 ```powershell
-docker compose --profile test down -v
+docker compose --profile test --profile etl down -v
 docker compose up -d --build --wait
 ```
 
-`-v` deletes the `kadastrs_dbdata` volume. On the next start, initdb enables the extensions and `migrate` recreates the schema from `infra/migrations`. Then load the sources again (next section).
+`-v` deletes the `kadastrs_dbdata` and `kadastrs_etl_raw` volumes. On the next start, initdb enables the extensions and `migrate` recreates the schema from `infra/migrations`. Then import the data again (see "Import data").
 
 ## Load the source registry
 
@@ -75,13 +77,58 @@ docker compose exec api python -m etl.sources load
 
 `load` is idempotent. An entry removed from the YAML is set `active = false`, never deleted, because dataset versions point to it.
 
+## Import data (ETL)
+
+All imports run in the `etl` container (CLAUDE.md rule 12), never with the host Python. Phase 2a sources, imported in this order by `all`:
+
+| Source | What | Takes |
+|---|---|---|
+| `admin_boundaries` | VARIS `aw_shp.zip`: municipalities, cities, parishes (whole country) | ~30 s |
+| `varis_addresses` | addresses of the pilot cities (`EKS` + `DEL`) and their earlier texts | ~1.5 min (340 MB download) |
+| `cadastre_spatial` | cadastre map of the pilot cities: parcels, parts, buildings, engineering structures, servitudes | ~40 s |
+| `cadastre_text` | cadastre text of the pilot cities: parcels, parts, buildings, building→parcel links, properties | ~3 min (pilot members only, by HTTP Range) |
+
+```powershell
+docker compose run --rm etl import all
+docker compose run --rm etl import varis_addresses cadastre_text   # some sources only
+docker compose run --rm etl status                                 # live version and last run per source
+```
+
+- The import also loads `config/sources.yaml` into the registry, so a separate `etl.sources load` is not needed.
+- Each run writes one `import_log` row per source. New data creates a new `dataset_version`, which becomes `live` in the same transaction as its load; the previous version becomes `superseded`. If nothing changed, the run is `unchanged` and no version is created.
+- **If a source changed its columns or XML elements, the import stops** (`failed`, with the reason in `import_log.message` and in the output), and the last good version stays live. Check the change, re-verify the source (`docs/data-sources.md`), update `config/schemas.yaml`, and import again.
+- The exit code is 1 if any source failed.
+- The ETL runs the checked-out code (mounted read-only), so code changes need no rebuild. Rebuild after dependency changes: `docker compose --profile etl build etl`.
+
+Import history:
+
+```powershell
+docker compose exec db psql -U kadastrs -d kadastrs -c "SELECT id, source_id, status, started_at, message FROM import_log ORDER BY id DESC LIMIT 20"
+```
+
 ## Run the tests
 
 ```powershell
 docker compose --profile test run --rm tests
 ```
 
-This builds the test image if needed, starts `db`, `migrate`, `api` and `db-nogrid`, and runs pytest with the repo mounted at `/src`. Code changes need no rebuild. A subset or extra pytest options:
+This builds the test image if needed, starts `db`, `migrate`, `api`, `db-nogrid` and `migrate-test`, and runs pytest with the repo mounted at `/src`. Code changes need no rebuild.
+
+The ETL rule tests (`tests/etl`) import synthetic files through a fake data.gov.lv into the separate `kadastrs_test` database, so they never touch your data.
+
+**The `pilot` tests check the real import in the dev database** (row counts against the source files, geometry, seed objects, and that a second run created no new versions). They **fail when nothing is imported**, so import twice first:
+
+```powershell
+docker compose run --rm etl import all
+docker compose run --rm etl import all
+docker compose --profile test run --rm tests
+```
+
+Without real data, run everything else:
+
+```powershell
+docker compose --profile test run --rm tests python -m pytest -p no:cacheprovider -m "not pilot"
+``` A subset or extra pytest options:
 
 ```powershell
 docker compose --profile test run --rm tests python -m pytest -p no:cacheprovider tests/test_crs.py -v
@@ -90,7 +137,7 @@ docker compose --profile test run --rm tests python -m pytest -p no:cacheprovide
 After changing **dependencies** (`pyproject.toml`, `constraints.txt`) or a **Dockerfile**, rebuild:
 
 ```powershell
-docker compose --profile test build
+docker compose --profile test --profile etl build
 docker compose up -d --build --wait
 ```
 
@@ -102,7 +149,7 @@ Lint and format (also run on every commit by pre-commit):
 pre-commit run --all-files
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same two things on every push and pull request.
+CI (`.github/workflows/ci.yml`) runs pre-commit and the tests without `pilot` on every push and pull request. `.github/workflows/pilot-import.yml` does the real import twice and runs the full suite, every Monday and on demand (Actions → Pilot import → Run workflow).
 
 ## Migrations
 

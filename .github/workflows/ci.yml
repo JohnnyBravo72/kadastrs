@@ -28,15 +28,16 @@ jobs:
   test:
     # Same path as on Windows (docs/runbook.md): build the stack, run pytest in
     # the tests container. Includes the CRS tests (grid, PROJ >= 9.8, SRID
-    # 10306, Odukalns within 1 cm, and the no-grid negative checks).
+    # 10306, Odukalns within 1 cm, and the no-grid negative checks) and the ETL
+    # rule tests T-E1..T-E7 on synthetic files.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - name: Build and start db, migrate, api
         run: docker compose up -d --build --wait
-      - name: Run tests
-        run: docker compose --profile test run --rm tests
+      - name: Run tests (fixture-based; real pilot data runs in pilot-import.yml)
+        run: docker compose --profile test run --rm tests python -m pytest -p no:cacheprovider -m "not pilot"
       - name: Service logs
         if: failure()
         run: docker compose --profile test logs --no-color
