@@ -475,7 +475,7 @@ Checked before any import code was written (CLAUDE.md rule 2): `package_show` fo
 - `aw_shp.zip` `.prj` files: `PROJCS["LKS-2020_Latvia_TM_EPSG_10306", …]` without `AUTHORITY`, so SRID 10306 is assigned by name. DBF `KODS` / `VKUR_CD` are numeric `N(10)`; VARIS codes are always 9 digits without leading zeros (§3.1), and the importer converts them to text and checks the length.
 
 ### 5.2 Cadastre map (SHP)
-- Every `.prj` names EPSG:10306; each layer has the same fields in all three cities; `.cpg` UTF-8.
+- Every `.prj` names EPSG:10306, written as unquoted WKT (`PROJCS[LKS_2020_Latvia_TM,…,AUTHORITY[EPSG,10306]]`; the VARIS `.prj` files are quoted, so the check ignores quotes); each layer has the same fields in all three cities; `.cpg` UTF-8.
 - `OBJECTCODE` first digit (rule E6) holds on all pilot data: 5 in `KKBuilding`, 6 in `KKEngineeringStructurePoly`, 7 in `KKParcel`, `KKParcelPart`, `KKWayRestriction`.
 
 | Layer | Daugavpils | Jelgava | Jūrmala |

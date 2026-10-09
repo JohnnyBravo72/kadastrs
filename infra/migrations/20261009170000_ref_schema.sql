@@ -26,6 +26,7 @@ CREATE TABLE ref.admin_area (
     atvk         text,                              -- ATRIB: 7-digit ATVK code
     parent_code  text,
     status       text NOT NULL,
+    parts        integer NOT NULL,
     geom         geometry(MultiPolygon, 10306) NOT NULL,
     flags        text[] NOT NULL DEFAULT '{}',
     PRIMARY KEY (dataset_version_id, varis_code)
