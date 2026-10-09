@@ -442,5 +442,5 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
 - **Phase 0 step 2:** done for the MVP sources (2026-10-09, Jelgava). Still open:
   - TAPIS WFS `DescribeFeatureType` (module 8 is not MVP);
   - DAP `ATIS_CODE` vs cadastre `EncumbranceKindId`.
-- **Decisions:** D1 and D9 were decided on 2026-10-09 (`docs/decisions.md`). D1 E7 (LVĢMC MapServer) is pending owner confirmation.
+- **Decisions:** D1, D5, D6, D9 and D1 E7 (LVĢMC MapServer) were decided on 2026-10-09; D3 has interim answers until Phase 10 (`docs/decisions.md`).
 - **D1 follow-up:** open geolatvija.lv products 309 and 361 and check for a stable SHP download URL.
