@@ -451,3 +451,56 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
   - DAP `ATIS_CODE` vs cadastre `EncumbranceKindId`.
 - **Decisions:** D1, D5, D6, D9 and D1 E7 (LVĢMC MapServer) were decided on 2026-10-09; D3 has interim answers until Phase 10 (`docs/decisions.md`).
 - **D1 follow-up:** open geolatvija.lv products 309 and 361 and check for a stable SHP download URL.
+
+---
+
+## 5. Phase 2a import verification (2026-10-09)
+
+Checked before any import code was written (CLAUDE.md rule 2): `package_show` for the three datasets, today's files (the national VARIS files are byte-identical to the Phase 0 samples) and, for the cadastre text, the pilot members fetched by HTTP Range. Registry entries: `config/sources.yaml`; resource roles: `config/etl.yaml`; expected columns and element paths: `config/schemas.yaml` (generated from these files).
+
+| Source (registry id) | Dataset | Resources (id → file) | `last_modified` |
+|---|---|---|---|
+| `admin_boundaries` | `varis-atvertie-dati` | `b643b1b3-…` → `aw_shp.zip` (layers `Novadi` 35, `Pilsetas` 82, `Pagasti` 511) | 2026-10-09 |
+| `varis_addresses` | `varis-atvertie-dati` | `a510737a-…` `aw_eka.csv`, `d07443d7-…` `aw_eka_his.csv`, `3c4ab802-…` `aw_iela.csv`, `ee02baa4-…` `aw_pilseta.csv` | 2026-10-09 |
+| `cadastre_spatial` | `kadastra-informacijas-sistemas-atverti-telpiskie-dati` | `a55953fb-…` `0002000_kk_shp.zip`, `269dadbd-…` `0003000_…`, `0d6779e2-…` `0004000_…` | 2026-10-06 |
+| `cadastre_text` | `kadastra-informacijas-sistemas-atvertie-dati` | `1618f19a-…` `parcel.zip`, `58635c63-…` `parcelpart.zip`, `9fe29b57-…` `building.zip`, `931e6299-…` `property.zip` | 2026-09-28 |
+
+### 5.1 VARIS
+- **Pilot filter by hierarchy.** `aw_pilseta.ATRIB` is the ATVK code: Daugavpils `100003011`, Jelgava `100003028`, Jūrmala `100003036` (all `EKS`, `TIPS_CD` 104). An address (`aw_eka`, all `TIPS_CD` 108) is in the pilot when its `VKUR_CD` is one of these cities (112 rows) or a street (`aw_iela`, 1,567 streets incl. 8 `DEL` and 31 `ERR`) whose `VKUR_CD` is one of them (44,924 rows).
+  - Result: **41,319 `EKS` + 1,095 `DEL`** (and 2,622 `ERR`, never imported).
+  - Cross-check: matching the city name at the end of `STD` gives exactly the same 42,414 `EKS`/`DEL` codes.
+- **Coordinates: `KOORD_X` is the northing and `KOORD_Y` the easting** (geodetic axis order), the reverse of the SHP. With the axes swapped, all 41,319 pilot `EKS` points equal `Ekas.shp` exactly (0.0 m), so the CSV coordinates are LKS-2020 TM (EPSG:10306) like the SHP. Read naively (x = `KOORD_X`), every point would be ~470 km off. `DEL` and `ERR` rows have no coordinates.
+- **Dates** in the CSVs are always `YYYY.MM.DD` (`DAT_BEIG` empty while the address exists). The SHP DBF mixes `YYYY.MM.DD` and `DD.MM.YYYY hh:mm:ss`; those DBF date fields are not used.
+- **History** (`aw_eka_his.csv`, 1,319,326 rows): 39,902 rows have a pilot `KODS`; 302 rows link to a pilot code only through `KODS_HIS`. The import keeps rows where either code is a pilot `EKS`/`DEL` address.
+- `aw_shp.zip` `.prj` files: `PROJCS["LKS-2020_Latvia_TM_EPSG_10306", …]` without `AUTHORITY`, so SRID 10306 is assigned by name. DBF `KODS` / `VKUR_CD` are numeric `N(10)`; VARIS codes are always 9 digits without leading zeros (§3.1), and the importer converts them to text and checks the length.
+
+### 5.2 Cadastre map (SHP)
+- Every `.prj` names EPSG:10306; each layer has the same fields in all three cities; `.cpg` UTF-8.
+- `OBJECTCODE` first digit (rule E6) holds on all pilot data: 5 in `KKBuilding`, 6 in `KKEngineeringStructurePoly`, 7 in `KKParcel`, `KKParcelPart`, `KKWayRestriction`.
+
+| Layer | Daugavpils | Jelgava | Jūrmala |
+|---|---|---|---|
+| `KKParcel` | 21,039 | 14,255 | 13,085 |
+| `KKParcelPart` | 151 | 286 | 115 |
+| `KKBuilding` | 53,413 | 20,899 | 26,322 |
+| `KKEngineeringStructurePoly` | 194 | 272 | 434 |
+| `KKWayRestriction` | 1,482 | 714 | 177 |
+
+- **The Daugavpils zip also holds cadastral groups `4460…`** (2,132 parcels), which are not in the Daugavpils parcel XML (only one `4460…` parcel is). The map is imported as delivered; these parcels have geometry but no text record in the pilot. Jelgava: 2 map-only parcels and 1 text-only parcel (known since Phase 0). Jūrmala: map and text agree.
+- `KKEngineeringStructureLine` (line geometry) is not imported (rule E5 keeps polygons only); those structures get `no_geometry`.
+
+### 5.3 Cadastre text (XML)
+- The server answers Range requests with **206** on all four zips. Each zip has 85 members and no zip64 records. Pilot members (one per city today), e.g. `Parcel/0003000_20260926_540190/<GUID>.xml`; uncompressed up to 193 MB (Daugavpils `building`).
+- Root elements: `PreparedDate` (2026-09-26 in all pilot members, the file's own date → `version_date`, rule E7), `ATVK`, `PacketId`, `FilePartCount`, `FilePartNr`, then the item list. **A city may be split into several members** (`FilePartCount`); the importer takes all members of a pilot ATVK and checks their number against `FilePartCount`.
+- Namespace `http://ivis.eps.gov.lv/XMLSchemas/100007/CadastreRegistry/v1-0`; parsing is namespace-agnostic (rule E4).
+- Items in the pilot: parcels 46,244; parcel parts 618; buildings 103,841; properties 126,875 (359,824 property objects).
+- Value domains seen: `ObjectRelation/ObjectType` is always `PARCEL` (buildings and parcel parts); `NotExist` = "Būve apvidū nav konstatēta" (1,719); `Prereg` = "Pirmsreģistrēta būve" (10,688); `EngineeringStructureType` Punktveida / Lineāra / Lineāra/Punktveida; `PropertyKind` 4 values; `ObjectKindData` = Zemes vienība (11 digits), Būve / Būve(FSO) (14), Telpu grupa (17). Areas are decimals with `.`.
+- `ParcelCadastreNrList/ObjectCadastreNrData` lists the further parcels of a building that stands on several; the building→parcel link is `ObjectRelation` plus that list.
+
+### 5.4 Version identity (rule E7)
+- **Full-download files** (VARIS CSVs, `aw_shp.zip`, the cadastre SHP zips): SHA-256 of each file.
+- **Range-fetched zip members** (cadastre text):
+  - **Remote fingerprint** per resource = SHA-256 of the zip's central directory + CKAN `last_modified` + size. The central directory holds every member's name, CRC-32 and sizes, so it changes whenever any member changes. If all fingerprints equal those of the live version, the run is `unchanged` and no member is fetched.
+  - **Version checksum** = SHA-256 over the canonical list of the pilot members only: resource id, member name, CRC-32, uncompressed size and SHA-256 of the decompressed bytes. A change elsewhere in Latvia, or a metadata-only change of `last_modified`, therefore does not create a pilot version; a changed pilot member does. Member names contain the export date, so a re-export with a new date is a new version.
+  - If the server ignores Range (answers 200), the importer downloads the whole zip, reads the same members locally and records `range_unsupported` in `import_log`; the checksum is the same either way.
+- `dataset_version.checksum` = SHA-256 over the canonical list of the file checksums above.

@@ -2,7 +2,83 @@
 # Add an entry only after the dataset is verified in docs/data-sources.md.
 # Never guess dataset ids or resource ids.
 
-sources: []
+sources:
+  # --- Phase 2a: reference data (verified 2026-10-09, docs/data-sources.md §5) ---
+  - id: admin_boundaries
+    names:
+      lv: "Administratīvās teritorijas"
+      en: "Administrative boundaries"
+    owner: VZD
+    group: Pamatdati
+    order: 1
+    type: reference
+    subject_kinds: [object, municipality]
+    default_selected: true
+    coverage: "Whole country: VARIS Novadi, Pilsetas, Pagasti"
+    max_age: P2D
+    datagov:
+      dataset_id: varis-atvertie-dati
+      resource_ids: ["b643b1b3-223f-4394-9beb-18524f8b0b82"]   # aw_shp.zip
+    licence: CC-BY-4.0
+  - id: varis_addresses
+    names:
+      lv: "Adrešu reģistrs (VARIS)"
+      en: "Address register (VARIS)"
+    owner: VZD
+    group: Pamatdati
+    order: 2
+    type: reference
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Pilot cities: building and parcel addresses, EKS and DEL, with earlier texts"
+    max_age: P2D
+    datagov:
+      dataset_id: varis-atvertie-dati
+      resource_ids:
+        - "a510737a-18ce-400f-ad4b-04fce5228272"   # aw_eka.csv
+        - "d07443d7-15a8-4db6-9e53-7a68eec3c0dd"   # aw_eka_his.csv
+        - "3c4ab802-76cf-433c-9c1c-89215e28d833"   # aw_iela.csv
+        - "ee02baa4-2bc3-4f77-a6cb-5427a3e9befe"   # aw_pilseta.csv
+    licence: CC-BY-4.0
+  - id: cadastre_spatial
+    names:
+      lv: "Kadastra karte"
+      en: "Cadastre map"
+    owner: VZD
+    group: Pamatdati
+    order: 3
+    type: reference
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Pilot cities (one SHP zip per city)"
+    max_age: P14D
+    datagov:
+      dataset_id: kadastra-informacijas-sistemas-atverti-telpiskie-dati
+      resource_ids:
+        - "a55953fb-b4ce-4c10-aa0d-c89119b3428f"   # 0002000_kk_shp.zip Daugavpils
+        - "269dadbd-f504-4bb5-98f4-7f4c01f773bc"   # 0003000_kk_shp.zip Jelgava
+        - "0d6779e2-f4ba-4a89-849c-0c2aee99b43c"   # 0004000_kk_shp.zip Jūrmala
+    licence: CC-BY-4.0
+  - id: cadastre_text
+    names:
+      lv: "Kadastra teksta dati"
+      en: "Cadastre text data"
+    owner: VZD
+    group: Pamatdati
+    order: 4
+    type: reference
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Pilot cities: parcels, parcel parts, buildings, properties"
+    max_age: P14D
+    datagov:
+      dataset_id: kadastra-informacijas-sistemas-atvertie-dati
+      resource_ids:
+        - "1618f19a-c818-4966-8183-a2e3c108597a"   # parcel.zip
+        - "58635c63-8c04-4193-a9f2-ec674c57ae93"   # parcelpart.zip
+        - "9fe29b57-07cd-4458-b22c-b0b9f2bc8915"   # building.zip
+        - "931e6299-61ba-477b-ba8d-f0fb30db9667"   # property.zip
+    licence: CC-BY-4.0
 
 # Example entry (placeholder values, not verified):
 #

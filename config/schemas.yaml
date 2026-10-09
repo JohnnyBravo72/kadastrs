@@ -1,0 +1,303 @@
+# Expected source schemas (ETL schema check, PLAN.md §2.2).
+# An import stops if a file has a missing, extra, renamed or retyped column
+# (CSV header, SHP field) or an XML element path that is not listed here.
+# Generated from the files verified on 2026-10-09 (docs/data-sources.md §5);
+# when a source changes on purpose, re-verify and update this file.
+
+csv:
+  aw_eka.csv: [KODS, TIPS_CD, STATUSS, APSTIPR, APST_PAK, VKUR_CD, VKUR_TIPS, NOSAUKUMS, SORT_NOS, ATRIB, PNOD_CD, DAT_SAK, DAT_MOD, DAT_BEIG, FOR_BUILD, PLAN_ADR, STD, KOORD_X, KOORD_Y, DD_N, DD_E]
+  aw_eka_his.csv: [KODS, KODS_HIS, TIPS_CD, DAT_SAK, DAT_MOD, DAT_BEIG, STD, NOSAUKUMS, VKUR_CD, VKUR_TIPS]
+  aw_iela.csv: [KODS, TIPS_CD, NOSAUKUMS, VKUR_CD, VKUR_TIPS, APSTIPR, APST_PAK, STATUSS, SORT_NOS, DAT_SAK, DAT_MOD, DAT_BEIG, ATRIB, STD]
+  aw_pilseta.csv: [KODS, TIPS_CD, NOSAUKUMS, VKUR_CD, VKUR_TIPS, APSTIPR, APST_PAK, STATUSS, SORT_NOS, DAT_SAK, DAT_MOD, DAT_BEIG, ATRIB, STD]
+
+# SHP layers: [name, DBF type, width]. CRS: EPSG code the .prj must name (or
+# the exact PROJCS name, for .prj files without an AUTHORITY clause).
+shp:
+  Novadi:
+    crs_name: LKS-2020_Latvia_TM_EPSG_10306
+    fields:
+      - [KODS, "N", 10]
+      - [TIPS_CD, "N", 6]
+      - [NOSAUKUMS, "C", 128]
+      - [VKUR_CD, "N", 10]
+      - [VKUR_TIPS, "N", 6]
+      - [APSTIPR, "C", 1]
+      - [APST_PAK, "N", 6]
+      - [STATUSS, "C", 3]
+      - [SORT_NOS, "C", 160]
+      - [DAT_SAK, "C", 19]
+      - [DAT_MOD, "C", 19]
+      - [DAT_BEIG, "C", 19]
+      - [ATRIB, "C", 32]
+      - [STD, "C", 254]
+  Pilsetas:
+    crs_name: LKS-2020_Latvia_TM_EPSG_10306
+    fields:
+      - [KODS, "N", 10]
+      - [TIPS_CD, "N", 6]
+      - [NOSAUKUMS, "C", 128]
+      - [VKUR_CD, "N", 10]
+      - [VKUR_TIPS, "N", 6]
+      - [APSTIPR, "C", 1]
+      - [APST_PAK, "N", 6]
+      - [STATUSS, "C", 3]
+      - [SORT_NOS, "C", 160]
+      - [DAT_SAK, "C", 19]
+      - [DAT_MOD, "C", 19]
+      - [DAT_BEIG, "C", 19]
+      - [ATRIB, "C", 32]
+      - [STD, "C", 254]
+  Pagasti:
+    crs_name: LKS-2020_Latvia_TM_EPSG_10306
+    fields:
+      - [KODS, "N", 10]
+      - [TIPS_CD, "N", 6]
+      - [NOSAUKUMS, "C", 128]
+      - [VKUR_CD, "N", 10]
+      - [VKUR_TIPS, "N", 6]
+      - [APSTIPR, "C", 1]
+      - [APST_PAK, "N", 6]
+      - [STATUSS, "C", 3]
+      - [SORT_NOS, "C", 160]
+      - [DAT_SAK, "C", 19]
+      - [DAT_MOD, "C", 19]
+      - [DAT_BEIG, "C", 19]
+      - [ATRIB, "C", 32]
+      - [STD, "C", 254]
+  KKParcel:
+    crs_epsg: 10306
+    fields:
+      - [CODE, "C", 11]
+      - [GEOM_ACT_D, "D", 8]
+      - [OBJECTCODE, "C", 10]
+      - [AREA_SCALE, "N", 19]
+      - [GROUP_CODE, "C", 7]
+  KKParcelPart:
+    crs_epsg: 10306
+    fields:
+      - [CODE, "C", 15]
+      - [OBJECTCODE, "C", 10]
+      - [PARCELCODE, "C", 11]
+      - [GROUP_CODE, "C", 7]
+      - [AREA_SCALE, "N", 19]
+  KKBuilding:
+    crs_epsg: 10306
+    fields:
+      - [CODE, "C", 14]
+      - [OBJECTCODE, "C", 10]
+      - [PARCELCODE, "C", 11]
+      - [AREA_SCALE, "N", 19]
+      - [GROUP_CODE, "C", 7]
+  KKEngineeringStructurePoly:
+    crs_epsg: 10306
+    fields:
+      - [CODE, "C", 14]
+      - [OBJECTCODE, "C", 10]
+      - [PARCELCODE, "C", 11]
+      - [GROUP_CODE, "C", 7]
+      - [AREA_SCALE, "N", 19]
+  KKWayRestriction:
+    crs_epsg: 10306
+    fields:
+      - [CODE, "C", 20]
+      - [OBJECTCODE, "C", 10]
+      - [PARCELCODE, "C", 11]
+      - [AREA_SCALE, "N", 19]
+      - [GROUP_CODE, "C", 7]
+
+# XML: element paths below each item, namespace-agnostic (rule E4).
+xml:
+  parcel:
+    root: ParcelFullData
+    root_children: [ATVK, FilePartCount, FilePartNr, PacketId, ParcelItemList, PreparedDate]
+    item: ParcelItemData
+    paths:
+      - LandPurposeList
+      - LandPurposeList/LandPurposeData
+      - LandPurposeList/LandPurposeData/LandPurposeArea
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultDetails
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultDetails/Areable
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultDetails/Meadows
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultDetails/Orchards
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultDetails/Pastures
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultTotal
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/Bushes
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/Drained
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/Forest
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/OtherLand
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/Swamp
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderBuildings
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderRoads
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderWaterDetails
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderWaterDetails/Flooded
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderWaterDetails/UnderFishPonds
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderWaterTotal
+      - LandPurposeList/LandPurposeData/LandPurposeKind
+      - LandPurposeList/LandPurposeData/LandPurposeKind/LandPurposeKindId
+      - LandPurposeList/LandPurposeData/LandPurposeKind/LandPurposeKindName
+      - ParcelBasicData
+      - ParcelBasicData/ATVKCode
+      - ParcelBasicData/NewForestArea
+      - ParcelBasicData/ParcelArea
+      - ParcelBasicData/ParcelCadastreNr
+      - ParcelBasicData/ParcelLizValue
+      - ParcelBasicData/ParcelStatus
+      - ParcelBasicData/ParcelStatus/ParcelStatusKindId
+      - ParcelBasicData/ParcelStatus/ParcelStatusKindName
+      - ParcelBasicData/ParcelVARISCode
+      - PlannedParcelList
+      - PlannedParcelList/PlannedParcelData
+      - PlannedParcelList/PlannedParcelData/PlannedParcelArea
+      - PlannedParcelList/PlannedParcelData/PlannedParcelCadastreNr
+      - PlannedParcelList/PlannedParcelData/VARISCode
+      - SurveyList
+      - SurveyList/SurveyData
+      - SurveyList/SurveyData/SurveyDate
+      - SurveyList/SurveyData/SurveyKind
+  parcelpart:
+    root: ParcelPartFullData
+    root_children: [ATVK, FilePartCount, FilePartNr, PacketId, ParcelPartItemList, PreparedDate]
+    item: ParcelPartItemData
+    paths:
+      - LandPurposeList
+      - LandPurposeList/LandPurposeData
+      - LandPurposeList/LandPurposeData/LandPurposeArea
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultDetails
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultDetails/Areable
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultDetails/Meadows
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultDetails/Orchards
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/AgricultTotal
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/Bushes
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/Forest
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/OtherLand
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/Swamp
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderBuildings
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderRoads
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderWaterDetails
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderWaterDetails/Flooded
+      - LandPurposeList/LandPurposeData/LandPurposeExplicationData/UnderWaterTotal
+      - LandPurposeList/LandPurposeData/LandPurposeKind
+      - LandPurposeList/LandPurposeData/LandPurposeKind/LandPurposeKindId
+      - LandPurposeList/LandPurposeData/LandPurposeKind/LandPurposeKindName
+      - ObjectRelation
+      - ObjectRelation/ObjectCadastreNr
+      - ObjectRelation/ObjectType
+      - ParcelPartBasicData
+      - ParcelPartBasicData/ParcelPartArea
+      - ParcelPartBasicData/ParcelPartCadastreNr
+      - SurveyList
+      - SurveyList/SurveyData
+      - SurveyList/SurveyData/SurveyDate
+      - SurveyList/SurveyData/SurveyKind
+  building:
+    root: BuildingFullData
+    root_children: [ATVK, BuildingItemList, FilePartCount, FilePartNr, PacketId, PreparedDate]
+    item: BuildingItemData
+    paths:
+      - BuildingAmountList
+      - BuildingAmountList/BuildingAmountData
+      - BuildingAmountList/BuildingAmountData/BuildingAmountBuildingKind
+      - BuildingAmountList/BuildingAmountData/BuildingAmountBuildingKind/BuildingKindId
+      - BuildingAmountList/BuildingAmountData/BuildingAmountBuildingKind/BuildingKindName
+      - BuildingAmountList/BuildingAmountData/BuildingAmountKind
+      - BuildingAmountList/BuildingAmountData/BuildingAmountKind/AmountKindName
+      - BuildingAmountList/BuildingAmountData/BuildingAmountMeasure
+      - BuildingAmountList/BuildingAmountData/BuildingAmountMeasure/MeasureKindName
+      - BuildingAmountList/BuildingAmountData/BuildingAmountQuantity
+      - BuildingAmountList/BuildingAmountData/BuildingAmountTitle
+      - BuildingBasicData
+      - BuildingBasicData/BuildingAcceptionYears
+      - BuildingBasicData/BuildingArea
+      - BuildingBasicData/BuildingCadastreNr
+      - BuildingBasicData/BuildingConstrArea
+      - BuildingBasicData/BuildingDepValDate
+      - BuildingBasicData/BuildingDeprecation
+      - BuildingBasicData/BuildingExploitYear
+      - BuildingBasicData/BuildingGroundFloors
+      - BuildingBasicData/BuildingMaterialKind
+      - BuildingBasicData/BuildingMaterialKind/MaterialKindId
+      - BuildingBasicData/BuildingMaterialKind/MaterialKindName
+      - BuildingBasicData/BuildingName
+      - BuildingBasicData/BuildingPregCount
+      - BuildingBasicData/BuildingSurveyDate
+      - BuildingBasicData/BuildingUndergroundFloors
+      - BuildingBasicData/BuildingUseKind
+      - BuildingBasicData/BuildingUseKind/BuildingUseKindId
+      - BuildingBasicData/BuildingUseKind/BuildingUseKindName
+      - BuildingBasicData/EngineeringStructureType
+      - BuildingBasicData/NotExist
+      - BuildingBasicData/NotForLandBook
+      - BuildingBasicData/ParcelCadastreNrList
+      - BuildingBasicData/ParcelCadastreNrList/ObjectCadastreNrData
+      - BuildingBasicData/Prereg
+      - BuildingBasicData/VARISCode
+      - BuildingElementData
+      - BuildingElementData/ConstructionDataList
+      - BuildingElementData/ConstructionDataList/BuildingElementExploitYear
+      - BuildingElementData/ConstructionDataList/BuildingElementMaterialKindList
+      - BuildingElementData/ConstructionDataList/BuildingElementMaterialKindList/BuildingElementMaterialKind
+      - BuildingElementData/ConstructionDataList/BuildingElementMaterialKindList/BuildingElementMaterialKind/MaterialKindName
+      - BuildingElementData/ConstructionDataList/BuildingElementName
+      - BuildingHistoricalData
+      - BuildingHistoricalData/BuildingHistoricalLiter
+      - BuildingHistoricalData/BuildingHistoricalName
+      - BuildingOrPremiseGroupExplicationData
+      - BuildingOrPremiseGroupExplicationData/TotalArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/FlatTotalArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/FlatTotalAreaDetails
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/FlatTotalAreaDetails/FlatArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/FlatTotalAreaDetails/FlatAreaDetails
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/FlatTotalAreaDetails/FlatAreaDetails/FlatAuxArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/FlatTotalAreaDetails/FlatAreaDetails/LivingArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/FlatTotalAreaDetails/FlatOuterArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/NonlivingAreaDetails
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/NonlivingAreaDetails/NonlivingInteriorArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/NonlivingAreaDetails/NonlivingOuterArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/ExpedientAreaDetails/NonlivingTotalArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/SharedArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/SharedAreaDetails
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/SharedAreaDetails/SharedInteriorArea
+      - BuildingOrPremiseGroupExplicationData/TotalAreaDetails/SharedAreaDetails/SharedOuterArea
+      - BuildingTypeData
+      - BuildingTypeData/BuildingKind
+      - BuildingTypeData/BuildingKind/BuildingKindId
+      - BuildingTypeData/BuildingKind/BuildingKindName
+      - ImprovementItemData
+      - ImprovementItemData/ImprovementCommonData
+      - ImprovementItemData/ImprovementCommonData/ImprovementDate
+      - ImprovementItemData/ImprovementList
+      - ImprovementItemData/ImprovementList/ImprovementData
+      - ImprovementItemData/ImprovementList/ImprovementData/ImprovementTypeName
+      - ObjectRelation
+      - ObjectRelation/ObjectCadastreNr
+      - ObjectRelation/ObjectType
+  property:
+    root: PropertyFullData
+    root_children: [ATVK, FilePartCount, FilePartNr, PacketId, PreparedDate, PropertyItemList]
+    item: PropertyItemData
+    paths:
+      - CadastreObjectIdData
+      - CadastreObjectIdData/ProCadastreNr
+      - CadastreObjectIdData/PropertyKind
+      - CadastreObjectIdData/ShareFlatProperty
+      - LandbookData
+      - LandbookData/LandbookFolioLiterNr
+      - LandbookData/LandbookFolioNr
+      - LandbookData/LandbookOfficeName
+      - LandbookData/NotCorroboratedInLandbook
+      - PropertyBasicData
+      - PropertyBasicData/PropertyName
+      - PropertyBasicData/PropertyParcelTotalArea
+      - PropertyBasicData/PropertyPremiseGroupTotalArea
+      - PropertyContentData
+      - PropertyContentData/ObjectList
+      - PropertyContentData/ObjectList/ObjectData
+      - PropertyContentData/ObjectList/ObjectData/NrOfShares
+      - PropertyContentData/ObjectList/ObjectData/ObjectCadastreNrData
+      - PropertyContentData/ObjectList/ObjectData/ObjectKindData
+      - PropertyContentData/ObjectList/ObjectData/ShareParts
