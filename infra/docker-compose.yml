@@ -41,5 +41,73 @@ services:
       db:
         condition: service_healthy
 
+  api:
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+      target: runtime
+    image: kadastrs-api:dev
+    environment:
+      DATABASE_URL: *db-url
+    ports:
+      - "127.0.0.1:${KADASTRS_API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 5s
+      timeout: 6s
+      retries: 12
+      start_period: 5s
+
+  # --- test profile: `docker compose --profile test run --rm tests` -------------
+
+  # Runs pytest on the api image's Python with the repo mounted at /src.
+  # (Tests run in a container so Windows and CI behave the same.)
+  tests:
+    profiles: [test]
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+      target: test
+    image: kadastrs-tests:dev
+    environment:
+      KADASTRS_TEST_DATABASE_URL: *db-url
+      KADASTRS_TEST_API_URL: http://api:8000
+      KADASTRS_TEST_NOGRID_DATABASE_URL: postgresql://kadastrs:nogrid@db-nogrid:5432/kadastrs
+    volumes:
+      - ..:/src
+    depends_on:
+      api:
+        condition: service_healthy
+      db-nogrid:
+        condition: service_healthy
+
+  # Same DB image with the grid deleted, to prove the CRS tests fail without it.
+  # Throwaway: data on tmpfs, no migrations (the test applies what it needs).
+  db-nogrid:
+    profiles: [test]
+    image: kadastrs-db:dev
+    entrypoint:
+      - sh
+      - -c
+      - rm -f /usr/share/proj/lv_lgia_lks92to2020.tif && exec docker-entrypoint.sh postgres
+    environment:
+      POSTGRES_DB: kadastrs
+      POSTGRES_USER: kadastrs
+      POSTGRES_PASSWORD: nogrid
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "kadastrs", "-d", "kadastrs"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    depends_on:
+      db:
+        condition: service_started  # only to make sure kadastrs-db:dev is built first
+
 volumes:
   dbdata:
