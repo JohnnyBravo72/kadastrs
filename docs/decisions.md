@@ -26,7 +26,23 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 | E4 | TAPIS WFS/WMS `https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_454_4DUoZx/e4ab2161-88bf-4f35-85b8-f1ca8dd5ebb3` (WFS), `…/Teritorija_451_GKJOzb/96f059e4-9ed2-479c-976f-dcbed668972f` (WMS) | geo-dpps.viss.gov.lv → tapis.gov.lv (VARAM/VRAA) | `teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati` (resource URLs) | Module 8, zoning layer | allowed |
 | E5 | Flood WMTS/WMS (spring 10-year WMTS `…/Pludu_risk_443_Dv50WI/…`; 3rd cycle WMS `…/3._cikla_L_556/557/558…`) | geo-dpps.viss.gov.lv → geodata.lvgmc.lv (LVĢMC) | `pldu-riska-karu-atvrtie-dati-un-servisi1`, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1` (resource URLs) | Plūdi map layer only (images) | allowed |
 | E6 | geolatvija.lv flood products 309 and 361 (SHP) `https://geolatvija.lv/main?geoProductId=309`, `…=361` | geolatvija.lv (VRAA) | `pldu-riska-karu-atvrtie-dati-un-servisi`, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes` (description) | Module 4 (if a stable file URL exists) | allowed; download URL **not verified** |
-| E7 | LVĢMC ArcGIS MapServer `https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer` (layers 0, 1: 10-year) | geodata.lvgmc.lv (LVĢMC) | **Not named on any data.gov.lv page.** The same server (`…/Atvertie_dati/Pavasara_pali_010/MapServer/WMTS`) is named in the capabilities of E5's WMTS. The 3rd-cycle WMS (E5, resource 557) has the same 4 layers, but the proxy hides its backend | Module 4 vectors | **pending**: needs the owner's confirmation that it falls under D1 |
+| E7 | LVĢMC ArcGIS MapServer `https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer`, layer 0 `Pavasara_palu_010_3_cikls` and layer 1 `Pavasara_pali_Salaca_010_3_cikls` | geodata.lvgmc.lv (LVĢMC) | Not named directly on a data.gov.lv page. The same server (`…/Atvertie_dati/Pavasara_pali_010/MapServer/WMTS`) is named in the capabilities of E5's WMTS, and the 3rd-cycle WMS (E5, resource 557) has the same 4 layers | Module 4 vectors (primary) | **allowed, with conditions** (see below). Licence: **to confirm with LVĢMC** |
+
+### E7 conditions (approved 2026-10-09, Janis)
+- **Licence: to confirm with LVĢMC.**
+  - The service metadata has `copyrightText: "none"` and no terms.
+  - No LVĢMC licence or terms-of-use page was found (searched lvgmc.lv and videscentrs.lvgmc.lv; [pris.lvgmc.lv](https://pris.lvgmc.lv/par-sistemu) renders no text without JavaScript).
+  - The data.gov.lv entries for the same data (`3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1`, harvested by ĢEOLatvija.lv) say **CC0-1.0**. That is an indication, not LVĢMC's own statement.
+  - The service description says depth-class data is **paid** (not used here).
+  - An email to LVĢMC (klientu.serviss@lvgmc.lv) has been drafted.
+- **Snapshot only:** layers 0 and 1 are imported as a versioned dataset snapshot (`dataset_version`) by the ETL. The app and the check engine never query the service live.
+- **E6 cross-check:** once E6 download links are verified, compare feature count and total area (EPSG:10306, m²) between E6 and E7 for the 10-year layers, and record the result here. E6 stays as the fallback source.
+
+| Check | E7 | E6 | Result |
+|---|---|---|---|
+| Feature count, layer 0 (whole country) | 24,590 (2026-10-09, `returnCountOnly`) | not yet (E6 URL not verified) | pending |
+| Feature count, layer 1 (Salaca) | 386 | not yet | pending |
+| Total area | not yet computed | not yet | pending |
 
 ## D9: storage and analysis CRS
 

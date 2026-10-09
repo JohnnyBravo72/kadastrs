@@ -77,6 +77,9 @@ allowed_external_resources:
     name: "LVĢMC ArcGIS Pavasara_pludu_kartes_3_cikls (layers 0, 1 = 10-year)"
     url: "https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer"
     host: geodata.lvgmc.lv
-    datagov_dataset: null
-    status: pending
-    note: "Not named on a data.gov.lv page; needs owner confirmation under D1."
+    layers: [0, 1]          # 0 Pavasara_palu_010_3_cikls, 1 Pavasara_pali_Salaca_010_3_cikls
+    datagov_dataset: null   # same data described by 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1
+    status: allowed         # approved 2026-10-09 with conditions (docs/decisions.md, E7)
+    licence: "to confirm with LVĢMC"   # data.gov.lv entry for the same data says CC0-1.0; service says none
+    access: snapshot        # imported as a versioned snapshot; never queried live
+    fallback: E6
