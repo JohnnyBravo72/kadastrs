@@ -30,6 +30,15 @@ def _member_fetches(server) -> int:
 # --- Range-fetched members -----------------------------------------------------------
 
 
+def test_fast_path_leaves_no_work_dir(run, server, tmp_path):
+    server.ignore_range = True  # full downloads land in the work dir
+    publish_all(server)
+    assert run("cadastre_text").status == "succeeded"
+    assert run("cadastre_text").status == "unchanged"
+    left = sorted(p.name for p in (tmp_path / "raw" / "cadastre_text").iterdir())
+    assert left == ["1"]  # only the live version's raw files
+
+
 def test_unchanged_remote_zip_is_unchanged_without_fetching_members(run, server, q):
     publish_all(server)
     assert run("cadastre_text").status == "succeeded"

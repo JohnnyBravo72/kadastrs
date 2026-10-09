@@ -6,7 +6,8 @@ name: Pilot import
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 5 * * 1"   # Mondays 05:00 UTC
+    # Mondays 03:00 UTC: before VARIS republishes (~05:20 UTC), so the two runs see the same files
+    - cron: "0 3 * * 1"
 
 permissions:
   contents: read

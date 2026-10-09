@@ -146,6 +146,7 @@ def run_import(
         try:
             files = importer.fetch(ctx)
         except RemoteUnchanged:
+            shutil.rmtree(workdir, ignore_errors=True)  # may hold full-zip downloads
             return _finish(
                 conn_factory,
                 log_id,
