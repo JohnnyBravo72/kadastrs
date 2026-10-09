@@ -65,7 +65,9 @@ class Source(BaseModel):
     owner: str
     group: str
     order: int
-    type: Literal["layer", "check"]
+    # reference = core data (cadastre, addresses, boundaries): always used,
+    # hidden from the sources checklist.
+    type: Literal["layer", "check", "reference"]
     subject_kinds: Annotated[
         list[Literal["object", "applicant", "municipality"]], Field(min_length=1)
     ]
@@ -82,6 +84,12 @@ class Source(BaseModel):
         if not _ISO_DURATION.match(v):
             raise ValueError(f"max_age must be an ISO 8601 duration such as P2D or P1M, got {v!r}")
         return v
+
+    @model_validator(mode="after")
+    def _reference_always_selected(self) -> Self:
+        if self.type == "reference" and not self.default_selected:
+            raise ValueError(f"source {self.id!r}: a reference source must be default_selected")
+        return self
 
     @model_validator(mode="after")
     def _has_origin(self) -> Self:

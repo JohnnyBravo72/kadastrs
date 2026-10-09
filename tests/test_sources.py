@@ -81,6 +81,7 @@ def test_example_source_validates():
         ({"max_age": "1 month"}, "ISO 8601"),
         ({"max_age": "P"}, "ISO 8601"),
         ({"type": "map"}, "type"),
+        ({"type": "reference", "default_selected": False}, "must be default_selected"),
         ({"subject_kinds": []}, "subject_kinds"),
         ({"subject_kinds": ["person"]}, "subject_kinds"),
         ({"id": "Flood-10y"}, "id"),
@@ -186,3 +187,14 @@ def test_removed_entry_is_deactivated_not_deleted(db_conn):
         active = db_conn.execute("SELECT active FROM source WHERE id = 'test_flood_10y'").fetchone()
     assert active == (False,)
     assert counts["sources_deactivated"] >= 1
+
+
+@pytest.mark.stack
+def test_reference_source_is_not_user_selectable(db_conn):
+    cfg = SourcesConfig.model_validate(_with_source(type="reference"))
+    with db_conn.transaction(force_rollback=True):
+        sync_registry(db_conn, cfg)
+        row = db_conn.execute(
+            "SELECT type, user_selectable FROM source WHERE id = 'test_flood_10y'"
+        ).fetchone()
+    assert row == ("reference", False)
