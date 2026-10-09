@@ -9,6 +9,10 @@
 **Status:** Phase 0 steps 1 and 3 are done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
 
 **Change log**
+- 2026-10-09 (policy): open data only, no external permissions or approvals.
+  - DPO gates and the named-exception route are removed.
+  - Rule: open-data fields only; ownership = owner type; sanctions = legal entities by reg. no.; no names of natural persons stored.
+  - D5, D6 and E7 are decided (E7 licence CC0-1.0 per data.gov.lv).
 - 2026-10-09 (later): updated with Phase 0 steps 1 and 3 results.
   - §2.3 now has the verified datasets.
   - D1 decided: listed agency-hosted resources are allowed.
@@ -31,9 +35,9 @@
 | Hosting | CFLA internal server or CFLA cloud tenant; not a personal account | CFLA IT |
 | Sign-in | CFLA SSO (Entra ID) if available; otherwise the tool runs on the internal network only | CFLA IT / security |
 | Security review | Before the pilot: dependencies, network exposure, logging | IT security |
-| Data protection | DPIA-light note; DPO review before any personal or ownership data (section 6, module 7) | DPO |
-| Storage of uploads | Uploaded files are not stored. Only the cleaned list and the results are kept | DPO |
-| Retention | Reports and result snapshots kept for the evaluation's retention period (confirm the period) | DPO / records management |
+| Data protection | Open-data fields only; ownership = owner type only; sanctions = legal entities by reg. no. only; no names of natural persons stored (see `docs/decisions.md`, Policy) | decided 2026-10-09 |
+| Storage of uploads | Uploaded files are not stored. Only the cleaned list and the results are kept | decided 2026-10-09 |
+| Retention | Reports and result snapshots kept for the evaluation's retention period (confirm the period) | Janis / records management |
 | Maintenance | Named owner and a backup person; `docs/runbook.md` covers refreshing data and fixing a failed import | Janis |
 | Legal status of output | "Informational, based on open data as of <date>; not an official registry extract" on every report | Legal / team leads |
 
@@ -44,7 +48,7 @@
 ### 2.1 Rule
 - **Rule:** every dataset the platform uses must be listed on **data.gov.lv**. Nothing comes from scraping, commercial services (Lursoft) or login-protected portals.
 - **Agency-hosted resources (D1, decided 2026-10-09):** an official agency resource referenced from a data.gov.lv dataset page (file, WFS, ArcGIS service) is allowed. It must be listed by name in `docs/decisions.md` (D1) and in `config/sources.yaml` (`allowed_external_resources`).
-- **If a dataset is missing:** the module is not built. It shows as *unavailable* in the source registry. The other option is a **named exception** that the project owner approves in writing; it is recorded in `docs/decisions.md`.
+- **Open data only:** the project needs no external permissions or approvals. If a dataset is missing or not open, the module is not built and shows as *unavailable* in the source registry.
 - **Basemap:** background tiles are not datasets. **Decision needed:** OSM tiles (as in the prototype, attribution required) or a plain background drawn only from imported parcels and buildings.
 
 ### 2.2 How data gets in
@@ -64,7 +68,7 @@ Phase 0 steps 1 and 3 were done on 2026-10-09 (metadata, fields, join keys). Det
 | Cadastre (parcels, buildings, parts, property numbers) | VZD | Text: `kadastra-informacijas-sistemas-atvertie-dati` (XML, weekly). Spatial: `kadastra-informacijas-sistemas-atverti-telpiskie-dati` (SHP per municipality, weekly) | SHP is **EPSG:10306** (LKS-2020). Layers KKParcel, KKParcelPart, KKBuilding (with `PARCELCODE`), KKWayRestriction, … in one folder per cadastral group. XML per municipality, UTF-8. `building.xml` gives the building→parcel link | ☑☑ |
 | Administrative boundaries | VZD / VARAM | VARIS `aw_shp.zip` (Novadi, Pagasti, Pilsetas); `atr` | Use the VARIS layers | ☑ |
 | ATIS (apgrūtinājumi) | VZD | **Per-parcel encumbrances only:** cadastre text resource "Kadastra objektam reģistrētie apgrūtinājumi" (code, description, area); classifier `atis-datu-un-kadastra-objektu-apgrutinajumu-klasifikators` | **No ATIS geometries on data.gov.lv.** Module 6 is a list per parcel, not a map layer or overlap. A frozen pre-2025-02-01 list also exists (`apgrutinajumi-kas-kadastra-registreti-lidz-2025-gada-31-janvarim`). Sample (Jelgava): 12,474 parcels/parts, 54,062 encumbrances with code, description, area and date | ☑☑ |
-| Flood maps | LVĢMC (harvested via ĢEOLatvija.lv) | Spring 10-year: `pldu-riska-karu-atvrtie-dati-un-servisi` (SHP, geolatvija link only), `…-servisi1` (WMTS); 3rd cycle: `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes` (SHP, geolatvija link only), `…-kartes1` (WMS) | **Vectors: not directly downloadable from data.gov.lv.** Images (WMTS/WMS) are fine for the map layer (D1 E5). Vector candidates: geolatvija products 309/361 (D1 E6, URL not verified) and the LVĢMC ArcGIS MapServer `Pavasara_pludu_kartes_3_cikls`, layers 0 and 1, which supports feature queries with geometry (D1 E7, **approved 2026-10-09 as the primary source**: snapshot import only; licence to confirm with LVĢMC). The Miro slug `…-servisi5` is the sea wind-surge 200-year WMTS, the wrong layer. Covers designated risk areas only. E7 sample (Jelgava): 749 polygons, only `objectid`, 5% invalid (repairable). Very large polygons need `objectIds` paging with `maxAllowableOffset=0.01` | ☑☑ (E7); E6 ☐ |
+| Flood maps | LVĢMC (harvested via ĢEOLatvija.lv) | Spring 10-year: `pldu-riska-karu-atvrtie-dati-un-servisi` (SHP, geolatvija link only), `…-servisi1` (WMTS); 3rd cycle: `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes` (SHP, geolatvija link only), `…-kartes1` (WMS) | **Vectors: not directly downloadable from data.gov.lv.** Images (WMTS/WMS) are fine for the map layer (D1 E5). Vector candidates: geolatvija products 309/361 (D1 E6, URL not verified) and the LVĢMC ArcGIS MapServer `Pavasara_pludu_kartes_3_cikls`, layers 0 and 1, which supports feature queries with geometry (D1 E7, **decided 2026-10-09 as the primary source**: snapshot import only; licence CC0-1.0 per the data.gov.lv listing of the same data). The Miro slug `…-servisi5` is the sea wind-surge 200-year WMTS, the wrong layer. Covers designated risk areas only. E7 sample (Jelgava): 749 polygons, only `objectid`, 5% invalid (repairable). Very large polygons need `objectIds` paging with `maxAllowableOffset=0.01` | ☑☑ (E7); E6 ☐ |
 | Protected areas, microreserves, nature monuments, habitats | DAP | `ipasi-aizsargajamas-dabas-teritorijas` (incl. zoning), `mikroliegumi` (incl. buffer zones), `dabas-pieminekli`, `aizsargajamas-dzivotnes-biotopi` (SHP/GDB, annual, CC0) | LKS-92 (`.prj` has no EPSG code, so assign 3059). ArcGIS REST on ozols.gov.lv as a backup (D1 E3). Sample: UTF-8; self-intersecting rings in every polygon layer except monuments (up to 6% in buffer zones); habitat `ID` not unique, so use `GlobalID`; layers carry `ATIS_CODE` | ☑☑ |
 | Zoning (TAPIS) | VARAM | `teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati` (WFS, EPSG:3059, layer `funkcionalais_zonejums`; D1 E4); `fz-skelumi` (VZD, quarterly) | The ~55% coverage figure is not verified. Zone types still need a common legend | ☑ |
 | Construction cases (BIS) | BVKB | `bis_jlyakg7hgslonjnwyrwc6w` (cases), `bis_tln9s3hrpjlnucmjip9r3g` (case objects), `bis_04lylzfvt9f25h4divvcfq` (new builds, geo); daily, CC0 | All case types (new build, reconstruction, demolition, …). Objects carry the **building** designation (14 digits, or 17 for premise groups) and the VARIS address code, **not** the parcel designation. Sample: the case-objects CSV has 425,185 rows (the DataStore copy has only 48,000); filenames are dated, so take URLs from `package_show` | ☑☑ |
@@ -76,7 +80,7 @@ Phase 0 steps 1 and 3 were done on 2026-10-09 (metadata, fields, join keys). Det
 | Procurement (EIS / IUB) | VDAA / IUB | `iepirkumu-rezultatu-datu-grupa` (EIS CSV); `ligumi`, `publisko-iepirkumu-pazinojumi` (JSON on open.iub.gov.lv, D1 E2) | Winner and buyer reg. no. | ☑ |
 | Cultural heritage | KISC | `valsts-aizsargajamo-nekustamo-piemineklu-saraksts` (CSV, CC0) | `Kadastra_apzimejums` in 84% of rows; no geometry | ☑ |
 | Municipal liabilities | Valsts kase | `pasvaldibu-saistibu-apmers` (annual, CC0) | Per municipality (ATVK) | ☑ |
-| Ownership (īpašumtiesības) | VZD | Cadastre text resource "Īpašumtiesību statusu raksturojošie dati" | Per XSD: ownership status + person type (natural / legal / state / municipality / other) only; no names. Land book excluded. DPO review required (module 7) | ☑ (XSD) |
+| Ownership (īpašumtiesības) | VZD | Cadastre text resource "Īpašumtiesību statusu raksturojošie dati" | Per XSD: ownership status + person type (natural / legal / state / municipality / other) only; no names. Land book excluded. Module 7 uses the owner type only | ☑ (XSD) |
 | Sanctions | UR / FID | `sanctions` (UR, daily), `sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija` (FID) | **Available on data.gov.lv** (contrary to the earlier assumption). Contains personal data: use legal entities by reg. no. only (§6.1). EU/UN consolidated lists themselves: not found | ☑ |
 
 ### 2.4 Phase 0 checklist
@@ -179,10 +183,10 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 | 1 | Cadastre facts | object | Cadastre | 4 | Units, areas, land use, buildings |
 | 2 | Address consistency ("Neatbilst") | object + given address | VARIS + Cadastre | 4 | Flags when the given address is not linked to the given designation |
 | 3 | Protected nature (OZOLS scheme) | object | DAP datasets | 4 | Separate lines: protected area, microreserve, buffer zone, nature monument, habitat |
-| 4 | Flood (10-year) | object | LVĢMC | 4 | Intersect yes/no, share of area; outside coverage = `not_covered`. Source: **LVĢMC MapServer `Pavasara_pludu_kartes_3_cikls`, layers 0 and 1 (Salaca), D1 E7**, imported as a versioned snapshot and never queried live; EPSG:3059 → 10306 on import. Fallback: geolatvija SHP (E6), after an E6/E7 feature-count and area comparison. Licence to confirm with LVĢMC |
+| 4 | Flood (10-year) | object | LVĢMC | 4 | Intersect yes/no, share of area; outside coverage = `not_covered`. Source: **LVĢMC MapServer `Pavasara_pludu_kartes_3_cikls`, layers 0 and 1 (Salaca), D1 E7**, imported as a versioned snapshot and never queried live; EPSG:3059 → 10306 on import. Fallback: geolatvija SHP (E6), after an E6/E7 feature-count and area comparison. Licence CC0-1.0 (per the data.gov.lv listing of the same data) |
 | 5 | Construction cases (BIS) | object | BIS | 4 | BIS has no parcel designation. Join keys, in this order: (a) building designation (17-digit premise groups cut to 14) → **the cadastre's own building→parcel link** (`building.xml` `ObjectRelation` + `ParcelCadastreNrList`); (b) **building designation prefix** (first 11 digits = the parcel the building was created on), as a fallback only for buildings missing from the cadastre, with match type "probable"; (c) **VARIS address code** (`Buves_objekta_adreses_kods` / `Buves_adreses_kods`), matched against both the building's and the parcel's VARIS code. **Verified on Jelgava samples:** the prefix equals the cadastre parcel in 90.5% (case objects) and 93.4% (new builds) of buildings found. The other ~7–10% are re-formed parcels, so the prefix alone is not exact. The address code matches the building or parcel VARIS code in 84%. Match types: exact building / building on parcel (cadastre link) / probable parcel (prefix) / same address code / same property / nearby (coordinates, fuzzy). The colleagues' example: 13 cases, only 3 exact |
 | 6 | Registered encumbrances (apgrūtinājumi) | object | Cadastre text data (encumbrances resource, ATIS-coded) | 4 | **A list per parcel or parcel part:** code, description, area, registration date. No ATIS geometries are open, so there is no map layer and no spatial overlap |
-| 7 | Ownership status | object | Cadastre (owner type only) | 8, **DPO-gated** | Never names of natural persons |
+| 7 | Ownership status | object | Cadastre (owner type only) | 8 | Owner type only (`PersonStatus`: natural / legal person, state, municipality, other). Never names of natural persons |
 | 8 | Zoning | object | TAPIS | 6 | Common legend mapping; partial coverage |
 | 9 | Applicant registry | applicant | UR | 8 | Status, form, legal address, dates |
 | 10 | Applicant tax (VID rating) | applicant | VID | 8 | Rating A/B/C/J/N with its date. Freshness `max_age` 120 days (the source is updated irregularly, at least 4× a year). **No tax-debt data on data.gov.lv**, so the module does not claim to check debts |
@@ -192,7 +196,7 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 | 14 | Companies at address | object | UR | 8 | Legal address only, labelled "not proof of activity" |
 | 15 | Cultural heritage | object | KISC | later | Match on `Kadastra_apzimejums`; no geometry |
 | 16 | Municipal liabilities | municipality | Valsts kase | later | Per ATVK |
-| 17 | Sanctions (legal entities) | applicant | UR `sanctions` | 8, **D6-gated (DPO / legal)** | Match **only by reg. no.** (applicant reg. no. against `legal_entity_registration_number` / `sanctions_subject_registration_number`). A name-only hit is never a finding: it is flagged "manual review" with no risk level. Natural-person fields (name, birth date, personal code) are never imported |
+| 17 | Sanctions (legal entities) | applicant | UR `sanctions` | 8 | Legal entities only. Match **only by reg. no.** (applicant reg. no. against `legal_entity_registration_number` / `sanctions_subject_registration_number`). A name-only hit is never a finding: it is flagged "manual review" with no risk level. Natural-person fields (name, birth date, personal code) are never imported |
 
 ### 6.2 Module contract
 ```
@@ -339,7 +343,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report | **Pilot with 2–3 colleagues; measured time per object vs the baseline** |
 | 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list | UI criteria pass for the pilot municipality |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in) | UI criteria pass |
-| 8. Applicant & funding | Modules 9–14; module 7 only after DPO approval | Each module verified on the test set |
+| 8. Applicant & funding | Modules 7 and 9–14, and 17 | Each module verified on the test set |
 | 9. Whole country + performance | Full import, vector tiles, MapLibre decision | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
 | 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, deployment behind CFLA sign-in | A refresh runs unattended; a failed import alerts the owner |
 
@@ -350,12 +354,12 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 ## 10. Risks and open decisions
 
 **Risks**
-- **ATIS geometries are not open** (confirmed in Phase 0). Module 6 can only list encumbrances registered on the parcel; it cannot show restricted areas that are not yet registered. If evaluators need the geometries, ask VZD about access for CFLA as a named exception.
+- **ATIS geometries are not open** (confirmed in Phase 0). Module 6 can only list encumbrances registered on the parcel; it cannot show restricted areas that are not yet registered. Reports must say so; non-open ATIS data is not used.
 - **Flood vectors** are not directly downloadable from data.gov.lv. Module 4 uses D1 E7 (LVĢMC MapServer snapshot), with E6 as the fallback. The licence is still to be confirmed with LVĢMC (`docs/decisions.md`).
 - **Missing join keys:** if BIS, UR or EU-project data has no cadastre or address codes, the matching is fuzzy and may be wrong. Show the match type and confidence; never present a fuzzy match as exact.
 - **Over-trust:** evaluators may read "clear" as "no risk". The status wording (`clear` vs `not_covered` vs `no_data`) and the report footer must make the limits visible.
 - **Freshness:** open data lags the live registries, especially for tax and company status. The stale-data warnings and the report date are mandatory.
-- **Personal data:** names of owners or board members are never stored. Ownership is limited to the owner type and gated by the DPO.
+- **Personal data:** modules use only open-data fields. No names of natural persons (owners, board members, aid recipients, sanctioned persons) are stored. Ownership = owner type only; sanctions = legal entities by reg. no. only.
 - **Licences:** confirm reuse and attribution terms for each dataset and the basemap.
 - **Bus factor:** one developer. The runbook, the tests and `CLAUDE.md` are deliverables, not extras.
 - **Data volume:** whole-country parcels and buildings are large. The pilot municipality comes first; tiles and indexes come before scaling.
@@ -368,8 +372,8 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | D2 | Basemap: OSM or plain | Phase 6 |
 | D3 | Hosting, sign-in, security review (section 1) | Phase 1 |
 | D4 | Risk rules v1, agreed with the team leads | Phase 4 |
-| D5 | Ownership module: build or not (DPO) | Phase 8 |
-| D6 | Sanctions: legal entities by reg. no. (module 17) or out of scope; data is on data.gov.lv, decision is DPO / legal | Phase 8 |
+| D5 | Ownership module: **decided**, owner type only | Phase 8 |
+| D6 | Sanctions: **decided**, legal entities by reg. no. only (module 17) | Phase 8 |
 | D7 | Contents of Avoti and Žurnāls | Phase 6 |
 | D8 | Project number format (free text for now) | Phase 7 |
 | D9 | Storage CRS: **decided** EPSG:10306 (LKS-2020); see `docs/decisions.md` | Phase 1 |

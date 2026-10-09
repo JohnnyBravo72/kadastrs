@@ -8,11 +8,20 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 | D2 | Basemap: OSM or plain | Phase 6 | open | | |
 | D3 | Hosting, sign-in, security review (PLAN.md §1) | Phase 1 | open | | |
 | D4 | Risk rules v1, agreed with the team leads | Phase 4 | open | | |
-| D5 | Ownership module: build or not (DPO) | Phase 8 | open | | |
-| D6 | Sanctions: legal entities only, or out of scope (DPO / legal) | Phase 8 | open | Data exists on data.gov.lv (see docs/data-sources.md §3.17); proposal in PLAN.md §6.1 | |
+| D5 | Ownership module | Phase 8 | **decided** | Built, with owner **type** only (`PersonStatus`); no names. See [Policy](#policy-open-data-only) | Janis, 2026-10-09 |
+| D6 | Sanctions module | Phase 8 | **decided** | Built for **legal entities by reg. no. only** (UR `sanctions`); natural-person fields never imported. See [Policy](#policy-open-data-only) | Janis, 2026-10-09 |
 | D7 | Contents of Avoti and Žurnāls | Phase 6 | open | | |
 | D8 | Project number format (free text for now) | Phase 7 | open | | |
 | D9 | Storage and analysis CRS | Phase 1 | **decided** | EPSG:10306 (LKS-2020 / Latvia TM), see [D9](#d9-storage-and-analysis-crs) | Janis, 2026-10-09 |
+
+## Policy: open data only
+
+**Decided 2026-10-09 (Janis).** The project uses only open data and needs no external permissions or approvals. Instead of approval gates, these rules apply to every module:
+- Modules use only fields published as open data.
+- Ownership is the owner **type** only (natural / legal person, state, municipality, other).
+- Sanctions cover **legal entities, matched by reg. no.** only.
+- **No names of natural persons are stored** (nor personal codes or birth dates).
+- Data that is not open (e.g. ATIS geometries, land book) is not used, and the affected check shows as *unavailable*.
 
 ## D1: agency-hosted resources
 
@@ -26,15 +35,13 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 | E4 | TAPIS WFS/WMS `https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_454_4DUoZx/e4ab2161-88bf-4f35-85b8-f1ca8dd5ebb3` (WFS), `…/Teritorija_451_GKJOzb/96f059e4-9ed2-479c-976f-dcbed668972f` (WMS) | geo-dpps.viss.gov.lv → tapis.gov.lv (VARAM/VRAA) | `teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati` (resource URLs) | Module 8, zoning layer | allowed |
 | E5 | Flood WMTS/WMS (spring 10-year WMTS `…/Pludu_risk_443_Dv50WI/…`; 3rd cycle WMS `…/3._cikla_L_556/557/558…`) | geo-dpps.viss.gov.lv → geodata.lvgmc.lv (LVĢMC) | `pldu-riska-karu-atvrtie-dati-un-servisi1`, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1` (resource URLs) | Plūdi map layer only (images) | allowed |
 | E6 | geolatvija.lv flood products 309 and 361 (SHP) `https://geolatvija.lv/main?geoProductId=309`, `…=361` | geolatvija.lv (VRAA) | `pldu-riska-karu-atvrtie-dati-un-servisi`, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes` (description) | Module 4 (if a stable file URL exists) | allowed; download URL **not verified** |
-| E7 | LVĢMC ArcGIS MapServer `https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer`, layer 0 `Pavasara_palu_010_3_cikls` and layer 1 `Pavasara_pali_Salaca_010_3_cikls` | geodata.lvgmc.lv (LVĢMC) | Not named directly on a data.gov.lv page. The same server (`…/Atvertie_dati/Pavasara_pali_010/MapServer/WMTS`) is named in the capabilities of E5's WMTS, and the 3rd-cycle WMS (E5, resource 557) has the same 4 layers | Module 4 vectors (primary) | **allowed, with conditions** (see below). Licence: **to confirm with LVĢMC** |
+| E7 | LVĢMC ArcGIS MapServer `https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer`, layer 0 `Pavasara_palu_010_3_cikls` and layer 1 `Pavasara_pali_Salaca_010_3_cikls` | geodata.lvgmc.lv (LVĢMC) | Not named directly on a data.gov.lv page. The same server (`…/Atvertie_dati/Pavasara_pali_010/MapServer/WMTS`) is named in the capabilities of E5's WMTS, and the 3rd-cycle WMS (E5, resource 557) has the same 4 layers | Module 4 vectors (primary) | **allowed, decided**. Licence **CC0-1.0** (see below) |
 
-### E7 conditions (approved 2026-10-09, Janis)
-- **Licence: to confirm with LVĢMC.**
-  - The service metadata has `copyrightText: "none"` and no terms.
-  - No LVĢMC licence or terms-of-use page was found (searched lvgmc.lv and videscentrs.lvgmc.lv; [pris.lvgmc.lv](https://pris.lvgmc.lv/par-sistemu) renders no text without JavaScript).
-  - The data.gov.lv entries for the same data (`3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1`, harvested by ĢEOLatvija.lv) say **CC0-1.0**. That is an indication, not LVĢMC's own statement.
-  - The service description says depth-class data is **paid** (not used here).
-  - An email to LVĢMC (klientu.serviss@lvgmc.lv) has been drafted.
+### E7 (decided 2026-10-09, Janis)
+- **Licence: CC0-1.0.**
+  - **Source of that statement:** the data.gov.lv listing of the same data, [`3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1`](https://data.gov.lv/dati/lv/dataset/3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1) (`license_id: CC0-1.0`, harvested by ĢEOLatvija.lv, metadata modified 2026-08-19).
+  - The service's own metadata has `copyrightText: "none"`.
+- **Free data only:** the service description says depth-class data is paid; it is not used.
 - **Snapshot only:** layers 0 and 1 are imported as a versioned dataset snapshot (`dataset_version`) by the ETL. The app and the check engine never query the service live.
 - **E6 cross-check:** once E6 download links are verified, compare feature count and total area (EPSG:10306, m²) between E6 and E7 for the 10-year layers, and record the result here. E6 stays as the fallback source.
 

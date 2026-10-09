@@ -66,7 +66,7 @@ Status words used below:
    - `valsts-adresu-registra-informacijas-sistemas-atvertie-dati` exists but returns *403 Authorization Error* (private or deleted). The live VARIS dataset is `varis-atvertie-dati`.
    - `pldu-riska-karu-atvrtie-dati-un-servisi5` is **"Jūras vēja uzplūdi reizi 200 gados WMTS"**, not the spring 10-year flood.
    - `kadastra-informacijas-sistemas-atvertie-dati` is the *text* data. The spatial data is a separate dataset.
-3. **Sanctions data is on data.gov.lv** (UR and FID). PLAN §2.3/§6 assumed it was not. It holds personal data, so D6 is still a legal/DPO decision, but it is no longer a data-availability decision.
+3. **Sanctions data is on data.gov.lv** (UR and FID). PLAN §2.3/§6 assumed it was not. It holds personal data, so under the open-data policy (D6, decided) only legal entities matched by reg. no. are used, and natural-person fields are not imported.
 4. **Owners differ from PLAN:** cultural heritage is published by KISC (Kultūras informācijas sistēmu centrs); municipal liabilities by Valsts kase.
 5. **Don't import from the DataStore copies; import the raw files.**
    - Several DataStore tables type designations as `numeric`, which drops leading zeros: BIS `Buves_kadastra_apzimejums`, and EU 14–20 and RRF `KadastraNumurs`.
@@ -175,7 +175,7 @@ Per-municipality counts for all 42 municipalities are in `etl/discovery/out/pilo
 - **Counts to reconcile in Phase 2:**
   - 14,254 parcels in text vs 14,255 in the map;
   - 23,329 buildings in text vs 20,899 in the map. The text includes pre-registered and non-existing buildings and some without a surveyed outline; the exact reason was not checked.
-- Ownership XML was not downloaded (module 7 is DPO-gated).
+- Ownership XML was not sampled (module 7 is Phase 8; it uses the owner type only, per the XSD in §3.16).
 
 ### 3.3 Administrative boundaries
 - [`atr`](https://data.gov.lv/dati/lv/dataset/atr) (VARAM, CC0, modified 2026-05-07): 2021 and 2026 boundaries as SHP, GeoJSON, GPKG and KML, plus an old→new territory table.
@@ -225,7 +225,7 @@ Per-municipality counts for all 42 municipalities are in `etl/discovery/out/pilo
   - Fields are only `objectid`, `shape`, `st_area(shape)`, `st_length(shape)`, so there is no depth or scenario attribute; the scenario is the layer itself.
   - `query?where=1=1&outFields=*&returnGeometry=true&resultRecordCount=1` returned a polygon with `rings` in EPSG:3059. An envelope query (`geometry=505000,230000,515000,240000`, `esriSpatialRelIntersects`) returned a count of 18.
   - **So feature queries with geometry work.** A full copy would take about 25 paged requests of 1,000.
-  - **D1 status:** approved on 2026-10-09 as D1 E7 (snapshot only; licence to confirm with LVĢMC).
+  - **D1 status:** decided on 2026-10-09 as D1 E7 (snapshot only). Licence CC0-1.0, per the data.gov.lv listing of the same data (`3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1`).
 
 **Sample inspection** (E7 layer 0, Jelgava bounding box; `data/samples/flood_e7/layer0_0003000.geojson`, 32.4 MB; Daugavpils and Jūrmala also fetched)
 - 749 polygons, GeoJSON in EPSG:3059 (`outSR=3059`). The only attribute is `objectid`; there is no scenario or depth field.

@@ -79,7 +79,7 @@ allowed_external_resources:
     host: geodata.lvgmc.lv
     layers: [0, 1]          # 0 Pavasara_palu_010_3_cikls, 1 Pavasara_pali_Salaca_010_3_cikls
     datagov_dataset: null   # same data described by 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1
-    status: allowed         # approved 2026-10-09 with conditions (docs/decisions.md, E7)
-    licence: "to confirm with LVĢMC"   # data.gov.lv entry for the same data says CC0-1.0; service says none
+    status: allowed         # decided 2026-10-09 (docs/decisions.md, E7)
+    licence: CC0-1.0        # per data.gov.lv listing of the same data: 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1
     access: snapshot        # imported as a versioned snapshot; never queried live
     fallback: E6

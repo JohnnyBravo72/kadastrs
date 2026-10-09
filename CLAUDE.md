@@ -33,11 +33,15 @@ Output: an Excel report per object (MVP), later an interactive map and dashboard
 Not set up yet. Added in Phase 1 (`docker compose up` → empty DB + API health check).
 
 ## Rules
-1. **All data comes only from data.gov.lv** (PLAN.md §2.1). No scraping, no commercial services (e.g. Lursoft), no login-protected portals. Under D1, an official agency resource referenced from a data.gov.lv dataset page is allowed only if it is listed by name in `docs/decisions.md` (D1) **and** in `config/sources.yaml` (`allowed_external_resources`, `status: allowed`). A missing dataset means the module is not built and shows as *unavailable*; the only alternative is a named exception approved in writing and recorded in `docs/decisions.md`.
+1. **All data comes only from data.gov.lv** (PLAN.md §2.1). No scraping, no commercial services (e.g. Lursoft), no login-protected portals. Under D1, an official agency resource referenced from a data.gov.lv dataset page is allowed only if it is listed by name in `docs/decisions.md` (D1) **and** in `config/sources.yaml` (`allowed_external_resources`, `status: allowed`). We work **only on open data and need no external permissions or approvals**. A missing or non-open dataset means the module is not built and shows as *unavailable*.
 2. **Verify data endpoints before coding against them.** Never guess URLs, dataset ids, resource ids or field names. Confirm them via the data.gov.lv CKAN API or a downloaded sample, and record them in `docs/data-sources.md` first.
 3. **Check results are never changed after they are stored.** `check_result` rows are never updated; re-checking creates a new run.
 4. **Risk levels come only from `config/rules.yaml`.** No risk logic hard-coded elsewhere, and no AI/LLM decides risk.
-5. **No personal data.** Never store or display names of owners or board members. Ownership is limited to owner type and is DPO-gated.
+5. **Open-data fields only, no personal data** (policy in `docs/decisions.md`):
+   - modules use only fields published as open data;
+   - ownership = owner **type** only;
+   - sanctions = **legal entities by reg. no.** only;
+   - **no names of natural persons are stored** (nor personal codes or birth dates), including owners and board members.
 6. **Work phase by phase** following PLAN.md §9. Before starting each phase, propose a short plan and wait for approval.
 7. **Import from the raw resource files** (CSV, XML, SHP, service responses), **never from CKAN DataStore tables** (`datastore_search`). DataStore copies retype columns (leading zeros lost) and can be truncated. DataStore queries are fine for discovery only.
 8. **Designations and codes are always text:** kadastra numuri and apzīmējumi, VARIS codes, reg. numbers, ATVK codes, project numbers. Never parse them as numbers in pandas, SQL or Excel; read them with an explicit string dtype.
