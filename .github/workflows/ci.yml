@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Install pre-commit
+        run: pip install -c constraints.txt pre-commit
+      - name: Run pre-commit
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  test:
+    # Same path as on Windows (docs/runbook.md): build the stack, run pytest in
+    # the tests container. Includes the CRS tests (grid, PROJ >= 9.8, SRID
+    # 10306, Odukalns within 1 cm, and the no-grid negative checks).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and start db, migrate, api
+        run: docker compose up -d --build --wait
+      - name: Run tests
+        run: docker compose --profile test run --rm tests
+      - name: Service logs
+        if: failure()
+        run: docker compose --profile test logs --no-color
+      - name: Stop
+        if: always()
+        run: docker compose --profile test down -v
