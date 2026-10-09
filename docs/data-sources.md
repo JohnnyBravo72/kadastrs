@@ -137,8 +137,23 @@ Per-municipality counts for all 42 municipalities are in `etl/discovery/out/pilo
 - **CSV vs SHP count gap, explained:**
   - The CSV has 610,914 rows (`STATUSS`: `EKS` 550,685, `DEL` 32,453, `ERR` 27,776); the SHP has 550,686 points (all `EKS` plus 1 `DEL`). Every SHP code is in the CSV.
   - The 60,228 CSV rows missing from the SHP are **all `DEL` (32,452) or `ERR` (27,776)**, and **none has coordinates** (`KOORD_X` empty). 32,787 of them have `DAT_BEIG` set.
-  - The status names are read as deleted / erroneous; that reading was not confirmed against the VZD specification.
-  - **Phase 2:** import all rows for history, but resolve inputs only against `STATUSS = EKS`. A `DEL`/`ERR` match is reported as "adrese nav spēkā".
+- **Meaning of `STATUSS` (confirmed):** **EKS – eksistējošs; DEL – likvidēts; ERR – kļūdains.**
+  - Sources: the VZD VARIS CSV specification, *"Valsts adrešu reģistra informācijas sistēmas datu publicēšanas atvērto datu veidā teksta datu specifikācija"*, version 7.1 (2026), §2.2 (linked from [vzd.gov.lv/lv/VAR-atversana](https://www.vzd.gov.lv/lv/VAR-atversana) as `varis_csv_specifikacija_v7.1.pdf`), and the CSVW metadata resource `aw_eka_metadata.json` on data.gov.lv.
+  - `DAT_BEIG` = "Adresācijas objekta likvidācijas datums".
+  - `aw_eka_metadata.json` declares `"encoding": "ISO-8859-1"`, but the file is UTF-8 with BOM. **Trust the file, not the metadata.**
+- **Successor link: partial, through the history file.**
+  - `aw_eka_his.csv` (192.3 MB, 1,319,326 rows; columns `KODS, KODS_HIS, TIPS_CD, DAT_SAK, DAT_MOD, DAT_BEIG, STD, NOSAUKUMS, VKUR_CD, VKUR_TIPS`).
+  - Spec §2.2.13: `KODS_HIS` = "Adresācijas objekta vēsturiskais kods (gadījumos, kad viena adrese bija lietota vairākiem objektiem)", and "KODS_HIS norāda par faktu, ka adrese vēsturiski bija saistīta ar citu adresi".
+  - **The spec defines no successor field and no direction.** In the data:
+    - 11,705 distinct `KODS`→`KODS_HIS` pairs (EKS→EKS 10,095; EKS→DEL 1,024; DEL→EKS 469; DEL→DEL 47; EKS→ERR 42; ERR→EKS 27; ERR→DEL 1);
+    - only **990 of 32,453 `DEL` addresses (3.1%)** are linked to an `EKS` address in either direction, 198 of them to several. Example: `DEL` 101030967 "Rīgas iela 91, Valmiera" ↔ `EKS` "Čempionu iela 2" and "Čempionu iela 4".
+  - The cadastre text data carries only current address codes, so it gives no further `DEL` → object link.
+- **Earlier texts of existing addresses:** `aw_eka_his.csv` has 1,182,452 rows with earlier full texts (`STD`) of `EKS` addresses (renamed streets, municipality reforms, e.g. "… Valmieras raj." → "… Rūjienas nov."). An input in old wording can be matched to the **same, still existing** address.
+- **Matching rule (PLAN §5.1):**
+  - match `EKS` first (current text, then earlier texts of `EKS` codes);
+  - otherwise match a `DEL` address and return it with warning **"vēsturiska adrese"**, plus the linked `EKS` address(es) via `KODS_HIS` in either direction, if any (about 3% of `DEL`);
+  - **`ERR` addresses are never matched.**
+- Re-run: `inspect_samples.py varishis` (`samples.py` downloads `aw_eka_his.csv`).
 
 ### 3.2 Cadastre
 - **Text:** [`kadastra-informacijas-sistemas-atvertie-dati`](https://data.gov.lv/dati/lv/dataset/kadastra-informacijas-sistemas-atvertie-dati), id `be841486-…`. VZD, weekly, CC-BY-4.0, modified 2026-09-28.

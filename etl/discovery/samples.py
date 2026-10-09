@@ -123,6 +123,7 @@ def main(atvk):
     print("VARIS")
     download(VARIS + "a510737a-18ce-400f-ad4b-04fce5228272/download/aw_eka.csv", ROOT / "varis" / "aw_eka.csv")
     download(VARIS + "b643b1b3-223f-4394-9beb-18524f8b0b82/download/aw_shp.zip", ROOT / "varis" / "aw_shp.zip")
+    download(VARIS + "d07443d7-15a8-4db6-9e53-7a68eec3c0dd/download/aw_eka_his.csv", ROOT / "varis" / "aw_eka_his.csv")
     print("DAP nature (national SHP)")
     for key, url in DAP.items():
         download(url, ROOT / "nature" / f"{key}.zip")

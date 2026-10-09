@@ -7,6 +7,7 @@ Run with the project venv (pyshp, shapely):
     .venv/Scripts/python -I etl/discovery/inspect_samples.py flood     # E7 GeoJSON
     .venv/Scripts/python -I etl/discovery/inspect_samples.py bisrule   # BIS building-designation prefix rule
     .venv/Scripts/python -I etl/discovery/inspect_samples.py gaps      # VARIS CSV/SHP and building text/map count gaps
+    .venv/Scripts/python -I etl/discovery/inspect_samples.py varishis  # VARIS DEL/ERR -> EKS links via aw_eka_his.KODS_HIS
 Results are written to etl/discovery/out/inspect_<part>.json.
 """
 
@@ -341,6 +342,30 @@ def part_gaps():
                         "text_without_geometry": sum(1 for c in text if c not in mapped),
                         "text_without_geometry_by_kind": dict(collections.Counter(k for c, k in text.items() if c not in mapped)),
                         "notexist_with_geometry": sum(1 for c, k in text.items() if k == "NotExist" and c in mapped)}
+    print(json.dumps(res, ensure_ascii=False, indent=1))
+    return res
+
+
+def part_varishis():
+    """VARIS DEL/ERR addresses: does aw_eka_his (KODS_HIS) link them to existing (EKS) addresses?"""
+    status = {r["KODS"]: r["STATUSS"] for r in
+              csv.DictReader(io.StringIO((ROOT / "varis" / "aw_eka.csv").read_text(encoding="utf-8-sig")))}
+    his = list(csv.DictReader(io.StringIO((ROOT / "varis" / "aw_eka_his.csv").read_text(encoding="utf-8-sig"))))
+    pairs = {(h["KODS"], h["KODS_HIS"]) for h in his if h["KODS_HIS"]}
+    linked = collections.defaultdict(set)   # DEL code -> EKS codes, either direction
+    for a, b in pairs:
+        if status.get(a) == "EKS" and status.get(b) == "DEL":
+            linked[b].add(a)
+        if status.get(a) == "DEL" and status.get(b) == "EKS":
+            linked[a].add(b)
+    dels = [k for k, s in status.items() if s == "DEL"]
+    res = {"history_rows": len(his), "rows_with_KODS_HIS": sum(1 for h in his if h["KODS_HIS"]),
+           "distinct_pairs": len(pairs),
+           "pair_status": {f"{x}->{y}": n for (x, y), n in collections.Counter(
+               (status.get(a, "?"), status.get(b, "?")) for a, b in pairs).most_common()},
+           "del_total": len(dels), "del_linked_to_eks": len(linked),
+           "del_linked_to_several_eks": sum(1 for v in linked.values() if len(v) > 1),
+           "history_rows_of_eks_codes": sum(1 for h in his if status.get(h["KODS"]) == "EKS" and not h["KODS_HIS"])}
     print(json.dumps(res, ensure_ascii=False, indent=1))
     return res
 

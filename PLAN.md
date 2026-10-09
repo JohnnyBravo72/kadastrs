@@ -163,11 +163,16 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 | Registration number (11 digits) entered in the **applicant** field or column | UR reg. no. (never guessed from the main field) | applicant |
 | Text | Address: trigram + prefix match against VARIS | address → linked parcel(s) / building(s) |
 
+**Address status (VARIS `STATUSS`: EKS eksistējošs, DEL likvidēts, ERR kļūdains; `docs/data-sources.md` §3.1):**
+1. Match `EKS` addresses first, on the current text and then on earlier texts of the same code from `aw_eka_his` (renamed streets, reforms). Matching an earlier text returns the current address with warning "vēsturiska adrese".
+2. Only if no `EKS` address matches: match a `DEL` address and return it with warning **"vēsturiska adrese"**, plus the current `EKS` address(es) if VARIS links one through `aw_eka_his.KODS_HIS` (either direction; about 3% of `DEL` addresses; several = split, list all). With no link, the result says "pašreizējā adrese nav zināma" and the object is not resolved automatically.
+3. **`ERR` addresses are never matched.**
+
 **Excel leading zeros:** a value that is 1 digit short of 11, 14 or 17 gets a `0` added at the front and the flag "leading zero restored". The fix also handles scientific notation and a trailing `.0`.
 
 ### 5.2 Endpoints
 - `GET /api/suggest?q=&kind=cadastre|address`: ranked suggestions with type labels
-- `GET /api/property/{number}/units`: linked parcels, buildings and parcel parts
+- `GET /api/property/{number}/units?include_non_existing=false`: linked parcels, buildings and parcel parts (non-existing buildings only on request, §6.3)
 - `GET /api/address/{varis_code}/objects`: cadastre objects for an address
 - `POST /api/resolve`: raw values in; per row: type, match status, suggestions, corrections
 - `GET /api/sources`: the source registry
@@ -225,12 +230,14 @@ check(subject, dataset_version) -> {
 - Intersections use the parcel geometry **buffered inward by 0.5 m** to avoid boundary slivers. A finding also needs an overlap of **≥ 1 m² or ≥ 0.1% of the parcel**. Both thresholds live in config and are listed in the report.
 - Every overlap reports its area in m² and its % of the parcel.
 - A property with several units: results are per unit, plus an aggregate (worst risk wins).
-- **Objects without geometry:** an object found in the register but without geometry (e.g. pre-registered buildings, point and linear engineering structures; ~9% of buildings in the Jelgava sample, `docs/data-sources.md` §3.2):
-  - gets the warning **`no_geometry`**;
-  - every spatial module (3, 4, 8 and spatial matches in 5) returns status **`no_data`** with reason **"nav ģeometrijas"**, and risk `unknown`;
-  - is **never** `clear`.
-  
+- **Objects without geometry:** some objects are in the register but have no geometry (e.g. pre-registered buildings, point and linear engineering structures; ~9% of buildings in the Jelgava sample, `docs/data-sources.md` §3.2). They always get the warning **`no_geometry`** and are **never** `clear` because of a missing geometry. Spatial modules (3, 4, 8 and the spatial matches in 5) then work as follows:
+  1. **Building without geometry, parcel with geometry:** run on the geometry of the parcel(s) the cadastre links the building to (`building.xml`), with warning **"pārbaudīts pēc zemes vienības"**. Results are labelled as parcel-level.
+  2. **Neither the building nor its parcel(s) has geometry** (or the object is a parcel without geometry): status **`no_data`** with reason **"nav ģeometrijas"**, risk `unknown`.
+
   Non-spatial modules (1, 2, 6, 7) still run on register data. A property whose units partly lack geometry is checked on the units that have it; the aggregate carries the warning.
+- **Buildings marked non-existing** (`NotExist` "Būve apvidū nav konstatēta"; 272 in Jelgava, 264 of them still drawn on the map):
+  - stay resolvable when entered directly, with warning **"reģistrā atzīmēta kā neeksistējoša"**;
+  - are **excluded from "buildings on parcel" lists** (module 1, `/api/property/{number}/units`, the entry-dialog unit checklist) unless the user asks for them (`include_non_existing=true`).
 
 ### 6.4 Risk rules
 - Risk levels come only from `risk_rule` entries, e.g.:
