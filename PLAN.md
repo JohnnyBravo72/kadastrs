@@ -1,0 +1,388 @@
+# Kadastra pārbaude: Build Plan
+
+**Goal:** a tool for CFLA project evaluators. They give it a list of objects: **kadastra numuri**, **kadastra apzīmējumi** or **addresses**, optionally grouped by **project number** and linked to the **applicant's registration number**. The tool checks each object against open data and produces:
+1. an **Excel report** with one row per object: findings, risk level, source, data date and evidence link (MVP), and
+2. an **interactive map and dashboard** with layers (Plūdi, Zonējums, Daba, Kadastrs) and a results list (after the MVP).
+
+**Data policy:** all data comes from **data.gov.lv** (section 2).
+
+**Status:** dataset names come from desk research and the colleagues' Miro doc "data.gov.lv saites…". **Nothing is verified yet.** Phase 0 confirms every URL, field and licence before code depends on it.
+
+**Change log**
+- 2026-10-09: rewritten after a critical review.
+  - Check engine and Excel report now come before the map.
+  - Added a subject model (object / applicant / municipality).
+  - Added explicit risk rules, unchangeable result snapshots and an operating-context section.
+  - Removed contradictions between sections.
+
+---
+
+## 1. Operating context (decide before Phase 1)
+
+| Question | Proposed default | Who decides |
+|---|---|---|
+| Users | CFLA project evaluators (start with a pilot group of ~5) | Janis + team leads |
+| Hosting | CFLA internal server or CFLA cloud tenant; not a personal account | CFLA IT |
+| Sign-in | CFLA SSO (Entra ID) if available; otherwise the tool runs on the internal network only | CFLA IT / security |
+| Security review | Before the pilot: dependencies, network exposure, logging | IT security |
+| Data protection | DPIA-light note; DPO review before any personal or ownership data (section 6, module 7) | DPO |
+| Storage of uploads | Uploaded files are not stored. Only the cleaned list and the results are kept | DPO |
+| Retention | Reports and result snapshots kept for the evaluation's retention period (confirm the period) | DPO / records management |
+| Maintenance | Named owner and a backup person; `docs/runbook.md` covers refreshing data and fixing a failed import | Janis |
+| Legal status of output | "Informational, based on open data as of <date>; not an official registry extract" on every report | Legal / team leads |
+
+---
+
+## 2. Data policy and sources
+
+### 2.1 Rule
+- **Rule:** every dataset the platform uses must be listed on **data.gov.lv**. Nothing comes from scraping, commercial services (Lursoft) or login-protected portals.
+- **Hosting assumption to confirm:** a resource listed on a data.gov.lv dataset but hosted on the agency's own server (file, WFS, ArcGIS service) counts as data.gov.lv data.
+- **If a dataset is missing:** the module is not built. It shows as *unavailable* in the source registry. The other option is a **named exception** that the project owner approves in writing; it is recorded in `docs/decisions.md`.
+- **Basemap:** background tiles are not datasets. **Decision needed:** OSM tiles (as in the prototype, attribution required) or a plain background drawn only from imported parcels and buildings.
+
+### 2.2 How data gets in
+- **Find:** datasets are found through the data.gov.lv CKAN API (`package_search`, `package_show`).
+- **Import, never call live:** resources are downloaded and imported into PostGIS on a schedule. The app never calls agency services at request time.
+- **Track every import:** `import_log` records the dataset id, resource id, licence, last-modified date, row counts and a file checksum. Each import becomes a **dataset version**.
+- **Schema check on every import:** expected columns, types and CRS. If a source changes, the import stops and alerts; the last good version stays live.
+- **Freshness:** each source has a `max_age`, e.g. 1 day for UR and VID, 1 month for the cadastre. A report built on older data gets a warning.
+
+### 2.3 Availability (single source of truth; Phase 0 fills the last column)
+
+| Source | Owner | data.gov.lv status | Notes | Verified |
+|---|---|---|---|---|
+| Address Register (VARIS) | VZD | Yes: `valsts-adresu-registra-informacijas-sistemas-atvertie-dati` | CSV + spatial | ☐ |
+| Cadastre (parcels, buildings, parts, property numbers) | VZD | Yes: `kadastra-informacijas-sistemas-atvertie-dati` | Shapefile + text data | ☐ |
+| Administrative boundaries | VZD | Yes | | ☐ |
+| ATIS (apgrūtinātās teritorijas) | VZD | **Unclear.** The Miro doc lists an ATIS *classifier*; whether restriction geometries are open is not known. A 2025 government document discusses limiting some ATIS data to identified users | If geometries are not open, module 6 drops to "unavailable" | ☐ |
+| Flood maps | LVĢMC | Per Miro doc: `pldu-riska-karu-atvrtie-dati-un-servisi5` | Layer "3. cikla pavasara plūdu kartes, reizi 10 gados". Covers designated risk areas only | ☐ |
+| Protected areas, microreserves, nature monuments, habitats | DAP | Per Miro doc: `ipasi-aizsargajamas-dabas-teritorijas`, mikroliegumi, dabas pieminekļi, biotopi | Check whether buffer zones and habitat detail are included | ☐ |
+| Zoning (TAPIS) | VARAM | Per Miro doc: data + WMS | Only ~55% of parcels have plan vector data (2024). Zone types differ by municipality and must be mapped to a common legend | ☐ |
+| Construction cases (BIS) | BVKB | Per Miro doc; known dataset "Būvniecības lietas (jaunbūves) ģeotelpiskie dati" | Check which case types are covered (new builds only?) and whether cases carry cadastre designations | ☐ |
+| Companies (UR) | UR | Yes: dataset `uz`, daily | Check whether NACE codes and an **address code** (not just text) are included | ☐ |
+| VID taxpayer rating, tax debts | VID | Per Miro doc | Check update frequency and the debt threshold | ☐ |
+| De minimis aid | FM | Per Miro doc | Check the identifier (reg. no.) and the time window | ☐ |
+| EU co-financed projects | CFLA / FM | Per Miro doc | Check whether project location or cadastre is included (needed for double-funding checks) | ☐ |
+| Procurement (EIS / IUB) | IUB / VRAA | Per Miro doc | | ☐ |
+| Cultural heritage | NKMP | Unknown | Only if on data.gov.lv | ☐ |
+| Municipal liabilities | FM | Unknown | Only if on data.gov.lv | ☐ |
+| Ownership (īpašumtiesības) | VZD / Tiesu adm. | Unknown what is open | Land book is excluded. Check whether the cadastre open data has only an owner *type* (state / municipality / legal / natural person). DPO review required (module 7) | ☐ |
+| Sanctions lists | EU / UN / FID | **Almost certainly not on data.gov.lv** | Cannot be built under the policy without a named exception | ☐ |
+
+### 2.4 Phase 0 checklist
+1. **Inventory:** for every row above, open the data.gov.lv dataset and record resources, formats, CRS, key fields, update frequency and licence.
+2. **Samples:** download one sample per source and inspect it in QGIS: ID fields, geometry validity, encoding.
+3. **Join keys:** answer the questions that decide feasibility:
+   - Do BIS cases carry cadastre designations?
+   - Does UR have an address code?
+   - Do EU projects have location data?
+   - What does the cadastre say about ownership?
+4. **Baseline:** time the current manual check for 5 objects with 2 colleagues. This is the number the tool must beat.
+5. **Test set:** collect **14–20 real projects** with the colleagues' manual answers and the date of each check. Seed examples: Daugavpils Tautas iela 11 / `05000041006`, `13000102702`, `09000360220`, UR `90000077325`.
+6. **Write up:** record findings in `docs/data-sources.md`; update the "Verified" column and section 6.
+7. **CSBLatvia repo:** read `CSBLatvia/postgresql-open-data-lv` as a structural reference. It has **no licence**, so do not copy its code unless the authors grant one.
+
+---
+
+## 3. Architecture
+
+```
+data.gov.lv ──(scheduled ETL + schema check)──► PostgreSQL/PostGIS (versioned datasets)
+                                                     │
+                                         Check engine (Python, rules)
+                                                     │
+                              ┌──────────────────────┼──────────────────────┐
+                        Batch runner            FastAPI API            Report builder
+                     (list → results)     (resolve, results, layers)   (Excel; PDF later)
+                                                     │
+                                         Web UI (React + Leaflet)
+```
+
+The **check engine is the core**. The UI and the reports only display its stored results, so the Excel report, the dashboard and the PDF always agree.
+
+**Stack**
+- **DB:** PostgreSQL 16 + PostGIS, `pg_trgm`, `unaccent`.
+- **ETL and engine:** Python (geopandas / ogr2ogr / psycopg), CLI commands, cron or a simple scheduler.
+- **API:** FastAPI + Pydantic.
+- **Reports:** `openpyxl` for Excel. PDF later via Playwright on the server, which also captures the map.
+- **Frontend:** Vite + React + TypeScript + Leaflet.
+  - Pilot: layers served as GeoJSON per bounding box from the API.
+  - Whole country: vector tiles via Martin, with a switch to MapLibre if Leaflet struggles with them (decide in Phase 9).
+- **Dev:** Docker Compose (db, api, web).
+
+**CRS (decided):** store and analyse in **LKS-92 / EPSG:3059**, because areas and overlaps are in metres. Serve GeoJSON in EPSG:4326.
+
+---
+
+## 4. Data model
+
+**Reference data** (one table set per dataset, each row tagged with `dataset_version_id`)
+- `address`: varis_code, full_text, normalized_text, hierarchy, geom
+- `parcel`, `building`, `parcel_part`: designation, property_number, area, land_use, geom
+- `property`: property_number, type
+- `restriction_zone` (ATIS), `flood_zone`, `nature_area` (kind: protected area / microreserve / buffer zone / nature monument / habitat), `zoning_zone`, `bis_case`, `company`, and so on
+- `admin_area`
+- `dataset_version`: source_id, datagov ids, last_modified, imported_at, checksum, row_count, status
+
+**Work data**
+- `project`: project_no (free text), applicant_reg_no (optional), name
+- `subject`: kind (object | applicant | municipality), identifier, resolved ids, project_id. An object subject points to a property, parcel or building; an applicant subject points to a reg. no.
+- `run`: who, when, selected sources, rule set version, dataset versions used
+- `check_result`: run_id, subject_id, module, module_version, status, risk, rule_ids, items (jsonb), match_type, warnings, dataset_version_id, computed_at. **Never updated:** re-checking creates a new run.
+- `risk_rule`: id, module, condition, level, text, version
+- `source` (registry, also in `sources.yaml`): id, names, owner, group, order, type (layer / check), subject kinds, default_selected, coverage, max_age, datagov ids, licence
+
+**Indexes:** GIST on geometries, GIN trigram on `normalized_text`, btree on codes.
+
+---
+
+## 5. Input resolution
+
+### 5.1 Classification
+Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, expand abbreviations.
+
+| Input | Rule | Resolves to |
+|---|---|---|
+| 11 digits | Property number **or** parcel designation; the same value is often both. Look up both tables and show both matches when ambiguous | property / parcel |
+| 14 digits | Building designation | building |
+| 17 digits | Room-group designation (out of scope for checks; resolve to the building) | building |
+| Registration number (11 digits) entered in the **applicant** field or column | UR reg. no. (never guessed from the main field) | applicant |
+| Text | Address: trigram + prefix match against VARIS | address → linked parcel(s) / building(s) |
+
+**Excel leading zeros:** a value that is 1 digit short of 11, 14 or 17 gets a `0` added at the front and the flag "leading zero restored". The fix also handles scientific notation and a trailing `.0`.
+
+### 5.2 Endpoints
+- `GET /api/suggest?q=&kind=cadastre|address`: ranked suggestions with type labels
+- `GET /api/property/{number}/units`: linked parcels, buildings and parcel parts
+- `GET /api/address/{varis_code}/objects`: cadastre objects for an address
+- `POST /api/resolve`: raw values in; per row: type, match status, suggestions, corrections
+- `GET /api/sources`: the source registry
+
+---
+
+## 6. Check engine
+
+### 6.1 Modules
+
+| # | Module | Subject | Source | Phase | Notes |
+|---|---|---|---|---|---|
+| 1 | Cadastre facts | object | Cadastre | 4 | Units, areas, land use, buildings |
+| 2 | Address consistency ("Neatbilst") | object + given address | VARIS + Cadastre | 4 | Flags when the given address is not linked to the given designation |
+| 3 | Protected nature (OZOLS scheme) | object | DAP datasets | 4 | Separate lines: protected area, microreserve, buffer zone, nature monument, habitat |
+| 4 | Flood (10-year) | object | LVĢMC | 4 | Intersect yes/no, share of area; outside coverage = `not_covered` |
+| 5 | Construction cases (BIS) | object | BIS | 4 | Match type: exact parcel / same property / building on parcel / nearby. The colleagues' example: 13 cases, only 3 exact |
+| 6 | Restrictions (ATIS) | object | ATIS | 4, if open | Depends on Phase 0 |
+| 7 | Ownership status | object | Cadastre (owner type only) | 8, **DPO-gated** | Never names of natural persons |
+| 8 | Zoning | object | TAPIS | 6 | Common legend mapping; partial coverage |
+| 9 | Applicant registry | applicant | UR | 8 | Status, form, legal address, dates |
+| 10 | Applicant tax (VID rating, tax debt) | applicant | VID | 8 | Freshness ≤ 1 day |
+| 11 | De minimis | applicant | FM | 8 | Aid in the relevant period |
+| 12 | EU double funding | object + applicant | EU projects | 8 | Other EU-funded projects on the same object or for the same applicant |
+| 13 | Procurement | applicant | IUB / EIS | 8 | |
+| 14 | Companies at address | object | UR | 8 | Legal address only, labelled "not proof of activity" |
+| 15 | Cultural heritage | object | NKMP | if on data.gov.lv | |
+| 16 | Municipal liabilities | municipality | FM | if on data.gov.lv | |
+| — | Sanctions | applicant | — | **not built** | Not on data.gov.lv; needs a named exception |
+
+### 6.2 Module contract
+```
+check(subject, dataset_version) -> {
+  module, module_version, subject: {kind, id},
+  status: found | clear | not_covered | no_data | source_unavailable | error,
+  risk: high | medium | low | none | unknown,
+  rule_ids: [...],                 # risk rules that fired
+  items: [...], match_type,
+  warnings: [...],                 # e.g. stale data, partial coverage, leading zero restored
+  source: {id, name, dataset_date, dataset_version_id, datagov_url},
+  computed_at,
+  display: {kind: kv|table|badges|text, columns: [...]}
+}
+```
+
+**Status meanings:**
+- `found`: the source covers the object and has relevant records.
+- `clear`: the source covers the object and nothing relevant was found.
+- `not_covered`: the source does not cover this area, e.g. outside the flood risk areas or with no zoning vectors. This is never reported as "clear".
+- `no_data`: the object itself was not found in the dataset.
+- `source_unavailable` / `error`: the import is missing or the check failed.
+
+### 6.3 Spatial rules
+- Intersections use the parcel geometry **buffered inward by 0.5 m** to avoid boundary slivers. A finding also needs an overlap of **≥ 1 m² or ≥ 0.1% of the parcel**. Both thresholds live in config and are listed in the report.
+- Every overlap reports its area in m² and its % of the parcel.
+- A property with several units: results are per unit, plus an aggregate (worst risk wins).
+
+### 6.4 Risk rules
+- Risk levels come only from `risk_rule` entries, e.g.:
+  - "microreserve overlap > threshold → high"
+  - "BIS case on the exact parcel → medium"
+  - "outside flood coverage → unknown"
+- Rules are versioned and kept in `rules.yaml`, reviewed with the team leads, and the rule-set version is printed on every report.
+- **No AI or LLM decides risk.** An LLM may later write a plain-language summary of stored results, clearly labelled.
+
+### 6.5 Snapshots and evidence
+- Each run stores its results and the dataset versions used. Old reports can be reproduced and are never silently changed by a data refresh.
+- Re-running creates a new run. The UI shows "results from <date>; newer data available" when relevant.
+
+---
+
+## 7. Outputs
+
+### 7.1 Excel report (MVP)
+- **Sheet "Kopsavilkums":** one row per object with:
+  - project no., input value, resolved designation, address
+  - one column per module with a status icon and risk
+  - overall risk
+  - warnings
+- **Sheet "Detaļas":** one row per finding: object, module, item, overlap, match type, risk rule, source, dataset date, data.gov.lv link.
+- **Sheet "Avoti":** each source with dataset version, date, freshness status and coverage note, plus the rule-set version and thresholds.
+- **Sheet "Neatrasts":** inputs that could not be resolved, with a reason.
+- Footer text: "Informatīvs pārskats, balstīts uz atvērtajiem datiem uz <datums>; nav oficiāls reģistra izraksts."
+
+### 7.2 PDF evidence report (after the MVP)
+One object per report: map snapshot with active layers and legend (rendered on the server with Playwright), all module results, sources and dates. It replaces the manual screenshots.
+
+---
+
+## 8. User interface (after the MVP)
+
+### 8.1 Entry dialog
+A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New search" reopens it.
+1. **Kadastrs field:**
+   - type-ahead from 3 digits; type badge (property number / parcel / building)
+   - ambiguous 11-digit values show both matches
+   - pasted lists are cleaned automatically
+2. **Related apzīmējumi** (when a property number is picked):
+   - checklist of units with a tri-state "Select all" (all ticked by default)
+   - counter "5 of 12"; filter by type
+   - entering a parcel offers "show all units of this property"
+3. **Address field:** diacritic- and typo-tolerant type-ahead on VARIS (2–3 characters, ~200 ms debounce); resolves to linked objects with the same checkboxes. If the address and kadastrs point to different objects, show a notice and run the "Neatbilst" check.
+4. **Projekta Nr.** and **Applicant reg. no.** (both optional). The applicant field enables modules 9–13.
+5. **Sources checklist:**
+   - built from the registry; all ticked by default; group headers
+   - sources not valid for the given subjects are greyed out (e.g. applicant checks without a reg. no.)
+   - partial-coverage sources carry a note
+6. **Import CSV / Excel:**
+   - template download; columns `vertiba`, optional `projekta_nr`, `pieteicejs_reg_nr`, `adrese`
+   - auto-detects the delimiter (`;`/`,`) and the encoding (UTF-8 / Windows-1257)
+   - preview with detected type, match status, corrections and duplicates
+   - error list download; limit 1,000 rows for the MVP
+   - files are parsed in the browser and not stored
+7. **Footer:** "N objects, M sources" + **Meklēt**.
+
+### 8.2 Main screen
+1. **Header:** *Atlase / Avoti / Žurnāls*. What Avoti and Žurnāls contain is still to be confirmed with the colleagues. Proposal:
+   - **Avoti:** the source registry with dates and coverage
+   - **Žurnāls:** the user's past runs
+2. **Filter bar:**
+   - source chips toggle on and off
+   - **Atjaunot** marks pending changes and creates a new run
+   - a banner shows when filters have changed but not been applied
+3. **Target switcher:**
+   - Project dropdown (incl. "Visi projekti") + searchable object combobox with ◀ ▶ and "3 / 12"; keyboard ← → and `/`
+   - "Objekti" drawer: tree of projects → numuri → apzīmējumi, with status badges
+   - groups can be created, renamed and moved
+4. **Object header:**
+   - the kadastra numurs (large) and address; buttons *Atlase*, *Excel*, *PDF*
+   - several units of one property default to the property view with all units highlighted
+5. **Map:**
+   - zoomed to the object; marker and address chip
+   - combinable layer toggles *Vieta, Plūdi, Zonējums, Daba, Kadastrs* with opacity
+   - legend for the active layers only, with source and date
+   - click to identify a feature; scale bar; attribution
+   - layers come from the layer registry and are hidden when their source is unticked
+6. **Results list:**
+   - status strip (one chip per source; click scrolls to the card and shows its layer)
+   - one card per source in registry order; findings open by default, clean cards collapsed
+   - footer per card: source, dataset date, run date, data.gov.lv link; per-unit breakdown
+   - lazy loading per card with Retry
+   - generic renderer driven by `display`
+7. **Group overview:** all objects of a project on the map + the summary table (same as the Excel "Kopsavilkums"); a row click opens that object.
+
+**Plūdi layer:** shows only the 3rd-cycle spring-flood 10-year scenario. Other scenarios sit behind a config flag; a sea-surge (*Jūras vējuzplūdi*) switch appears only if the data exists for the area. Outside coverage: "Šajā teritorijā plūdu karte nav pieejama".
+
+**Sessions and Žurnāls** are stored on the **server** per user, once sign-in exists. Until then they are local, with JSON export and import. The URL holds `?project=&target=`.
+
+### 8.3 UI acceptance criteria
+- `05000041006` shows the correct badge; its units appear, and Select all works in one click.
+- An ambiguous 11-digit value shows both matches.
+- `riga tautas` and typo variants give suggestions in < 300 ms.
+- An `.xlsx` file with lost leading zeros resolves correctly and reports the fix.
+- Unticking a source and pressing Atjaunot removes its card and layer.
+- A failing source shows an error card while the other cards display normally.
+- Switching between any two objects takes ≤ 2 clicks or ← →; the shared URL restores the view.
+- The legend always matches the active layers; Plūdi shows only the 10-year scenario.
+- Keyboard-only use works; the UI is in Latvian by default, with English switchable.
+
+---
+
+## 9. Roadmap
+
+**MVP = phases 0–5:** a list in, an Excel report out, for one pilot municipality, covering modules 1–6.
+
+| Phase | Deliverable | Done when |
+|---|---|---|
+| 0. Discovery | `docs/data-sources.md`, completed availability table, manual-time baseline, 14–20 test projects, operating-context answers (section 1) | Every MVP source verified or explicitly dropped |
+| 1. Foundation | Repo, Docker Compose, PostGIS, CI, `CLAUDE.md`, `sources.yaml`, `rules.yaml` skeleton | `docker compose up` gives an empty DB + API health check |
+| 2. ETL | Pilot municipality: VARIS, cadastre, admin boundaries, flood, nature, ATIS (if open), BIS; dataset versions; schema checks | Row counts match the sources; re-runs are idempotent; a changed schema fails loudly |
+| 3. Resolution | `/suggest`, `/resolve`, property units; leading-zero repair | Test-set inputs resolve correctly, including ambiguous ones |
+| 4. Check engine v1 | Modules 1–6, spatial rules, risk rules v1, stored runs and results | The test set's findings match the colleagues' manual answers, with differences explained by data dates |
+| 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report | **Pilot with 2–3 colleagues; measured time per object vs the baseline** |
+| 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list | UI criteria pass for the pilot municipality |
+| 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in) | UI criteria pass |
+| 8. Applicant & funding | Modules 9–14; module 7 only after DPO approval | Each module verified on the test set |
+| 9. Whole country + performance | Full import, vector tiles, MapLibre decision | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
+| 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, deployment behind CFLA sign-in | A refresh runs unattended; a failed import alerts the owner |
+
+**Pilot municipality:** one with flood-map coverage and several of the test projects. Choose it in Phase 0 from the test set.
+
+---
+
+## 10. Risks and open decisions
+
+**Risks**
+- **ATIS may not be open.** It is a key evaluator need. If it is restricted, ask VZD about access for CFLA as a named exception.
+- **Missing join keys:** if BIS, UR or EU-project data has no cadastre or address codes, the matching is fuzzy and may be wrong. Show the match type and confidence; never present a fuzzy match as exact.
+- **Over-trust:** evaluators may read "clear" as "no risk". The status wording (`clear` vs `not_covered` vs `no_data`) and the report footer must make the limits visible.
+- **Freshness:** open data lags the live registries, especially for tax and company status. The stale-data warnings and the report date are mandatory.
+- **Personal data:** names of owners or board members are never stored. Ownership is limited to the owner type and gated by the DPO.
+- **Licences:** confirm reuse and attribution terms for each dataset and the basemap.
+- **Bus factor:** one developer. The runbook, the tests and `CLAUDE.md` are deliverables, not extras.
+- **Data volume:** whole-country parcels and buildings are large. The pilot municipality comes first; tiles and indexes come before scaling.
+
+**Open decisions**
+
+| # | Decision | Needed by |
+|---|---|---|
+| D1 | Agency-hosted resources listed on data.gov.lv count as data.gov.lv? | Phase 0 |
+| D2 | Basemap: OSM or plain | Phase 6 |
+| D3 | Hosting, sign-in, security review (section 1) | Phase 1 |
+| D4 | Risk rules v1, agreed with the team leads | Phase 4 |
+| D5 | Ownership module: build or not (DPO) | Phase 8 |
+| D6 | Sanctions: named exception or out of scope | Phase 8 |
+| D7 | Contents of Avoti and Žurnāls | Phase 6 |
+| D8 | Project number format (free text for now) | Phase 7 |
+
+---
+
+## 11. Working with Claude Code in VS Code
+
+1. **Set up the repo:** add this file and a `CLAUDE.md` covering:
+   - stack, folder layout, run and test commands
+   - CRS = EPSG:3059
+   - "verify data endpoints before coding against them"
+   - "results are unchangeable; never compute risk outside `rules.yaml`"
+2. **Work phase by phase:** ask Claude Code for a short plan per phase, implement with tests, and commit per phase.
+3. **Repo layout:**
+```
+/docs        data-sources.md, decisions.md, runbook.md
+/etl         download, schema checks, import
+/engine      check modules, spatial rules, risk rules, batch runner
+/reports     Excel (later PDF) builders
+/api         FastAPI app + tests
+/web         Vite React TS app
+/config      sources.yaml, rules.yaml, layers.yaml
+/infra       docker-compose.yml, SQL migrations
+/tests/data  the 14–20 test projects with expected results
+```
+4. **First prompt:** *"Read PLAN.md. Execute Phase 0 steps 1–3: for every row in section 2.3, find the data.gov.lv dataset via the CKAN API, list its resources, formats, CRS, key fields, update frequency and licence, and answer the join-key questions. Write docs/data-sources.md. Do not write application code yet."*

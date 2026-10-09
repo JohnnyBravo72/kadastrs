@@ -1,0 +1,25 @@
+# Source registry (PLAN.md §4, table `source`).
+# Add an entry only after the dataset is verified in docs/data-sources.md.
+# Never guess dataset ids or resource ids.
+
+sources: []
+
+# Example entry (placeholder values, not verified):
+#
+# sources:
+#   - id: flood_10y                      # internal id
+#     names:
+#       lv: "Plūdi (10 gadu)"
+#       en: "Flood (10-year)"
+#     owner: LVĢMC
+#     group: Plūdi                       # group header in the sources checklist
+#     order: 40                          # display order within the registry
+#     type: check                        # layer | check
+#     subject_kinds: [object]            # object | applicant | municipality
+#     default_selected: true
+#     coverage: "Designated flood risk areas only"
+#     max_age: P1M                       # ISO 8601 duration
+#     datagov:
+#       dataset_id: "<CKAN package name>"
+#       resource_ids: ["<CKAN resource id>"]
+#     licence: "<licence from CKAN package_show>"
