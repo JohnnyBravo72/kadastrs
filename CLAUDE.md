@@ -30,7 +30,15 @@ Output: an Excel report per object (MVP), later an interactive map and dashboard
 ```
 
 ## Run and test
-Not set up yet. Added in Phase 1 (`docker compose up` → empty DB + API health check).
+Full details in [docs/runbook.md](docs/runbook.md). From the repo root (PowerShell):
+- **Start:** `docker compose up -d --build --wait`, then check `http://127.0.0.1:8000/health`.
+- **Stop:** `docker compose --profile test down`. **Reset the DB:** add `-v`.
+- **Tests:** `docker compose --profile test run --rm tests`. Tests run in a container because Smart App Control blocks psycopg's DLL on the host; CI does the same.
+- **Lint:** `pre-commit run --all-files`.
+- **Load the source registry:** `docker compose exec api python -m etl.sources load`.
+- **Migrations:** plain SQL in `infra/migrations` (dbmate), applied by the `migrate` service on start.
+- **LKS-92 → LKS-2020 in imports:** use the SQL function `lks92_to_lks2020(geom)`, not a bare `ST_Transform`. The function forces the EPSG:10838 grid and errors if the grid is missing, while `ST_Transform` silently falls back about 9.5 cm off.
+- **One Python minor** (`.python-version`, 3.14) for the host venv, the api image and CI.
 
 ## Rules
 1. **All data comes only from data.gov.lv** (PLAN.md §2.1). No scraping, no commercial services (e.g. Lursoft), no login-protected portals. Under D1, an official agency resource referenced from a data.gov.lv dataset page is allowed only if it is listed by name in `docs/decisions.md` (D1) **and** in `config/sources.yaml` (`allowed_external_resources`, `status: allowed`). We work **only on open data and need no external permissions or approvals**. A missing or non-open dataset means the module is not built and shows as *unavailable*.

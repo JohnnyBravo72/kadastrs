@@ -89,3 +89,10 @@ Sources:
   - **without** the grid, PROJ silently uses "LKS-92 to WGS 84 (1) + inverse LKS-2020 to WGS 84 (1)" and is off by **9.5 cm**;
   - **with** `lv_lgia_lks92to2020.tif`, it is off by **0.13 cm**.
   - Grid SHA-256: `6be363d4796bb3038e751da00e2344593edbb149ed193fc31b9c200688b31498` (20,235 bytes); pin it in the Dockerfile.
+
+**Confirmed in Phase 1 (2026-10-09, in the running `kadastrs-db` container, `postgis/postgis:18-3.6` digest `sha256:60f6ad1d…`):**
+- `postgis_full_version()`: PostGIS 3.6.4, **PROJ 9.8.1** at run time, EPSG db in `/usr/share/proj/proj.db`, `NETWORK_ENABLED=OFF`.
+- `spatial_ref_sys` had **no rows for 10305 and 10306**. Migration `20261009120000_extensions_and_crs.sql` adds them, with auth `EPSG`; PROJ resolves both codes.
+- Odukalns error with the grid: **0.13 cm** on both the geographic path (4661 → 10305) and the projected path (3059 → 10306). Without the grid (`db-nogrid` test service): **9.53 cm**, with no error raised.
+- For imports, use the SQL function `lks92_to_lks2020(geom)` (explicit EPSG:10838 grid pipeline). It raises an error when the grid is missing, instead of silently falling back.
+- Tests: `tests/test_crs.py`, run in CI.
