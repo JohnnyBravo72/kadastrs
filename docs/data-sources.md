@@ -138,7 +138,7 @@ Per-municipality counts for all 42 municipalities are in `etl/discovery/out/pilo
   - The CSV has 610,914 rows (`STATUSS`: `EKS` 550,685, `DEL` 32,453, `ERR` 27,776); the SHP has 550,686 points (all `EKS` plus 1 `DEL`). Every SHP code is in the CSV.
   - The 60,228 CSV rows missing from the SHP are **all `DEL` (32,452) or `ERR` (27,776)**, and **none has coordinates** (`KOORD_X` empty). 32,787 of them have `DAT_BEIG` set.
 - **Meaning of `STATUSS` (confirmed):** **EKS – eksistējošs; DEL – likvidēts; ERR – kļūdains.**
-  - Sources: the VZD VARIS CSV specification, *"Valsts adrešu reģistra informācijas sistēmas datu publicēšanas atvērto datu veidā teksta datu specifikācija"*, version 7.1 (2026), §2.2 (linked from [vzd.gov.lv/lv/VAR-atversana](https://www.vzd.gov.lv/lv/VAR-atversana) as `varis_csv_specifikacija_v7.1.pdf`), and the CSVW metadata resource `aw_eka_metadata.json` on data.gov.lv.
+  - Sources: the VZD VARIS CSV specification, *"Valsts adrešu reģistra informācijas sistēmas datu publicēšanas atvērto datu veidā teksta datu specifikācija"*, version 7.1 (2026), §2.2: <https://www.vzd.gov.lv/lv/media/9209/download?attachment> (`varis_csv_specifikacija_v7.1.pdf`, linked from [vzd.gov.lv/lv/VAR-atversana](https://www.vzd.gov.lv/lv/VAR-atversana); a local copy for reference is kept in `data/specs/`, not committed), and the CSVW metadata resource `aw_eka_metadata.json` on data.gov.lv.
   - `DAT_BEIG` = "Adresācijas objekta likvidācijas datums".
   - `aw_eka_metadata.json` declares `"encoding": "ISO-8859-1"`, but the file is UTF-8 with BOM. **Trust the file, not the metadata.**
 - **Successor link: partial, through the history file.**

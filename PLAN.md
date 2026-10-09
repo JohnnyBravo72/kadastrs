@@ -164,7 +164,7 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 | Text | Address: trigram + prefix match against VARIS | address → linked parcel(s) / building(s) |
 
 **Address status (VARIS `STATUSS`: EKS eksistējošs, DEL likvidēts, ERR kļūdains; `docs/data-sources.md` §3.1):**
-1. Match `EKS` addresses first, on the current text and then on earlier texts of the same code from `aw_eka_his` (renamed streets, reforms). Matching an earlier text returns the current address with warning "vēsturiska adrese".
+1. Match `EKS` addresses first, on the current text and then on earlier texts of the same code from `aw_eka_his` (renamed streets, reforms). If the address matches **only** through an earlier text, the current address is returned with warning **"atrasts pēc agrākā nosaukuma; pašreizējā adrese: <current>"**, where `<current>` is the current full address (`STD`).
 2. Only if no `EKS` address matches: match a `DEL` address and return it with warning **"vēsturiska adrese"**, plus the current `EKS` address(es) if VARIS links one through `aw_eka_his.KODS_HIS` (either direction; about 3% of `DEL` addresses; several = split, list all). With no link, the result says "pašreizējā adrese nav zināma" and the object is not resolved automatically.
 3. **`ERR` addresses are never matched.**
 
