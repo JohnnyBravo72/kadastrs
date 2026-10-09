@@ -15,6 +15,7 @@ csv:
 shp:
   Novadi:
     crs_name: LKS-2020_Latvia_TM_EPSG_10306
+    crs_srid: 10306
     fields:
       - [KODS, "N", 10]
       - [TIPS_CD, "N", 6]
@@ -32,6 +33,7 @@ shp:
       - [STD, "C", 254]
   Pilsetas:
     crs_name: LKS-2020_Latvia_TM_EPSG_10306
+    crs_srid: 10306
     fields:
       - [KODS, "N", 10]
       - [TIPS_CD, "N", 6]
@@ -49,6 +51,7 @@ shp:
       - [STD, "C", 254]
   Pagasti:
     crs_name: LKS-2020_Latvia_TM_EPSG_10306
+    crs_srid: 10306
     fields:
       - [KODS, "N", 10]
       - [TIPS_CD, "N", 6]
@@ -301,3 +304,141 @@ xml:
       - PropertyContentData/ObjectList/ObjectData/ObjectCadastreNrData
       - PropertyContentData/ObjectList/ObjectData/ObjectKindData
       - PropertyContentData/ObjectList/ObjectData/ShareParts
+
+# --- Phase 2b (verified 2026-10-09, docs/data-sources.md §6) ---
+# DAP nature SHP: .prj named LKS_1992_Latvia_TM without AUTHORITY -> EPSG:3059.
+shp_dap:
+  IADT_pamatteritorijas:
+    crs_name: LKS_1992_Latvia_TM
+    crs_srid: 3059
+    fields:
+      - [ID, "N", 10]
+      - [STATUS, "N", 5]
+      - [NAME, "C", 200]
+      - [CATEGORY, "C", 50]
+      - [SITE_CODE, "C", 50]
+      - [NATURA_STA, "N", 5]
+      - [NATURA_REA, "C", 1]
+      - [EC_CODE, "C", 50]
+      - [ESTABLISH_, "D", 8]
+      - [LEGAL_ACT, "C", 50]
+      - [PLAN_STATU, "N", 5]
+      - [IAN_STATUS, "N", 5]
+      - [AREA_DOC, "F", 19]
+      - [GlobalID, "C", 38]
+      - [ATIS_CODE, "C", 10]
+      - [ATIS_veids, "C", 254]
+      - [Shape_Leng, "F", 19]
+      - [Shape_Area, "F", 19]
+  IADT_zonejums:
+    crs_name: LKS_1992_Latvia_TM
+    crs_srid: 3059
+    fields:
+      - [ID, "N", 10]
+      - [STATUS, "N", 5]
+      - [NAME, "C", 200]
+      - [SITE_NAME, "C", 200]
+      - [AREA_DOC, "F", 19]
+      - [DESCRIPTIO, "C", 254]
+      - [GlobalID, "C", 38]
+      - [ATIS_CODE, "C", 10]
+      - [ATIS_veids, "C", 254]
+      - [Shape_Leng, "F", 19]
+      - [Shape_Area, "F", 19]
+  Mikroliegumi:
+    crs_name: LKS_1992_Latvia_TM
+    crs_srid: 3059
+    fields:
+      - [BUFFERZONE, "N", 5]
+      - [FROM_DATE, "D", 8]
+      - [AREA_DOC, "F", 19]
+      - [MRCODE, "N", 10]
+      - [MR_TYPE, "N", 5]
+      - [GlobalID, "C", 38]
+      - [ATIS_CODE, "C", 10]
+      - [ATIS_veids, "C", 254]
+      - [Shape_Leng, "F", 19]
+      - [Shape_Area, "F", 19]
+  MikroliegumuBuferzonas:
+    crs_name: LKS_1992_Latvia_TM
+    crs_srid: 3059
+    fields:
+      - [AREA_DOC, "F", 19]
+      - [MRCODE, "N", 10]
+      - [GlobalID, "C", 38]
+      - [ATIS_CODE, "C", 10]
+      - [ATIS_veids, "C", 254]
+      - [Shape_Leng, "F", 19]
+      - [Shape_Area, "F", 19]
+  IADT_dabas_pieminekli:
+    crs_name: LKS_1992_Latvia_TM
+    crs_srid: 3059
+    fields:
+      - [ID, "N", 10]
+      - [CATEGORY, "C", 50]
+      - [NATURA_STA, "N", 5]
+      - [ESTABLISH_, "D", 8]
+      - [LOCALNAME, "C", 200]
+      - [SPECIES_LV, "C", 100]
+      - [SPECIES_LA, "C", 100]
+      - [CIRCUMF_1_, "F", 19]
+      - [HEIGHT, "F", 19]
+      - [VOLUME, "F", 19]
+      - [CONTENT_DE, "C", 200]
+      - [ATIS_CODE, "C", 10]
+      - [ATIS_DESCR, "C", 254]
+      - [GlobalID, "C", 38]
+      - [CODE_DDPS_, "N", 5]
+      - [Shape_Leng, "F", 19]
+      - [Shape_Area, "F", 19]
+  Biotopi:
+    crs_name: LKS_1992_Latvia_TM
+    crs_srid: 3059
+    fields:
+      - [ID, "N", 10]
+      - [CODE_EC, "C", 5]
+      - [NAME_EC, "C", 200]
+      - [VARIANT_EC, "C", 1]
+      - [CODE_LVPRO, "C", 7]
+      - [NAME_LVPRO, "C", 200]
+      - [CODE_LV, "C", 12]
+      - [NAME_LV, "C", 200]
+      - [OBS_DATE, "D", 8]
+      - [AREA_DOC, "F", 19]
+      - [GlobalID, "C", 38]
+      - [FORM_NUMBE, "C", 50]
+      - [POLYGON_NU, "C", 15]
+      - [CHANGE_REA, "C", 254]
+      - [N2000_PURP, "C", 254]
+      - [Shape_Leng, "F", 19]
+      - [Shape_Area, "F", 19]
+
+# LVĢMC ArcGIS MapServer layers (D1 E7): fields, geometry type, spatial reference.
+arcgis:
+  layer_0:
+    name: Pavasara_palu_010_3_cikls
+    geometry_type: esriGeometryPolygon
+    wkid: 3059
+    fields:
+      - ["objectid", esriFieldTypeOID]
+      - ["shape", esriFieldTypeGeometry]
+      - ["st_area(shape)", esriFieldTypeDouble]
+      - ["st_length(shape)", esriFieldTypeDouble]
+  layer_1:
+    name: Pavasara_pali_Salaca_010_3_cikls
+    geometry_type: esriGeometryPolygon
+    wkid: 3059
+    fields:
+      - ["objectid", esriFieldTypeOID]
+      - ["shape", esriFieldTypeGeometry]
+      - ["st_area(shape)", esriFieldTypeDouble]
+      - ["st_length(shape)", esriFieldTypeDouble]
+  layer_3:
+    name: Pavasara_palu_200_3_cikls
+    geometry_type: esriGeometryPolygon
+    wkid: 3059
+    fields:
+      - ["objectid", esriFieldTypeOID]
+      - ["shape", esriFieldTypeGeometry]
+      - ["st_area(shape)", esriFieldTypeDouble]
+      - ["st_length(shape)", esriFieldTypeDouble]

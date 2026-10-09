@@ -80,6 +80,88 @@ sources:
         - "931e6299-61ba-477b-ba8d-f0fb30db9667"   # property.zip
     licence: CC-BY-4.0
 
+  # --- Phase 2b: flood and nature (verified 2026-10-09, docs/data-sources.md §6) ---
+  - id: flood_10y
+    names:
+      lv: "Plūdi (10 gadu, pavasara pali)"
+      en: "Flood (10-year, spring)"
+    owner: LVĢMC
+    group: Plūdi
+    order: 40
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Areas shown on the 3rd-cycle flood maps (200-year extent as mask); pilot extent + 1 km"
+    max_age: P1Y
+    datagov:
+      dataset_id: 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1   # licence and version date
+    external_resources: [E7]
+    licence: CC0-1.0
+  - id: nature_protected_areas
+    names:
+      lv: "Īpaši aizsargājamās dabas teritorijas un zonējums"
+      en: "Protected nature areas and zoning"
+    owner: DAP
+    group: Daba
+    order: 30
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Whole country"
+    max_age: P13M
+    datagov:
+      dataset_id: ipasi-aizsargajamas-dabas-teritorijas
+      resource_ids: ["aa165932-8835-41a0-baa2-3336d2e8e6ef"]   # SHP zip
+    licence: CC0-1.0
+  - id: nature_microreserves
+    names:
+      lv: "Mikroliegumi un to buferzonas"
+      en: "Microreserves and buffer zones"
+    owner: DAP
+    group: Daba
+    order: 31
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Whole country"
+    max_age: P13M
+    datagov:
+      dataset_id: mikroliegumi
+      resource_ids: ["4770cc11-02eb-42e1-98c9-e640e3d8b7ff"]   # SHP zip
+    licence: CC0-1.0
+  - id: nature_monuments
+    names:
+      lv: "Dabas pieminekļi"
+      en: "Nature monuments"
+    owner: DAP
+    group: Daba
+    order: 32
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Whole country"
+    max_age: P13M
+    datagov:
+      dataset_id: dabas-pieminekli
+      resource_ids: ["18139898-7119-4ff8-b769-5ab956209bd3"]   # SHP zip
+    licence: CC0-1.0
+  - id: nature_habitats
+    names:
+      lv: "Aizsargājamās dzīvotnes (biotopi)"
+      en: "Protected habitats"
+    owner: DAP
+    group: Daba
+    order: 33
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Whole country (mapped habitats only)"
+    max_age: P13M
+    datagov:
+      dataset_id: aizsargajamas-dzivotnes-biotopi
+      resource_ids: ["e52b8094-f563-4706-b59f-401f7113a133"]   # SHP zip
+    licence: CC0-1.0
+
 # Example entry (placeholder values, not verified):
 #
 # sources:
@@ -148,19 +230,26 @@ allowed_external_resources:
     host: geolatvija.lv
     datagov_dataset: [pldu-riska-karu-atvrtie-dati-un-servisi, 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes]
     status: allowed
-    note: "Stable file download URL not verified."
+    note: "Checked 2026-10-09: product API answers 401 (login + order), so the files are login-protected and not usable under CLAUDE.md rule 1. Status change pending decision (docs/decisions.md, E6)."
   - id: E7
-    name: "LVĢMC ArcGIS Pavasara_pludu_kartes_3_cikls (layers 0, 1 = 10-year)"
+    name: "LVĢMC ArcGIS Pavasara_pludu_kartes_3_cikls (layers 0, 1 = 10-year; layer 3 = coverage mask)"
     url: "https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer"
     host: geodata.lvgmc.lv
-    layers: [0, 1]          # 0 Pavasara_palu_010_3_cikls, 1 Pavasara_pali_Salaca_010_3_cikls
+    layers: [0, 1, 3]       # 0 Pavasara_palu_010_3_cikls, 1 Pavasara_pali_Salaca_010_3_cikls (findings)
+    # 3 Pavasara_palu_200_3_cikls: coverage mask only, never a finding (decided 2026-10-09, D1 E7)
+    layer_roles: {0: finding, 1: finding, 3: coverage_mask}
     datagov_dataset: null   # same data described by 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1
-    status: allowed         # decided 2026-10-09 (docs/decisions.md, E7)
+    status: allowed         # decided 2026-10-09 (docs/decisions.md, E7); layer 3 added 2026-10-09
     licence: CC0-1.0        # per data.gov.lv listing of the same data: 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1
     access: snapshot        # imported as a versioned snapshot; never queried live
     fallback: E6
     # Source processing notes: listed on the report's "Avoti" sheet (PLAN §7.1).
     processing:
+      - id: coverage_mask
+        what: "Layer 3 (200-year extent) is used only as the coverage mask; outside it module 4 reports not_covered"
+        why: "No designated flood risk areas (APSFR) or modelled-area polygons are published as open data"
+        effect: "Outside the mask: not_covered, never clear"
+        report_lv: "Ārpus plūdu kartēs attēlotās teritorijas – plūdu karte šeit nav pieejama vai teritorija nav applūstoša pat 200 gadu scenārijā."
       - id: simplify_1cm
         what: "Geometry fetched with ArcGIS maxAllowableOffset=0.01 (1 cm generalisation)"
         why: "The server returns HTTP 500 for very large polygons without it (e.g. objectid 24562, 216 km2)"

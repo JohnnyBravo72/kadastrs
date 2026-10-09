@@ -34,8 +34,8 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 | E3 | DAP nature ArcGIS REST `https://ozols.gov.lv/arcgis/rest/services/OZOLS_DABASDATI_PUB_DATU_APMAINA/MapServer` and `/FeatureServer` | ozols.gov.lv (DAP) | `dabas-vertibu-geotelpiskie-dati` (resource); DAP nature datasets (description) | Module 3 (backup for the SHP files on data.gov.lv) | allowed |
 | E4 | TAPIS WFS/WMS `https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_454_4DUoZx/e4ab2161-88bf-4f35-85b8-f1ca8dd5ebb3` (WFS), `…/Teritorija_451_GKJOzb/96f059e4-9ed2-479c-976f-dcbed668972f` (WMS) | geo-dpps.viss.gov.lv → tapis.gov.lv (VARAM/VRAA) | `teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati` (resource URLs) | Module 8, zoning layer | allowed |
 | E5 | Flood WMTS/WMS (spring 10-year WMTS `…/Pludu_risk_443_Dv50WI/…`; 3rd cycle WMS `…/3._cikla_L_556/557/558…`) | geo-dpps.viss.gov.lv → geodata.lvgmc.lv (LVĢMC) | `pldu-riska-karu-atvrtie-dati-un-servisi1`, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1` (resource URLs) | Plūdi map layer only (images) | allowed |
-| E6 | geolatvija.lv flood products 309 and 361 (SHP) `https://geolatvija.lv/main?geoProductId=309`, `…=361` | geolatvija.lv (VRAA) | `pldu-riska-karu-atvrtie-dati-un-servisi`, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes` (description) | Module 4 (if a stable file URL exists) | allowed; download URL **not verified** |
-| E7 | LVĢMC ArcGIS MapServer `https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer`, layer 0 `Pavasara_palu_010_3_cikls` and layer 1 `Pavasara_pali_Salaca_010_3_cikls` | geodata.lvgmc.lv (LVĢMC) | Not named directly on a data.gov.lv page. The same server (`…/Atvertie_dati/Pavasara_pali_010/MapServer/WMTS`) is named in the capabilities of E5's WMTS, and the 3rd-cycle WMS (E5, resource 557) has the same 4 layers | Module 4 vectors (primary) | **allowed, decided**. Licence **CC0-1.0** (see below) |
+| E6 | geolatvija.lv flood products 309 and 361 (SHP) `https://geolatvija.lv/main?geoProductId=309`, `…=361` | geolatvija.lv (VRAA) | `pldu-riska-karu-atvrtie-dati-un-servisi`, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes` (description) | Module 4 (if a stable file URL exists) | allowed; **files login-protected** (product API 401, 2026-10-09), so not usable under rule 1; status change pending decision |
+| E7 | LVĢMC ArcGIS MapServer `https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer`, layer 0 `Pavasara_palu_010_3_cikls` and layer 1 `Pavasara_pali_Salaca_010_3_cikls` (findings); layer 3 `Pavasara_palu_200_3_cikls` (**coverage mask only, never a finding**, added 2026-10-09) | geodata.lvgmc.lv (LVĢMC) | Not named directly on a data.gov.lv page. The same server (`…/Atvertie_dati/Pavasara_pali_010/MapServer/WMTS`) is named in the capabilities of E5's WMTS, and the 3rd-cycle WMS (E5, resource 557) has the same 4 layers | Module 4 vectors (primary) | **allowed, decided**. Licence **CC0-1.0** (see below) |
 
 ### E7 (decided 2026-10-09, Janis)
 - **Licence: CC0-1.0.**
@@ -43,6 +43,10 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
   - The service's own metadata has `copyrightText: "none"`.
 - **Free data only:** the service description says depth-class data is paid; it is not used.
 - **Snapshot only:** layers 0 and 1 are imported as a versioned dataset snapshot (`dataset_version`) by the ETL. The app and the check engine never query the service live.
+- **Coverage mask: layer 3 (200-year extent), decided 2026-10-09 (Janis).**
+  - Checked first: designated flood risk areas (APSFR, *nozīmīgas plūdu riska teritorijas*) are **not published as polygons on data.gov.lv**. The listing `…-kartes1` has three WMS proxies and geolatvija links; `pldu-riska-zonas(-wfs)` has only flood-management units; LVĢMC's `udens` dataset points to the LVĢMC website and EU reporting (`cdr.eionet.europa.eu`, 2019 cycle), neither listed in D1. The MapServer has no extent layer of the modelled areas.
+  - So layer 3 of E7 is imported as a **coverage mask only, never a finding**. Module 4: a parcel outside the mask is `not_covered`, never `clear`, with the reason **"ārpus plūdu kartēs attēlotās teritorijas – plūdu karte šeit nav pieejama vai teritorija nav applūstoša pat 200 gadu scenārijā"**.
+  - **Limitation:** open data cannot tell "not modelled" from "modelled and dry even at 0.5 %". Outside the mask both are reported as `not_covered`, the cautious reading; the reason text names both possibilities.
 - **E6 cross-check:** once E6 download links are verified, compare feature count and total area (EPSG:10306, m²) between E6 and E7 for the 10-year layers, and record the result here. E6 stays as the fallback source.
 
 | Check | E7 | E6 | Result |
@@ -50,6 +54,8 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 | Feature count, layer 0 (whole country) | 24,590 (2026-10-09, `returnCountOnly`) | not yet (E6 URL not verified) | pending |
 | Feature count, layer 1 (Salaca) | 386 | not yet | pending |
 | Total area | not yet computed | not yet | pending |
+
+**E6 status (checked 2026-10-09): blocked.** `geolatvija.lv/api/v1/geoproducts/309` and `…/361` answer **401 Unauthorised**; the app obtains files through orders (`/api/v1/geoproduct-orders`). The files are login-protected, so CLAUDE.md rule 1 excludes them and the comparison above cannot be made with open data. Decision needed: mark E6 `withdrawn`, or keep it listed for a future open release.
 
 ## D9: storage and analysis CRS
 

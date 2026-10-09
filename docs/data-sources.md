@@ -506,3 +506,31 @@ Checked before any import code was written (CLAUDE.md rule 2): `package_show` fo
   - **Version checksum** = SHA-256 over the canonical list of the pilot members only: resource id, member name, CRC-32, uncompressed size and SHA-256 of the decompressed bytes. A change elsewhere in Latvia, or a metadata-only change of `last_modified`, therefore does not create a pilot version; a changed pilot member does. Member names contain the export date, so a re-export with a new date is a new version.
   - If the server ignores Range (answers 200), the importer downloads the whole zip, reads the same members locally and records `range_unsupported` in `import_log`; the checksum is the same either way.
 - `dataset_version.checksum` = SHA-256 over the canonical list of the file checksums above.
+
+---
+
+## 6. Phase 2b import verification (2026-10-09)
+
+Checked before coding (CLAUDE.md rule 2). Registry entries: `config/sources.yaml`; roles and options: `config/etl.yaml`; expected fields: `config/schemas.yaml` (`shp_dap`, `arcgis`).
+
+### 6.1 Flood (D1 E7)
+- MapServer `Atvertie_dati/Pavasara_pludu_kartes_3_cikls`: layers `0 Pavasara_palu_010_3_cikls` (24,590 ids), `1 Pavasara_pali_Salaca_010_3_cikls` (386), `2 …_100_…`, `3 Pavasara_palu_200_3_cikls` (17,712). All polygons, `wkid` 3059, fields `objectid`, `shape`, `st_area(shape)`, `st_length(shape)`; `maxRecordCount` 1000; capabilities `Map,Query,Data`; `copyrightText` "none".
+- **No date in the service:** no `editingInfo` on the layers, no date in `documentInfo`. The version date (rule E7) therefore comes from the data.gov.lv listing of the same data, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1` (`metadata_modified` 2026-08-19, CC0-1.0), read with `package_show` on every run. The version identity is the content (canonical GeoJSON per layer), so a metadata-only change of the listing creates no version.
+- **Coverage:** no designated flood risk areas (APSFR) or modelled-area polygons are open (listing `…-kartes1`: 3 WMS proxies + geolatvija links; `pldu-riska-zonas(-wfs)`: flood-management units only; `udens`: links to the LVĢMC website and EU reporting, 2019 cycle). Layer 3 (200-year extent) is the coverage mask (D1 E7, decided 2026-10-09).
+- **Fetch recipe** (Phase 0, §3.5): `returnIdsOnly` within each pilot city's extent + 1 km (transformed to 3059), then `objectIds` in batches of 25 with `outSR=3059`, `maxAllowableOffset=0.01` (1 cm), `f=geojson`.
+- **E6 (geolatvija products 309 / 361):** `/api/v1/geoproducts/{id}` answers **401**; files come through orders. Login-protected, so not usable (rule 1). The E6/E7 comparison is blocked (`docs/decisions.md`).
+
+### 6.2 DAP nature (SHP zips on data.gov.lv, CC0, annual)
+
+| Registry id | Dataset | SHP resource | Layers (records, 2026-04-07 files) |
+|---|---|---|---|
+| `nature_protected_areas` | `ipasi-aizsargajamas-dabas-teritorijas` | `aa165932-…` (9.2 MB) | `IADT_pamatteritorijas` 876, `IADT_zonejums` 2,517 |
+| `nature_microreserves` | `mikroliegumi` | `4770cc11-…` (4.6 MB) | `Mikroliegumi` 3,112, `MikroliegumuBuferzonas` 1,633 |
+| `nature_monuments` | `dabas-pieminekli` | `18139898-…` (51.6 MB) | `IADT_dabas_pieminekli` 16,503 |
+| `nature_habitats` | `aizsargajamas-dzivotnes-biotopi` | `e52b8094-…` (137.1 MB) | `Biotopi` 175,000 |
+
+- Resource `last_modified` 2026-04-07 (dataset metadata 2026-07-24); the Phase 0 samples are these files.
+- **`.prj`:** `PROJCS["LKS_1992_Latvia_TM", …]` with the EPSG:3059 parameters and no `AUTHORITY`, so SRID 3059 is assigned by name, then `lks92_to_lks2020()`.
+- **Key: `GlobalID`** (C38), unique in every layer, never empty. `ID` (N10) is not unique in habitats; `MRCODE` (N10) links buffer zones to microreserves. Both are kept as text attributes.
+- **Personal data:** no field holds a natural person's name, code or birth date (field lists in `config/schemas.yaml`). `LOCALNAME` (monuments) is a place name.
+- Geometry: self-intersections in every layer except monuments; 1 empty geometry in buffer zones; 1 zero-area habitat ring (Phase 0, §3.6). Repair counts are logged per layer.

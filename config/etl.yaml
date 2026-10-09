@@ -28,3 +28,23 @@ sources:
       parcelpart: "58635c63-8c04-4193-a9f2-ec674c57ae93"
       building: "9fe29b57-07cd-4458-b22c-b0b9f2bc8915"
       property: "931e6299-61ba-477b-ba8d-f0fb30db9667"
+  # --- Phase 2b -------------------------------------------------------------
+  flood_10y:
+    files: {}         # no data.gov.lv files: D1 E7 (service URL and layers in sources.yaml)
+    options:
+      batch_size: 25              # objectIds per request (Phase 0 recipe, data-sources.md §3.5)
+      max_allowable_offset: 0.01  # 1 cm; the server returns 500 for huge polygons without it
+      margin_m: 1000              # pilot city extent + 1 km
+      request_pause_s: 0.2        # be gentle with the agency server
+  nature_protected_areas:
+    files:
+      shp: "aa165932-8835-41a0-baa2-3336d2e8e6ef"
+  nature_microreserves:
+    files:
+      shp: "4770cc11-02eb-42e1-98c9-e640e3d8b7ff"
+  nature_monuments:
+    files:
+      shp: "18139898-7119-4ff8-b769-5ab956209bd3"
+  nature_habitats:
+    files:
+      shp: "e52b8094-f563-4706-b59f-401f7113a133"
