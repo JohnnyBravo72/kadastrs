@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   pilot:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned; upgrade deliberately (docs/runbook.md)
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5

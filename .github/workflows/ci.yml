@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned; upgrade deliberately (docs/runbook.md)
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -30,7 +30,7 @@ jobs:
     # the tests container. Includes the CRS tests (grid, PROJ >= 9.8, SRID
     # 10306, Odukalns within 1 cm, and the no-grid negative checks) and the ETL
     # rule tests T-E1..T-E7 on synthetic files.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned; upgrade deliberately (docs/runbook.md)
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5

@@ -149,6 +149,8 @@ Lint and format (also run on every commit by pre-commit):
 pre-commit run --all-files
 ```
 
+**CI runners are pinned to `ubuntu-24.04`** in both workflows (`ubuntu-latest` moves to Ubuntu 26 on 2026-10-19). Upgrade deliberately: change `runs-on` in both files on a branch, run CI and Actions → Pilot import → Run workflow on that branch, and merge only when both are green.
+
 CI (`.github/workflows/ci.yml`) runs pre-commit and the tests without `pilot` on every push and pull request. `.github/workflows/pilot-import.yml` does the real import twice and runs the full suite, every Monday and on demand (Actions → Pilot import → Run workflow).
 
 ## Migrations
