@@ -60,7 +60,7 @@
 
 ### 2.3 Availability (single source of truth)
 
-Phase 0 steps 1 and 3 were done on 2026-10-09 (metadata, fields, join keys). Details, counts and evidence are in `docs/data-sources.md`; every resource URL is in `docs/data-sources-resources.md`. "Verified" means the dataset and fields were confirmed from data.gov.lv. **Samples (step 2) were inspected on 2026-10-09 for the MVP sources** (pilot Jelgava; "Sample inspection" parts in `docs/data-sources.md`). ☑☑ = metadata and sample checked.
+Phase 0 steps 1 and 3 were done on 2026-10-09 (metadata, fields, join keys). Details, counts and evidence are in `docs/data-sources.md`; every resource URL is in `docs/data-sources-resources.md`. "Verified" means the dataset and fields were confirmed from data.gov.lv. **Samples (step 2) were inspected on 2026-10-09 for the MVP sources** (samples taken for Jelgava; "Sample inspection" parts in `docs/data-sources.md`). ☑☑ = metadata and sample checked.
 
 | Source | Owner | data.gov.lv dataset(s) | Notes | Verified |
 |---|---|---|---|---|
@@ -203,10 +203,11 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 check(subject, dataset_version) -> {
   module, module_version, subject: {kind, id},
   status: found | clear | not_covered | no_data | source_unavailable | error,
+  reason: text | null,             # required for no_data, e.g. "nav ģeometrijas"
   risk: high | medium | low | none | unknown,
   rule_ids: [...],                 # risk rules that fired
   items: [...], match_type,
-  warnings: [...],                 # e.g. stale data, partial coverage, leading zero restored
+  warnings: [...],                 # e.g. stale data, partial coverage, leading zero restored, no_geometry
   source: {id, name, dataset_date, dataset_version_id, datagov_url},
   computed_at,
   display: {kind: kv|table|badges|text, columns: [...]}
@@ -217,13 +218,19 @@ check(subject, dataset_version) -> {
 - `found`: the source covers the object and has relevant records.
 - `clear`: the source covers the object and nothing relevant was found.
 - `not_covered`: the source does not cover this area, e.g. outside the flood risk areas or with no zoning vectors. This is never reported as "clear".
-- `no_data`: the object itself was not found in the dataset.
+- `no_data`: the object itself was not found in the dataset, **or it has no geometry** (see §6.3). Always comes with a `reason`.
 - `source_unavailable` / `error`: the import is missing or the check failed.
 
 ### 6.3 Spatial rules
 - Intersections use the parcel geometry **buffered inward by 0.5 m** to avoid boundary slivers. A finding also needs an overlap of **≥ 1 m² or ≥ 0.1% of the parcel**. Both thresholds live in config and are listed in the report.
 - Every overlap reports its area in m² and its % of the parcel.
 - A property with several units: results are per unit, plus an aggregate (worst risk wins).
+- **Objects without geometry:** an object found in the register but without geometry (e.g. pre-registered buildings, point and linear engineering structures; ~9% of buildings in the Jelgava sample, `docs/data-sources.md` §3.2):
+  - gets the warning **`no_geometry`**;
+  - every spatial module (3, 4, 8 and spatial matches in 5) returns status **`no_data`** with reason **"nav ģeometrijas"**, and risk `unknown`;
+  - is **never** `clear`.
+  
+  Non-spatial modules (1, 2, 6, 7) still run on register data. A property whose units partly lack geometry is checked on the units that have it; the aggregate carries the warning.
 
 ### 6.4 Risk rules
 - Risk levels come only from `risk_rule` entries, e.g.:
@@ -331,23 +338,23 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 
 ## 9. Roadmap
 
-**MVP = phases 0–5:** a list in, an Excel report out, for one pilot municipality, covering modules 1–6.
+**MVP = phases 0–5:** a list in, an Excel report out, for the pilot area (the cities of Jelgava, Jūrmala and Daugavpils), covering modules 1–6.
 
 | Phase | Deliverable | Done when |
 |---|---|---|
 | 0. Discovery | `docs/data-sources.md`, completed availability table, manual-time baseline, 14–20 test projects, operating-context answers (section 1) | Every MVP source verified or explicitly dropped |
 | 1. Foundation | Repo, Docker Compose, PostGIS, CI, `CLAUDE.md`, `sources.yaml`, `rules.yaml` skeleton. **Custom DB Dockerfile `FROM postgis/postgis:18-3.6`** that bundles `lv_lgia_lks92to2020.tif` (from cdn.proj.org, CC-BY 4.0, checksum pinned) into the PROJ data directory (D9) | `docker compose up` gives an empty DB + API health check. **CRS test (in CI)**: fails if the grid file is missing, if PROJ < 9.8 or SRID 10306 is unknown, or if the EPSG sample point Odukalns 56.8283960°N 24.2727688°E (LKS-92) does not transform to 56.8283967°N 24.2727679°E (LKS-2020) **within 1 cm** |
-| 2. ETL | Pilot municipality: VARIS, cadastre, admin boundaries, flood (if a vector source is confirmed), nature, cadastre encumbrances, BIS; transform 3059 sources to 10306; dataset versions; schema checks | Row counts match the sources; re-runs are idempotent; a changed schema fails loudly |
+| 2. ETL | Pilot area (Jelgava, Jūrmala, Daugavpils): VARIS, cadastre, admin boundaries, flood (if a vector source is confirmed), nature, cadastre encumbrances, BIS; transform 3059 sources to 10306; dataset versions; schema checks | Row counts match the sources; re-runs are idempotent; a changed schema fails loudly |
 | 3. Resolution | `/suggest`, `/resolve`, property units; leading-zero repair | Test-set inputs resolve correctly, including ambiguous ones |
 | 4. Check engine v1 | Modules 1–6, spatial rules, risk rules v1, stored runs and results | The test set's findings match the colleagues' manual answers, with differences explained by data dates |
 | 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report | **Pilot with 2–3 colleagues; measured time per object vs the baseline** |
-| 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list | UI criteria pass for the pilot municipality |
+| 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list | UI criteria pass for the pilot area |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in) | UI criteria pass |
 | 8. Applicant & funding | Modules 7 and 9–14, and 17 | Each module verified on the test set |
 | 9. Whole country + performance | Full import, vector tiles, MapLibre decision | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
 | 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, deployment behind CFLA sign-in | A refresh runs unattended; a failed import alerts the owner |
 
-**Pilot municipality:** one with flood-map coverage and several of the test projects. **Proposed (2026-10-09): Jelgava (ATVK 0003000).** It has 15.9% of its area in the 10-year flood zone, a seed object, and the smallest data of the seed cities. Alternatives are Jūrmala (10.2%) and Daugavpils (8.0%); see `docs/data-sources.md` §2a. Confirm against the test set (step 5).
+**Pilot area (decided 2026-10-09): the cities of Jelgava (ATVK 0003000), Jūrmala (0004000) and Daugavpils (0002000).** Together they cover all seed examples (§2.4) and have 10-year flood coverage of 15.9%, 10.2% and 8.0% of their area (`docs/data-sources.md` §2a). Samples were inspected for Jelgava; Jūrmala and Daugavpils use the same source formats. Final check against the test set (step 5) later.
 
 ---
 
@@ -362,7 +369,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 - **Personal data:** modules use only open-data fields. No names of natural persons (owners, board members, aid recipients, sanctioned persons) are stored. Ownership = owner type only; sanctions = legal entities by reg. no. only.
 - **Licences:** confirm reuse and attribution terms for each dataset and the basemap.
 - **Bus factor:** one developer. The runbook, the tests and `CLAUDE.md` are deliverables, not extras.
-- **Data volume:** whole-country parcels and buildings are large. The pilot municipality comes first; tiles and indexes come before scaling.
+- **Data volume:** whole-country parcels and buildings are large. The pilot area (three cities) comes first; tiles and indexes come before scaling.
 
 **Open decisions**
 

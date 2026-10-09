@@ -83,3 +83,20 @@ allowed_external_resources:
     licence: CC0-1.0        # per data.gov.lv listing of the same data: 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1
     access: snapshot        # imported as a versioned snapshot; never queried live
     fallback: E6
+    # Source processing notes: listed on the report's "Avoti" sheet (PLAN §7.1).
+    processing:
+      - id: simplify_1cm
+        what: "Geometry fetched with ArcGIS maxAllowableOffset=0.01 (1 cm generalisation)"
+        why: "The server returns HTTP 500 for very large polygons without it (e.g. objectid 24562, 216 km2)"
+        effect: "Area change < 0.001% on the largest polygon (215.96 -> 215.958 km2)"
+        report_lv: "Ģeometrija iegūta ar 1 cm vienkāršošanu (servera ierobežojums); laukuma izmaiņa < 0,001 %."
+      - id: make_valid
+        what: "Invalid geometries repaired with make_valid (ring self-intersections)"
+        why: "About 5% of polygons are invalid at the source (Jelgava sample: 37 of 749)"
+        effect: "Total area unchanged in the Jelgava sample (216.904 km2 before and after)"
+        report_lv: "Nederīgas ģeometrijas (pašpārklāšanās) labotas automātiski; kopējais laukums nemainās."
+      - id: reproject
+        what: "Transformed EPSG:3059 -> EPSG:10306 with EPSG:10838 (NTv2 grid lv_lgia_lks92to2020.tif)"
+        why: "Storage CRS is LKS-2020 (D9)"
+        effect: "~1 cm accuracy"
+        report_lv: "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."

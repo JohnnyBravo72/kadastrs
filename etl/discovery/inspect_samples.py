@@ -6,6 +6,7 @@ Run with the project venv (pyshp, shapely):
     .venv/Scripts/python -I etl/discovery/inspect_samples.py csv       # VARIS / BIS CSV
     .venv/Scripts/python -I etl/discovery/inspect_samples.py flood     # E7 GeoJSON
     .venv/Scripts/python -I etl/discovery/inspect_samples.py bisrule   # BIS building-designation prefix rule
+    .venv/Scripts/python -I etl/discovery/inspect_samples.py gaps      # VARIS CSV/SHP and building text/map count gaps
 Results are written to etl/discovery/out/inspect_<part>.json.
 """
 
@@ -295,6 +296,53 @@ def part_flood():
         info["seed 09000360220"] = "not found in KKParcel"
     print(json.dumps(info, ensure_ascii=False, indent=1))
     return info
+
+
+def part_gaps():
+    """Explain two count gaps: VARIS aw_eka.csv vs Ekas.shp, and cadastre buildings text vs map."""
+    import xml.etree.ElementTree as ET
+    res = {}
+    # VARIS
+    shp_codes = {}
+    for n, r, _, _ in shp_layers(ROOT / "varis" / "aw_shp.zip"):
+        if Path(n).stem == "Ekas":
+            for rec in r.iterRecords(fields=["KODS", "STATUSS"]):
+                shp_codes[str(rec[0])] = rec[1]
+    rows = list(csv.DictReader(io.StringIO((ROOT / "varis" / "aw_eka.csv").read_text(encoding="utf-8-sig"))))
+    missing = [x for x in rows if x["KODS"] not in shp_codes]
+    res["varis"] = {"csv_rows": len(rows), "shp_points": len(shp_codes),
+                    "csv_by_status": dict(collections.Counter(x["STATUSS"] for x in rows)),
+                    "shp_by_status": dict(collections.Counter(shp_codes.values())),
+                    "csv_not_in_shp": len(missing),
+                    "csv_not_in_shp_by_status": dict(collections.Counter(x["STATUSS"] for x in missing)),
+                    "csv_not_in_shp_without_coords": sum(1 for x in missing if not x["KOORD_X"].strip()),
+                    "shp_not_in_csv": len(set(shp_codes) - {x["KODS"] for x in rows})}
+    # cadastre buildings
+    text = {}
+    for _, el in ET.iterparse(next((ROOT / "cadastre_text" / "building").glob("*.xml"))):
+        if local(el.tag) != "BuildingItemData":
+            continue
+        b = el.find(".//{*}BuildingBasicData")
+        text[b.findtext("{*}BuildingCadastreNr")] = (
+            "NotExist" if b.find("{*}NotExist") is not None else
+            "Prereg" if b.find("{*}Prereg") is not None else
+            f"engineering structure {b.findtext('{*}EngineeringStructureType')}" if b.findtext("{*}EngineeringStructureType") else
+            "other")
+        el.clear()
+    layers = collections.defaultdict(set)
+    for n, r, _, _ in shp_layers(ROOT / "cadastre_spatial" / f"{PILOT}_kk_shp.zip"):
+        st = Path(n).stem
+        if st in ("KKBuilding", "KKEngineeringStructurePoly", "KKEngineeringStructureLine"):
+            for rec in r.iterRecords(fields=["CODE"]):
+                layers[st].add(rec[0])
+    mapped = set().union(*layers.values())
+    res["buildings"] = {"text": len(text), **{k: len(v) for k, v in layers.items()},
+                        "map_not_in_text": len(mapped - set(text)),
+                        "text_without_geometry": sum(1 for c in text if c not in mapped),
+                        "text_without_geometry_by_kind": dict(collections.Counter(k for c, k in text.items() if c not in mapped)),
+                        "notexist_with_geometry": sum(1 for c, k in text.items() if k == "NotExist" and c in mapped)}
+    print(json.dumps(res, ensure_ascii=False, indent=1))
+    return res
 
 
 if __name__ == "__main__":
