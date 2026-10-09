@@ -49,6 +49,9 @@ services:
     image: kadastrs-api:dev
     environment:
       DATABASE_URL: *db-url
+    volumes:
+      # Live config: edits to config/*.yaml apply without rebuilding the image.
+      - ../config:/app/config:ro
     ports:
       - "127.0.0.1:${KADASTRS_API_PORT:-8000}:8000"
     depends_on:
