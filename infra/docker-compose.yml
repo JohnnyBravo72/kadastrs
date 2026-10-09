@@ -64,6 +64,27 @@ services:
       retries: 12
       start_period: 5s
 
+  # --- etl profile: `docker compose run --rm etl import all` --------------------
+
+  # Imports from data.gov.lv (etl/). Runs the mounted checkout; raw files of the
+  # live versions are kept in the etl_raw volume.
+  etl:
+    profiles: [etl]
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+      target: etl
+    image: kadastrs-etl:dev
+    environment:
+      DATABASE_URL: *db-url
+      KADASTRS_RAW_DIR: /data/raw
+    volumes:
+      - ..:/src:ro
+      - etl_raw:/data/raw
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   # --- test profile: `docker compose --profile test run --rm tests` -------------
 
   # Runs pytest on the api image's Python with the repo mounted at /src.
@@ -79,12 +100,34 @@ services:
       KADASTRS_TEST_DATABASE_URL: *db-url
       KADASTRS_TEST_API_URL: http://api:8000
       KADASTRS_TEST_NOGRID_DATABASE_URL: postgresql://kadastrs:nogrid@db-nogrid:5432/kadastrs
+      # Separate database for fixture imports, so tests never touch dev data.
+      KADASTRS_TEST_ETL_DATABASE_URL: postgresql://kadastrs:${KADASTRS_DB_PASSWORD:-kadastrs-dev}@db:5432/kadastrs_test
+      KADASTRS_RAW_DIR: /data/raw
     volumes:
       - ..:/src
+      - etl_raw:/data/raw:ro
     depends_on:
       api:
         condition: service_healthy
       db-nogrid:
+        condition: service_healthy
+      migrate-test:
+        condition: service_completed_successfully
+
+  # Creates (if missing) and migrates the kadastrs_test database.
+  migrate-test:
+    profiles: [test]
+    image: ghcr.io/amacneil/dbmate:2.36.0
+    environment:
+      DATABASE_URL: postgres://kadastrs:${KADASTRS_DB_PASSWORD:-kadastrs-dev}@db:5432/kadastrs_test?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: /migrations
+      DBMATE_NO_DUMP_SCHEMA: "true"
+      DBMATE_WAIT: "true"
+    volumes:
+      - ./migrations:/migrations:ro
+    command: ["up"]
+    depends_on:
+      db:
         condition: service_healthy
 
   # Same DB image with the grid deleted, to prove the CRS tests fail without it.
@@ -114,3 +157,4 @@ services:
 
 volumes:
   dbdata:
+  etl_raw:

@@ -14,12 +14,13 @@ dependencies = [
     "psycopg[binary,pool]>=3.2",
     "pydantic>=2.12",
     "pyyaml>=6.0",
+    "httpx>=0.28",   # CKAN API and downloads (ETL)
+    "pyshp>=3.1",    # SHP reading, pure Python; geometry work is done in PostGIS
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.4",
-    "httpx>=0.28",
     "ruff>=0.14",
     "pre-commit>=4.3",
 ]
@@ -47,4 +48,5 @@ addopts = "-ra --strict-markers"
 markers = [
     "stack: needs the running docker compose stack (db + api)",
     "docker: starts extra throwaway containers (slower)",
+    "pilot: needs a real pilot import in the dev DB (docker compose run --rm etl import all)",
 ]
