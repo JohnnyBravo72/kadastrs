@@ -83,6 +83,7 @@ Phase 0 steps 1 and 3 were done on 2026-10-09 (metadata, fields, join keys). Det
 | Cultural heritage | KISC | `valsts-aizsargajamo-nekustamo-piemineklu-saraksts` (CSV, CC0) | `Kadastra_apzimejums` in 84% of rows; no geometry | ☑ |
 | Municipal liabilities | Valsts kase | `pasvaldibu-saistibu-apmers` (annual, CC0) | Per municipality (ATVK) | ☑ |
 | Ownership (īpašumtiesības) | VZD | Cadastre text resource "Īpašumtiesību statusu raksturojošie dati" | Per XSD: ownership status + person type (natural / legal / state / municipality / other) only; no names. Land book excluded. Module 7 uses the owner type only | ☑ (XSD) |
+| Pre-registered buildings (**secondary cross-check, not MVP**) | VZD | `pirmsregistretas-buves` (quarterly, CC-BY-4.0, CSV/XLSX) | Building → parcel link for pre-registered buildings; no geometry. **Not an MVP source** (decided 2026-10-09). In Jelgava it covers only 18 of the 2,072 pre-registered buildings without geometry, while all 2,072 already have the parcel link in the cadastre text (`building.xml`); where both exist the parcel agrees in 1,224 of 1,224. 6,996 rows nationally have lost a leading zero. Use only as a cross-check; re-check its value on whole-country data in Phase 9 | ☑☑ |
 | Sanctions | UR / FID | `sanctions` (UR, daily), `sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija` (FID) | **Available on data.gov.lv** (contrary to the earlier assumption). Contains personal data: use legal entities by reg. no. only (§6.1). EU/UN consolidated lists themselves: not found | ☑ |
 
 ### 2.4 Phase 0 checklist
@@ -381,7 +382,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list | UI criteria pass for the pilot area |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in) | UI criteria pass |
 | 8. Applicant & funding | Modules 7 and 9–14, and 17 | Each module verified on the test set |
-| 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history) | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
+| 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history), re-check value of `pirmsregistretas-buves` on whole-country data | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
 | 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, D3 final: shared hosting, sign-in (required before sharing), security review, retention, maintenance, legal wording; deployment behind sign-in | A refresh runs unattended; a failed import alerts the owner |
 
 **Pilot area (decided 2026-10-09): the cities of Jelgava (ATVK 0003000), Jūrmala (0004000) and Daugavpils (0002000).** Together they cover all seed examples (§2.4) and have 10-year flood coverage of 15.9%, 10.2% and 8.0% of their area (`docs/data-sources.md` §2a). Samples were inspected for Jelgava; Jūrmala and Daugavpils use the same source formats. Final check against the test set (step 5) later.

@@ -153,6 +153,7 @@ VARIS runs daily on workdays via cron; the cadastre runs weekly. **Resource URLs
     - Jelgava's cadastre text marks 3,328 buildings as pre-registered; this dataset has 1,225 of them, and where both exist the parcel agrees with the cadastre link in 1,224 of 1,224.
     - Of the **2,072** pre-registered Jelgava buildings without geometry, **all 2,072 already have their parcel link in `building.xml`**, and only **18** are in this dataset.
     - **The cadastre text is the source for the fallback.** This dataset is at most a cross-check. Earlier text here overstated its role.
+  - **Decided 2026-10-09:** recorded as a **secondary cross-check outside the MVP** (PLAN §2.3) for the Jelgava reasons above. Its value is re-checked on whole-country data in Phase 9.
 - **[`dzesto-adresu-koordinatas`](https://data.gov.lv/dati/lv/dataset/dzesto-adresu-koordinatas)** (annual, CSV/XLSX): code, end date, X/Y coordinates and full text of **deleted addresses**. For a `DEL` address without a `KODS_HIS` link (about 97%), the point could locate the parcel or building there now and suggest a "probable" current address. Not yet in PLAN; a candidate for Phase 3. The coordinate CRS was not checked.
 
 Not relevant here: their LAD (field blocks), forest register, NĪTIS (market transactions) and postal-code Voronoi scripts.
