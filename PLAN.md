@@ -27,19 +27,21 @@
 
 ---
 
-## 1. Operating context (decide before Phase 1)
+## 1. Operating context
 
-| Question | Proposed default | Who decides |
+**Interim answers recorded 2026-10-09 (Janis). All rows marked *interim* are to be revisited in Phase 10** (D3 in `docs/decisions.md`).
+
+| Question | Answer | Status |
 |---|---|---|
-| Users | CFLA project evaluators (start with a pilot group of ~5) | Janis + team leads |
-| Hosting | CFLA internal server or CFLA cloud tenant; not a personal account | CFLA IT |
-| Sign-in | CFLA SSO (Entra ID) if available; otherwise the tool runs on the internal network only | CFLA IT / security |
-| Security review | Before the pilot: dependencies, network exposure, logging | IT security |
+| Users | Janis + 2–3 pilot colleagues | interim, revisit in Phase 10 |
+| Hosting | Local Docker on Janis's PC for Phases 1–9; shared hosting decided in Phase 10 | interim, revisit in Phase 10 |
+| Sign-in | None, local only. **Required before any shared hosting** | interim, revisit in Phase 10 |
+| Security review | Before shared hosting (Phase 10) | interim, revisit in Phase 10 |
 | Data protection | Open-data fields only; ownership = owner type only; sanctions = legal entities by reg. no. only; no names of natural persons stored (see `docs/decisions.md`, Policy) | decided 2026-10-09 |
 | Storage of uploads | Uploaded files are not stored. Only the cleaned list and the results are kept | decided 2026-10-09 |
-| Retention | Reports and result snapshots kept for the evaluation's retention period (confirm the period) | Janis / records management |
-| Maintenance | Named owner and a backup person; `docs/runbook.md` covers refreshing data and fixing a failed import | Janis |
-| Legal status of output | "Informational, based on open data as of <date>; not an official registry extract" on every report | Legal / team leads |
+| Retention | Keep all runs; no deletion during the MVP | interim, revisit in Phase 10 |
+| Maintenance | Janis | interim, revisit in Phase 10 |
+| Legal status of output | Report footer: "Informatīvs pārskats, balstīts uz atvērtajiem datiem; nav oficiāls reģistra izraksts" | interim, revisit in Phase 10 |
 
 ---
 
@@ -264,7 +266,7 @@ check(subject, dataset_version) -> {
 - **Sheet "Detaļas":** one row per finding: object, module, item, overlap, match type, risk rule, source, dataset date, data.gov.lv link.
 - **Sheet "Avoti":** each source with dataset version, date, freshness status and coverage note, plus the rule-set version and thresholds.
 - **Sheet "Neatrasts":** inputs that could not be resolved, with a reason.
-- Footer text: "Informatīvs pārskats, balstīts uz atvērtajiem datiem uz <datums>; nav oficiāls reģistra izraksts."
+- Footer text (§1): "Informatīvs pārskats, balstīts uz atvērtajiem datiem; nav oficiāls reģistra izraksts." The data dates are on the "Avoti" sheet.
 
 ### 7.2 PDF evidence report (after the MVP)
 One object per report: map snapshot with active layers and legend (rendered on the server with Playwright), all module results, sources and dates. It replaces the manual screenshots.
@@ -359,7 +361,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in) | UI criteria pass |
 | 8. Applicant & funding | Modules 7 and 9–14, and 17 | Each module verified on the test set |
 | 9. Whole country + performance | Full import, vector tiles, MapLibre decision | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
-| 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, deployment behind CFLA sign-in | A refresh runs unattended; a failed import alerts the owner |
+| 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, D3 final: shared hosting, sign-in (required before sharing), security review, retention, maintenance, legal wording; deployment behind sign-in | A refresh runs unattended; a failed import alerts the owner |
 
 **Pilot area (decided 2026-10-09): the cities of Jelgava (ATVK 0003000), Jūrmala (0004000) and Daugavpils (0002000).** Together they cover all seed examples (§2.4) and have 10-year flood coverage of 15.9%, 10.2% and 8.0% of their area (`docs/data-sources.md` §2a). Samples were inspected for Jelgava; Jūrmala and Daugavpils use the same source formats. Final check against the test set (step 5) later.
 
@@ -384,7 +386,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 |---|---|---|
 | D1 | Agency-hosted resources listed on data.gov.lv count as data.gov.lv? | Phase 0 |
 | D2 | Basemap: OSM or plain | Phase 6 |
-| D3 | Hosting, sign-in, security review (section 1) | Phase 1 |
+| D3 | Hosting, sign-in, security review, retention, maintenance, legal status (section 1; interim answers recorded) | Phase 10 |
 | D4 | Risk rules v1, agreed with the team leads | Phase 4 |
 | D5 | Ownership module: **decided**, owner type only | Phase 8 |
 | D6 | Sanctions: **decided**, legal entities by reg. no. only (module 17) | Phase 8 |

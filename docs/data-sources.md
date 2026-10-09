@@ -114,6 +114,45 @@ Per-municipality counts for all 42 municipalities are in `etl/discovery/out/pilo
 
 ---
 
+## 2b. Reference: CSBLatvia/postgresql-open-data-lv (Phase 0 step 7)
+
+**What:** [github.com/CSBLatvia/postgresql-open-data-lv](https://github.com/CSBLatvia/postgresql-open-data-lv), scripts used by the Central Statistical Bureau to import Latvian open data into PostgreSQL/PostGIS with history.
+
+**Read 2026-10-09 as a structural reference only.**
+- The GitHub API shows **no licence** (`license: null`); last push 2026-10-09. **No code was copied into this repo.**
+- Files read: `README.md` and the `vzd/` scripts for VARIS, the cadastre map, the cadastre text data and pre-registered buildings.
+
+**Structure**
+- One schema per agency (`vzd`, `lad`, `mvr`, `csp`). Raw files land in staging tables (the VARIS CSV via `COPY`, SHP/XLSX via the OGR foreign data wrapper) and are then normalised into history tables.
+- **History per object:** every table has `date_created` / `date_deleted`. A changed object (geometry, parcel link or object code) closes the old row and inserts a new one. Classifier texts (property kind, ownership status, …) go into lookup tables.
+- Geometry is `MultiPolygon` / `Point` in **SRID 10306**: they also moved to LKS-2020, and their README requires PROJ ≥ 9.6.1. Every geometry has a GIST index.
+
+**Import order (their README):**
+1. roles, database and extensions;
+2. administrative territories and villages (`aw_shp`);
+3. VARIS CSV (`aw_csv`) + deleted-address coordinates (`aw_del`);
+4. cadastre map (`kk_shp`) + pre-registered buildings;
+5. cadastre text (`nivkis_txt`: property, ownership, parcel, parcel part, building, premise group, address, encumbrance, mark, valuation);
+6. derived tables (current buildings with geometry and address).
+
+VARIS runs daily on workdays via cron; the cadastre runs weekly. **Resource URLs are read from the dataset's `.jsonld` (`dcat:accessURL`) on every run**, the same idea as our "take URLs from `package_show`" rule.
+
+**Pitfalls they handle that our plan does not yet cover:**
+1. **Geometry normalisation:** they repair geometries, explode them, **keep only polygon parts** (repair can produce lines or points), **union the parts per code**, and store them as MultiPolygon. Our plan only says `make_valid`, so add the polygon-only filter and the union per code (per `CODE` + `PARCELCODE` for servitudes). In the Jelgava sample, codes are unique for parcels, buildings and parcel parts, but 57 parcels and 3 buildings are multi-ring.
+2. **Dirty text in cadastre XML:** they remove carriage returns, tabs and backslashes from building, premise-group and property texts. Our ElementTree parsing is unaffected, but **normalise whitespace in text fields** before Excel export.
+3. **VARIS CSV quotes:** values contain doubled quotes (e.g. `"""4"""`, `"Elektriķi 2"`). OGR FDW drops them, so they use `COPY … QUOTE '"' ESCAPE '"'`. We must use a real CSV parser (Python `csv` does this correctly) and never split on commas.
+4. **Object kind by `OBJECTCODE`:** they separate buildings from engineering structures with `OBJECTCODE < 6000000000`. In our sample the first digit is 5 = building, 6 = engineering structure, 7 = parcel, parcel part or servitude.
+5. **History dates:** they use the run date (minus 1 day), which needs manual fixes. **We keep the source's `last_modified` as the version date** (PLAN §2.2).
+6. **Storage:** per-object diffs are much smaller than full snapshots. Our full `dataset_version` snapshots are simpler and fine for the pilot area; revisit for whole-country scale (Phase 9).
+
+**Two more VZD open datasets they use** (both on data.gov.lv, CC-BY-4.0; metadata checked via `ckan_discover.py show`):
+- **[`pirmsregistretas-buves`](https://data.gov.lv/dati/lv/dataset/pirmsregistretas-buves)** (quarterly, CSV/XLSX): pre-registered buildings with building designation, **parcel designation**, address, floors, built-up area, wall material and registration date. **No geometry.** It confirms the parcel link for pre-registered buildings, the largest no-geometry group (2,064 in Jelgava), which the parcel-geometry fallback in PLAN §6.3 needs.
+- **[`dzesto-adresu-koordinatas`](https://data.gov.lv/dati/lv/dataset/dzesto-adresu-koordinatas)** (annual, CSV/XLSX): code, end date, X/Y coordinates and full text of **deleted addresses**. For a `DEL` address without a `KODS_HIS` link (about 97%), the point could locate the parcel or building there now and suggest a "probable" current address. Not yet in PLAN; a candidate for Phase 3. The coordinate CRS was not checked.
+
+Not relevant here: their LAD (field blocks), forest register, NĪTIS (market transactions) and postal-code Voronoi scripts.
+
+---
+
 ## 3. Per source
 
 ### 3.1 Address Register (VARIS)
@@ -172,7 +211,7 @@ Per-municipality counts for all 42 municipalities are in `etl/discovery/out/pilo
 | `KKParcel` | 14,255 | `CODE` C11, `GEOM_ACT_D` D, `OBJECTCODE` C10, `AREA_SCALE` N, `GROUP_CODE` C7 | `CODE` (11 digits) unique | 1 self-intersection / 0 |
 | `KKBuilding` | 20,899 | `CODE` C14, `OBJECTCODE`, **`PARCELCODE` C11**, `AREA_SCALE`, `GROUP_CODE` | `CODE` (14) unique | 0 / 0 |
 | `KKParcelPart` | 286 | `CODE` C15, `OBJECTCODE`, `PARCELCODE`, `GROUP_CODE`, `AREA_SCALE` | `CODE` (15) unique | 0 / 0 |
-| `KKWayRestriction` (servitudes) | 714 | `CODE` C20, `OBJECTCODE`, `PARCELCODE`, `AREA_SCALE`, `GROUP_CODE` | `CODE` **not unique** (335 distinct: one servitude spans several parcels) | 0 / 0 |
+| `KKWayRestriction` (servitudes) | 714 | `CODE` C20, `OBJECTCODE`, `PARCELCODE`, `AREA_SCALE`, `GROUP_CODE` | `CODE` **not unique**: 62 distinct codes over 714 records in the pilot city (one servitude spans many parcels; key = `CODE` + `PARCELCODE`) | 0 / 0 |
 | `KKEngineeringStructurePoly` / `Line` | 272 / 15 | `CODE` C14, `PARCELCODE`, … | `CODE` unique | 0 / 0 |
 | `KKParcelError` | 15 | `CODE` C11, … | | 0 / 0 |
 | `KKSurveyingStatus` | 35 | **`SURVEYOR` C80**, `CODE`, … | | 0 / 0 |
