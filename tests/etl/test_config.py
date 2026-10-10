@@ -13,9 +13,18 @@ def test_etl_resources_are_registered_sources():
         assert set(roles.values()) <= set(registry[source_id].datagov.resource_ids), source_id
 
 
-def test_every_reference_source_has_an_importer():
-    reference = {s.id for s in load_config().sources if s.type == "reference"}
-    assert reference == set(IMPORTERS) == set(etl_config().files)
+def test_every_imported_source_is_registered_and_configured():
+    registry = {s.id: s for s in load_config().sources}
+    assert set(IMPORTERS) == set(etl_config().files)
+    assert set(IMPORTERS) <= set(registry)
+    assert {sid for sid, s in registry.items() if s.type == "reference"} <= set(IMPORTERS)
+
+
+def test_flood_layers_come_from_d1_e7():
+    e7 = next(e for e in load_config().allowed_external_resources if e.id == "E7")
+    roles = {int(k): v for k, v in e7.model_extra["layer_roles"].items()}
+    assert roles == {0: "finding", 1: "finding", 3: "coverage_mask"}
+    assert sorted(roles) == e7.model_extra["layers"]
 
 
 def test_pilot_atvk_are_text():

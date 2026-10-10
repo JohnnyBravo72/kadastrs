@@ -30,6 +30,7 @@ class EtlConfig:
     ckan_api: str
     pilot_atvk: tuple[str, ...]
     files: dict[str, dict[str, str]]  # source id -> role -> CKAN resource id
+    options: dict[str, dict]  # source id -> importer options
 
 
 @cache
@@ -41,7 +42,10 @@ def etl_config(path: Path | None = None) -> EtlConfig:
     files = {
         sid: {str(k): str(v) for k, v in s["files"].items()} for sid, s in data["sources"].items()
     }
-    return EtlConfig(ckan_api=data["ckan_api"], pilot_atvk=tuple(atvk), files=files)
+    options = {sid: dict(s.get("options") or {}) for sid, s in data["sources"].items()}
+    return EtlConfig(
+        ckan_api=data["ckan_api"], pilot_atvk=tuple(atvk), files=files, options=options
+    )
 
 
 @cache

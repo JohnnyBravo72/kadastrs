@@ -22,7 +22,25 @@ DATASETS = {
     "varis_addresses": "varis-atvertie-dati",
     "cadastre_spatial": "kadastra-informacijas-sistemas-atverti-telpiskie-dati",
     "cadastre_text": "kadastra-informacijas-sistemas-atvertie-dati",
+    "flood_10y": "3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1",
+    "nature_protected_areas": "ipasi-aizsargajamas-dabas-teritorijas",
+    "nature_microreserves": "mikroliegumi",
+    "nature_monuments": "dabas-pieminekli",
+    "nature_habitats": "aizsargajamas-dzivotnes-biotopi",
 }
+# Licences as on data.gov.lv: VZD data CC-BY-4.0 (FakeServer.licence), these CC0-1.0.
+CC0_DATASETS = {
+    DATASETS[s]: "CC0-1.0"
+    for s in (
+        "flood_10y",
+        "nature_protected_areas",
+        "nature_microreserves",
+        "nature_monuments",
+        "nature_habitats",
+    )
+}
+# D1 E7 service (config/sources.yaml); the fake answers it, no network in tests.
+E7_BASE = "https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer"
 
 
 @dataclass
@@ -34,6 +52,10 @@ class FakeServer:
     requests: list[httpx.Request] = field(default_factory=list)
     ignore_range: bool = False
     licence: str = "CC-BY-4.0"
+    metadata_modified: dict[str, str] = field(default_factory=dict)  # dataset -> CKAN date
+    arcgis: dict[int, dict] = field(default_factory=dict)  # layer -> {"info", "features"}
+    arcgis_fail_in_batch: set[int] = field(default_factory=set)  # ids that break batches > 1
+    arcgis_batches: list[tuple[int, list[int], dict]] = field(default_factory=list)
 
     def publish(
         self,
@@ -77,11 +99,16 @@ class FakeServer:
                     "result": {
                         "id": f"uuid-{name}",
                         "name": name,
-                        "license_id": self.licence,
+                        "license_id": CC0_DATASETS.get(name, self.licence),
+                        "metadata_modified": self.metadata_modified.get(
+                            name, "2026-08-19T06:57:02"
+                        ),
                         "resources": res,
                     },
                 },
             )
+        if url.startswith(E7_BASE):
+            return self._arcgis(request)
         body = self.files.get(url)
         if body is None:
             return httpx.Response(404)
@@ -103,11 +130,80 @@ class FakeServer:
             )
         return httpx.Response(200, content=body)
 
+    def _arcgis(self, request: httpx.Request) -> httpx.Response:
+        parts = request.url.path[len(httpx.URL(E7_BASE).path) :].strip("/").split("/")
+        layer = self.arcgis.get(int(parts[0]))
+        if layer is None:
+            return httpx.Response(200, json={"error": {"code": 400, "message": "Invalid layer"}})
+        if len(parts) == 1:
+            return httpx.Response(200, json=layer["info"])
+        p = request.url.params
+        if p.get("returnIdsOnly") == "true":
+            x0, y0, x1, y1 = map(float, p["geometry"].split(","))
+            ids = [
+                fid
+                for fid, f in layer["features"].items()
+                if _bbox_hits(f["geometry"], x0, y0, x1, y1)
+            ]
+            return httpx.Response(
+                200, json={"objectIdFieldName": "objectid", "objectIds": ids or None}
+            )
+        ids = [int(x) for x in p["objectIds"].split(",")]
+        self.arcgis_batches.append((int(parts[0]), ids, dict(p)))
+        if len(ids) > 1 and set(ids) & self.arcgis_fail_in_batch:
+            return httpx.Response(500, text="Error performing query operation")
+        feats = [layer["features"][i] for i in ids if i in layer["features"]]
+        return httpx.Response(200, json={"type": "FeatureCollection", "features": feats})
+
     def client(self) -> httpx.Client:
         return httpx.Client(transport=httpx.MockTransport(self.handler))
 
     def range_requests(self) -> list[str]:
         return [r.headers.get("Range") for r in self.requests if r.headers.get("Range")]
+
+
+def _bbox_hits(geom: dict, x0, y0, x1, y1) -> bool:
+    pts = []
+
+    def walk(c):
+        if isinstance(c[0], (int, float)):
+            pts.append(c)
+        else:
+            for x in c:
+                walk(x)
+
+    walk(geom["coordinates"])
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    return min(xs) <= x1 and max(xs) >= x0 and min(ys) <= y1 and max(ys) >= y0
+
+
+def arcgis_layer(layer: int, features: dict[int, list]) -> dict:
+    """A fake E7 layer: info as in config/schemas.yaml, features {objectid: ring}."""
+    spec = schemas()["arcgis"][f"layer_{layer}"]
+    info = {
+        "name": spec["name"],
+        "geometryType": spec["geometry_type"],
+        "extent": {"spatialReference": {"wkid": spec["wkid"], "latestWkid": spec["wkid"]}},
+        "fields": [{"name": n, "type": t} for n, t in spec["fields"]],
+    }
+    feats = {
+        fid: {
+            "type": "Feature",
+            "id": fid,
+            "geometry": {"type": "Polygon", "coordinates": [ring]},
+            "properties": {"objectid": fid, "st_area(shape)": 100.0, "st_length(shape)": 40.0},
+        }
+        for fid, ring in features.items()
+    }
+    return {"info": info, "features": feats}
+
+
+def _writestr(z: zipfile.ZipFile, name: str, data) -> None:
+    """Deterministic zip members: a fixed timestamp, so equal content gives equal
+    bytes (and equal checksums) whenever the fixture is built."""
+    info = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+    info.compress_type = z.compression
+    z.writestr(info, data)
 
 
 # --- VARIS CSV -------------------------------------------------------------------
@@ -294,7 +390,12 @@ def shp_layer(
     shp, shx, dbf = io.BytesIO(), io.BytesIO(), io.BytesIO()
     w = shapefile.Writer(shp=shp, shx=shx, dbf=dbf, shapeType=shapefile.POLYGON, encoding="utf-8")
     for name, ftype, size in fields or schemas()["shp"][layer]["fields"]:
-        w.field(name, ftype, size, 3 if (ftype == "N" and name == "AREA_SCALE") else 0)
+        w.field(
+            name,
+            ftype,
+            size,
+            3 if (ftype == "N" and name == "AREA_SCALE") else (6 if ftype == "F" else 0),
+        )
     for rec, rings in records:
         if rings:
             w.poly(rings)
@@ -302,16 +403,20 @@ def shp_layer(
             w.null()
         w.record(**rec)
     w.close()
-    z.writestr(path + ".shp", shp.getvalue())
-    z.writestr(path + ".shx", shx.getvalue())
-    z.writestr(path + ".dbf", dbf.getvalue())
-    z.writestr(path + ".prj", prj)
-    z.writestr(path + ".cpg", "UTF-8")
+    _writestr(z, path + ".shp", shp.getvalue())
+    _writestr(z, path + ".shx", shx.getvalue())
+    _writestr(z, path + ".dbf", dbf.getvalue())
+    _writestr(z, path + ".prj", prj)
+    _writestr(z, path + ".cpg", "UTF-8")
 
 
 def square(x: float, y: float, s: float = 10.0) -> list:
     """Clockwise outer ring (shapefile convention)."""
     return [[x, y], [x, y + s], [x + s, y + s], [x + s, y], [x, y]]
+
+
+# Pilot city squares (EPSG:10306, 1 km) in admin_zip().
+CITY_XY = {"0003000": (480000, 270000), "0002000": (650000, 195000), "0004000": (470000, 310000)}
 
 
 def admin_zip(novads_name: str = "Novads") -> bytes:
@@ -347,7 +452,14 @@ def admin_zip(novads_name: str = "Novads") -> bytes:
             z,
             "aw_shp/Pilsetas",
             "Pilsetas",
-            [(rec(CITY["0003000"], "Jelgava", "0003000"), [square(480000, 270000, 1000)])],
+            [
+                (rec(CITY["0003000"], "Jelgava", "0003000"), [square(*CITY_XY["0003000"], 1000)]),
+                (
+                    rec(CITY["0002000"], "Daugavpils", "0002000"),
+                    [square(*CITY_XY["0002000"], 1000)],
+                ),
+                (rec(CITY["0004000"], "Jūrmala", "0004000"), [square(*CITY_XY["0004000"], 1000)]),
+            ],
             PRJ_VARIS,
         )
         shp_layer(
@@ -499,7 +611,7 @@ def text_zip(
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
         for i, (atvk, body) in enumerate(sorted({**docs, **(other or {})}.items())):
-            z.writestr(f"{KINDS[role]}/{atvk}_{date}_{540000 + i}/GUID-{role}-{atvk}.xml", body)
+            _writestr(z, f"{KINDS[role]}/{atvk}_{date}_{540000 + i}/GUID-{role}-{atvk}.xml", body)
     return buf.getvalue()
 
 
@@ -536,3 +648,59 @@ def default_text_docs(
             ]
         out[atvk] = xml_doc(role, atvk, items, namespace=namespace)
     return out
+
+
+# --- DAP nature SHP (EPSG:3059 by .prj name) ------------------------------------------
+
+PRJ_LKS92 = (
+    'PROJCS["LKS_1992_Latvia_TM",GEOGCS["GCS_LKS_1992",DATUM["D_Latvia_1992",'
+    'SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],'
+    'UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],'
+    'PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",-6000000.0],'
+    'PARAMETER["Central_Meridian",24.0],PARAMETER["Scale_Factor",0.9996],'
+    'PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]'
+)
+
+DAP_FILES = {
+    "nature_protected_areas": (
+        "ipasi_aizsargajamas_dabas_teritorijas.zip",
+        "Ipasi_aizsargajamas_dabas_teritorijas",
+        ["IADT_pamatteritorijas", "IADT_zonejums"],
+    ),
+    "nature_microreserves": (
+        "mikroliegumi.zip",
+        "Mikroliegumi",
+        ["Mikroliegumi", "MikroliegumuBuferzonas"],
+    ),
+    "nature_monuments": ("dabas_pieminekli.zip", "Dabas_pieminekli", ["IADT_dabas_pieminekli"]),
+    "nature_habitats": ("biotopi.zip", "Biotopi", ["Biotopi"]),
+}
+
+
+def dap_record(layer: str, global_id: str, **values) -> dict:
+    """A full DBF record for a DAP layer: every field from config/schemas.yaml."""
+    import datetime as _dt
+
+    out = {}
+    for name, ftype, _size in schemas()["shp_dap"][layer]["fields"]:
+        default = {"C": "", "N": 0, "F": 0.0, "D": _dt.date(2020, 1, 1)}[ftype]
+        out[name] = values.get(name, default)
+    out["GlobalID"] = global_id
+    return out
+
+
+def dap_zip(source_id: str, records: dict[str, list[tuple[dict, list]]]) -> bytes:
+    """{layer: [(record, rings)]}; layers missing from `records` are written empty."""
+    _, folder, layers = DAP_FILES[source_id]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for layer in layers:
+            shp_layer(
+                z,
+                f"{folder}/{layer}",
+                layer,
+                records.get(layer, []),
+                PRJ_LKS92,
+                fields=schemas()["shp_dap"][layer]["fields"],
+            )
+    return buf.getvalue()

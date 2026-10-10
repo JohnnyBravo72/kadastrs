@@ -16,7 +16,7 @@ import shutil
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Protocol
 
@@ -44,6 +44,12 @@ class Context:
     workdir: Path
     live_files: list[dict] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    ckan: Ckan | None = None
+    registry: SourcesConfig | None = None
+    conn_factory: Callable[[], psycopg.Connection] | None = None
+    options: dict = field(default_factory=dict)  # config/etl.yaml `options`
+    processing: list[dict] = field(default_factory=list)  # recorded with the version
+    source_last_modified: datetime | None = None  # set by importers without CKAN files
 
     def live_fingerprints(self) -> list[dict] | None:
         if not self.live_files:
@@ -125,10 +131,20 @@ def run_import(
                 (sid,),
             ).fetchone()
         ctx = Context(
-            sid, dataset, resources, client, cfg, workdir, live_files=live[1] if live else []
+            sid,
+            dataset,
+            resources,
+            client,
+            cfg,
+            workdir,
+            live_files=live[1] if live else [],
+            ckan=ckan,
+            registry=registry,
+            conn_factory=conn_factory,
+            options=cfg.options.get(sid, {}),
         )
         urls = [r.url for r in resources.values()]
-        licence = next(iter(resources.values())).licence
+        licence = ckan.package(dataset).get("license_id")
         if source.licence and licence and licence != source.licence:
             ctx.notes.append(f"licence on data.gov.lv is {licence}, registry says {source.licence}")
         _log(
@@ -159,6 +175,10 @@ def run_import(
 
         checksum = version_checksum(files)
         files_json = [f.to_json() for f in files]
+        urls = urls or [f.url for f in files]
+        last_modified = ctx.source_last_modified or max(
+            (r.last_modified for r in resources.values() if r.last_modified), default=None
+        )
         with conn_factory() as c:
             same = c.execute(
                 "SELECT id, status FROM dataset_version WHERE source_id = %s AND checksum = %s",
@@ -198,10 +218,7 @@ def run_import(
                         urls,
                         licence,
                         vdate,
-                        max(
-                            (r.last_modified for r in resources.values() if r.last_modified),
-                            default=None,
-                        ),
+                        last_modified,
                         checksum,
                         Jsonb(files_json),
                     ),
@@ -209,7 +226,8 @@ def run_import(
                 counts = importer.load(ctx, conn, vid, files)
                 total = sum(v.get("loaded", 0) for v in counts.values() if isinstance(v, dict))
                 conn.execute(
-                    "UPDATE dataset_version SET row_count = %s WHERE id = %s", (total, vid)
+                    "UPDATE dataset_version SET row_count = %s, processing = %s WHERE id = %s",
+                    (total, Jsonb(ctx.processing), vid),
                 )
             conn.execute(
                 "UPDATE dataset_version SET status = 'superseded'"

@@ -55,15 +55,17 @@ def publish_all(server, **text_kwargs):
 def test_admin_boundaries(run, server, q):
     publish_all(server)
     out = run("admin_boundaries")
-    assert out.status == "succeeded", out.message
+    assert out.status == "succeeded"
     rows = q(
         "SELECT varis_code, level, atvk, GeometryType(geom), ST_SRID(geom)"
-        " FROM ref.admin_area_current ORDER BY level"
+        " FROM ref.admin_area_current ORDER BY level, atvk"
     )
     assert rows == [
         ("100000001", "novads", "0020000", "MULTIPOLYGON", 10306),
         ("100000002", "pagasts", "0020001", "MULTIPOLYGON", 10306),
+        ("100003011", "pilseta", "0002000", "MULTIPOLYGON", 10306),
         ("100003028", "pilseta", "0003000", "MULTIPOLYGON", 10306),
+        ("100003036", "pilseta", "0004000", "MULTIPOLYGON", 10306),
     ]
 
 

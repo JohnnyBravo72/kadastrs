@@ -57,9 +57,10 @@ def cmd_status() -> int:
             LEFT JOIN dataset_version v ON v.source_id = s.id AND v.status = 'live'
             LEFT JOIN LATERAL (SELECT * FROM import_log WHERE source_id = s.id
                                ORDER BY started_at DESC LIMIT 1) l ON true
-            WHERE s.type = 'reference' AND s.active
+            WHERE s.active AND (s.type = 'reference' OR s.id = ANY(%s))
             ORDER BY s.display_order
-            """
+            """,
+            (list(IMPORTERS),),
         ).fetchall()
     for sid, vid, vdate, n, imported, lstatus, lstarted, msg in rows:
         live = (
