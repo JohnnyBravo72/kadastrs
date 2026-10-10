@@ -15,7 +15,8 @@
 DROP VIEW ref.parcel_current, ref.parcel_part_current, ref.building_current,
           ref.servitude_current;
 
-CREATE VIEW ref.pilot_city AS
+-- All city (pilsēta) boundaries of the live admin version; joined by ATVK.
+CREATE VIEW ref.city_boundary AS
 SELECT atvk, varis_code, name, geom FROM ref.admin_area_current WHERE level = 'pilseta';
 
 CREATE VIEW ref.parcel_current_all AS
@@ -28,7 +29,7 @@ SELECT code, t.atvk, t.area_m2, t.varis_code, t.status_kind, t.land_purposes,
 FROM (SELECT * FROM ref.parcel WHERE dataset_version_id = ref.live_version('cadastre_text')) t
 FULL JOIN (SELECT * FROM ref.kk_parcel WHERE dataset_version_id = ref.live_version('cadastre_spatial')) g
     USING (code)
-LEFT JOIN ref.pilot_city c ON c.atvk = g.zip_atvk;
+LEFT JOIN ref.city_boundary c ON c.atvk = g.zip_atvk;
 
 CREATE VIEW ref.parcel_part_current_all AS
 SELECT code, coalesce(t.parcel_code, g.parcel_code) AS parcel_code, t.area_m2, t.land_purposes,
@@ -39,7 +40,7 @@ SELECT code, coalesce(t.parcel_code, g.parcel_code) AS parcel_code, t.area_m2, t
 FROM (SELECT * FROM ref.parcel_part WHERE dataset_version_id = ref.live_version('cadastre_text')) t
 FULL JOIN (SELECT * FROM ref.kk_parcel_part WHERE dataset_version_id = ref.live_version('cadastre_spatial')) g
     USING (code)
-LEFT JOIN ref.pilot_city c ON c.atvk = g.zip_atvk;
+LEFT JOIN ref.city_boundary c ON c.atvk = g.zip_atvk;
 
 CREATE VIEW ref.building_current_all AS
 SELECT code, t.name, t.use_kind_id, t.use_kind_name, t.building_kind_id, t.building_kind_name,
@@ -52,7 +53,7 @@ SELECT code, t.name, t.use_kind_id, t.use_kind_name, t.building_kind_id, t.build
 FROM (SELECT * FROM ref.building WHERE dataset_version_id = ref.live_version('cadastre_text')) t
 FULL JOIN (SELECT * FROM ref.kk_building WHERE dataset_version_id = ref.live_version('cadastre_spatial')) g
     USING (code)
-LEFT JOIN ref.pilot_city c ON c.atvk = g.zip_atvk;
+LEFT JOIN ref.city_boundary c ON c.atvk = g.zip_atvk;
 
 CREATE VIEW ref.servitude_current_all AS
 SELECT s.*,
@@ -62,7 +63,7 @@ SELECT s.*,
         AND c.geom IS NOT NULL
         AND NOT ST_Within(ST_PointOnSurface(s.geom), c.geom)) AS outside_pilot
 FROM ref.kk_servitude s
-LEFT JOIN ref.pilot_city c ON c.atvk = s.zip_atvk
+LEFT JOIN ref.city_boundary c ON c.atvk = s.zip_atvk
 WHERE s.dataset_version_id = ref.live_version('cadastre_spatial');
 
 -- Pilot views (same names and columns as before, plus zip_atvk where missing).
@@ -94,7 +95,7 @@ FROM ref.servitude_current_all WHERE outside_pilot;
 DROP VIEW ref.map_outside_pilot, ref.parcel_current, ref.parcel_part_current,
           ref.building_current, ref.servitude_current, ref.parcel_current_all,
           ref.parcel_part_current_all, ref.building_current_all, ref.servitude_current_all,
-          ref.pilot_city;
+          ref.city_boundary;
 
 CREATE VIEW ref.parcel_current AS
 SELECT code, t.atvk, t.area_m2, t.varis_code, t.status_kind, t.land_purposes,
