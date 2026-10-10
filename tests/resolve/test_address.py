@@ -84,6 +84,21 @@ def test_street_word_lookalikes(decide):
     assert (d.status, d.resolved_code) == ("resolved", "102485599")
 
 
+def test_near_identical_street_names(decide):
+    assert decide("Ārijas iela 3, Jūrmala").resolved_code == "102400001"
+    assert decide("arijas iela 3").resolved_code == "102400001"
+    assert decide("Marijas iela 3").resolved_code == "102400002"
+    d = decide("Arijs iela 3, Jūrmala")  # a typo resolves to the closer name, visibly
+    assert (d.resolved_code, d.warnings[0].code) == ("102400001", "fuzzy_match")
+
+
+def test_identical_texts_of_two_codes_are_ambiguous(decide):
+    # real VARIS data has a few (e.g. "Narcišu iela 26, Daugavpils" twice)
+    d = decide("Druvu iela 31, Jelgava")
+    assert d.status == "ambiguous"
+    assert [m.designation for m in d.matches[:2]] == ["101000010", "101000011"]
+
+
 def test_house_number_must_match(decide):
     d = decide("Tautas iela 12, Daugavpils")
     assert d.status == "ambiguous"

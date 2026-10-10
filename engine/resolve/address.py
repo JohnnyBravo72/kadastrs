@@ -37,7 +37,8 @@ class Candidate:
     tier: str  # current | earlier | deleted
     score: float = 0.0
     numbers_ok: bool = False
-    exact: bool = False
+    exact: bool = False  # normalised input == normalised matched text
+    words_exact: bool = False  # every typed word is a word of the address
 
 
 @dataclass
@@ -188,7 +189,10 @@ def candidates(conn, v: Versions, places: Places, cfg: AddressSettings, q: Query
         old = best.get(key)
         if old is None or (c.score, c.tier == "current") > (old.score, old.tier == "current"):
             best[key] = c
-    ranked = sorted(best.values(), key=lambda c: (-c.score, c.tier != "current", c.full_text))
+    ranked = sorted(
+        best.values(),
+        key=lambda c: (-c.score, not c.words_exact, c.tier != "current", c.full_text),
+    )
     return ranked, city_dropped
 
 
@@ -248,6 +252,7 @@ def _score(c: Candidate, q: Query, city_norm: str | None, word_match: float) -> 
     c.score = round(score, 4)
     c.numbers_ok = numbers_ok
     c.exact = q.norm == c.matched_norm
+    c.words_exact = bool(q.words) and all(w in cand_words for w in q.words)
 
 
 # --- decision ---------------------------------------------------------------------------
@@ -302,7 +307,11 @@ def _clear_winner(pool: list[Candidate], cfg: AddressSettings, city_dropped: boo
     if not best.numbers_ok or best.score < cfg.auto_resolve_score:
         return False
     rivals = [c for c in pool[1:] if c.code != best.code]
-    return not rivals or best.score - rivals[0].score >= cfg.auto_resolve_margin
+    if not rivals or best.score - rivals[0].score >= cfg.auto_resolve_margin:
+        return True
+    # near-identical street names ('Ārijas' / 'Marijas'): the only candidate
+    # with every typed word spelt as typed and the typed number wins
+    return best.words_exact and not any(c.words_exact and c.numbers_ok for c in rivals)
 
 
 def decide(
@@ -331,46 +340,9 @@ def decide(
 
     if ranked and ranked[0].status == "DEL" and _clear_winner(ranked, cfg, city_dropped):
         best = ranked[0]
-        warnings = [notes.historical_address()]
-        if not best.exact:
-            warnings.insert(0, notes.fuzzy_address(raw, best.matched_text))
-        current = links(conn, v, places, best.code)
-        deleted_match = _as_match(best, places, "historical")
-        if not current:
-            warnings.append(notes.current_unknown())
-            return AddressDecision(
-                status="unresolved",
-                matches=[deleted_match],
-                warnings=warnings,
-                reason="vēsturiska adrese; pašreizējā adrese nav zināma",
-            ), q
-        matches = [
-            Match(
-                type="address",
-                designation=ref.varis_code,
-                label="Adrese",
-                description=ref.full_text,
-                match_type="historical",
-                address=ref,
-                warnings=[notes.current_address(ref.full_text)],
-            )
-            for ref in current
-        ]
-        for ref in current:
-            warnings.append(notes.current_address(ref.full_text))
-        if len(current) == 1:
-            return AddressDecision(
-                status="resolved",
-                matches=matches + [deleted_match],
-                warnings=warnings,
-                resolved_code=current[0].varis_code,
-            ), q
-        return AddressDecision(
-            status="ambiguous",
-            matches=matches + [deleted_match],
-            warnings=warnings,
-            reason=f"vēsturiska adrese sadalīta {len(current)} pašreizējās adresēs; izvēlieties",
-        ), q
+        warnings = [] if best.exact else [notes.fuzzy_address(raw, best.matched_text)]
+        deleted = _as_match(best, places, "historical")
+        return _deleted(conn, v, places, deleted, warnings), q
 
     shortlist = (existing + deleted)[: cfg.suggest_limit]
     if not shortlist:
@@ -389,6 +361,75 @@ def decide(
         warnings=warnings,
         reason="adrese nav viennozīmīgi atrasta; izvēlieties no ieteikumiem",
     ), q
+
+
+def _deleted(
+    conn, v: Versions, places: Places, deleted: Match, warnings: list[Note]
+) -> AddressDecision:
+    """A deleted address: resolved to its one KODS_HIS successor, ambiguous with
+    several, not resolved with none (PLAN.md §5.1 step 2)."""
+    warnings = [*warnings, notes.historical_address()]
+    current = links(conn, v, places, deleted.designation)
+    if not current:
+        return AddressDecision(
+            status="unresolved",
+            matches=[deleted],
+            warnings=[*warnings, notes.current_unknown()],
+            reason="vēsturiska adrese; pašreizējā adrese nav zināma",
+        )
+    matches = [
+        Match(
+            type="address",
+            designation=ref.varis_code,
+            label="Adrese",
+            description=ref.full_text,
+            match_type="historical",
+            address=ref,
+            warnings=[notes.current_address(ref.full_text)],
+        )
+        for ref in current
+    ]
+    warnings += [notes.current_address(ref.full_text) for ref in current]
+    if len(current) == 1:
+        return AddressDecision(
+            status="resolved",
+            matches=[*matches, deleted],
+            warnings=warnings,
+            resolved_code=current[0].varis_code,
+        )
+    return AddressDecision(
+        status="ambiguous",
+        matches=[*matches, deleted],
+        warnings=warnings,
+        reason=f"vēsturiska adrese sadalīta {len(current)} pašreizējās adresēs; izvēlieties",
+    )
+
+
+def by_code(conn, v: Versions, places: Places, code: str) -> AddressDecision:
+    """A VARIS address code typed instead of an address."""
+    row = conn.execute(
+        "SELECT full_text, status, city_atvk FROM ref.address"
+        " WHERE dataset_version_id = %s AND code = %s",
+        (v.varis_addresses, code),
+    ).fetchone()
+    if row is None:
+        return AddressDecision(
+            status="not_found", reason=f"adrese {code} pilota adrešu datos nav atrasta"
+        )
+    full_text, status, atvk = row
+    match = Match(
+        type="address",
+        designation=code,
+        label="Adrese",
+        description=full_text,
+        match_type="exact" if status == "EKS" else "historical",
+        address=AddressRef(
+            varis_code=code, full_text=full_text, status=status, city=places.city_by_atvk.get(atvk)
+        ),
+    )
+    if status == "DEL":
+        return _deleted(conn, v, places, match, [])
+    return AddressDecision(status="resolved", matches=[match], resolved_code=code)
 
 
 # --- type-ahead ---------------------------------------------------------------------------

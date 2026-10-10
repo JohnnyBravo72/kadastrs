@@ -5,7 +5,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from engine.resolve import address, cadastre, notes
+from engine.resolve import address, cadastre, notes, service
 from engine.resolve.classify import classify
 from engine.resolve.context import SourceUnavailable, live_versions, pilot, resolve_config
 from engine.resolve.models import AddressObjects, AddressRef, PropertyUnits, SuggestResponse
@@ -41,6 +41,21 @@ def suggest(
             return SuggestResponse(query=q, kind=kind, suggestions=items)
         items, notices = address.suggest(conn, v, places, cfg.address, q)
         return SuggestResponse(query=q, kind=kind, suggestions=items, notices=notices)
+
+
+@router.post("/resolve", response_model=service.ResolveResponse)
+def resolve(request: Request, body: service.ResolveRequest) -> service.ResolveResponse:
+    """Raw values (pasted list or file column) in; per row: type, status,
+    matches, corrections, warnings and duplicates. Nothing is stored."""
+    cfg = resolve_config()
+    rows = body.all_rows()
+    if len(rows) > cfg.max_rows:
+        raise HTTPException(
+            status_code=413, detail=f"ne vairāk kā {cfg.max_rows} rindas vienā pieprasījumā"
+        )
+    with _session(request) as (conn, v):
+        p = pilot()
+        return service.resolve(conn, v, load_places(conn, v, p), p, cfg, rows)
 
 
 @router.get("/property/{number}/units", response_model=PropertyUnits)
