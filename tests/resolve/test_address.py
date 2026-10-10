@@ -133,6 +133,11 @@ def test_current_text_wins_over_earlier_text(decide):
     assert d.warnings == []
 
 
+def test_current_text_beats_earlier_text_of_another_address(decide):
+    d = decide("Ganību iela 86, Jelgava")
+    assert (d.status, d.resolved_code, d.warnings) == ("resolved", "101061534", [])
+
+
 def test_deleted_with_one_successor(decide):
     d = decide("Salnas iela 22A, Jelgava")
     assert (d.status, d.resolved_code) == ("resolved", "101000005")

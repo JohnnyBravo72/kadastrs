@@ -9,6 +9,12 @@
 **Status:** Phase 0 steps 1 and 3 are done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
 
 **Change log**
+- 2026-10-10 (Phase 3): input resolution built (§5).
+  - Endpoints `/api/suggest`, `/api/resolve`, `/api/property/{number}/units`, `/api/address/{varis_code}/objects`; nothing is stored.
+  - Classification adds 15 digits (parcel part), 9 digits (VARIS code) and Excel `precision_lost` (scientific notation with dropped digits is never resolved without confirmation).
+  - Pilot data: 158 numbers are a property **and** a parcel of another property (shown as ambiguous); the seed `05000041006` is a property only (its parcel is `05000040014`, itself one of the 158).
+  - Address rules: current text before earlier texts (an address split into 86A–86D keeps "86" as their earlier text); a place outside the pilot named in the input gives `outside_pilot` ("<vieta> nav pilota teritorijā"); every auto-resolved fuzzy match carries "ievadīts: '…' → atrasts: '…'".
+  - Deleted-address coordinates (`dzesto-adresu-koordinatas`) deferred; the applicant reg. no. waits for Phase 8.
 - 2026-10-10 (Phase 2c): BIS cases and cadastre encumbrances imported for the pilot.
   - The frozen pre-2025 encumbrance list is imported (flag `frozen`): 19,694 pilot rows with current codes are missing from the current list.
   - BIS links and frozen-encumbrance status are SQL functions of dataset versions; check results store the version ids (§6.5).
@@ -185,6 +191,8 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 | 11 digits | Property number **or** parcel designation; the same value is often both. Look up both tables and show both matches when ambiguous | property / parcel |
 | 14 digits | Building designation | building |
 | 17 digits | Room-group designation (out of scope for checks; resolve to the building) | building |
+| 15 digits | Parcel-part designation (14 digits that are no building are also tried as a parcel part without its leading 0) | parcel part |
+| 9 digits | VARIS address code | address |
 | Registration number (11 digits) entered in the **applicant** field or column | UR reg. no. (never guessed from the main field) | applicant |
 | Text | Address: trigram + prefix match against VARIS | address → linked parcel(s) / building(s) |
 
@@ -193,18 +201,24 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 2. Only if no `EKS` address matches: match a `DEL` address and return it with warning **"vēsturiska adrese"**, plus the current `EKS` address(es) if VARIS links one through `aw_eka_his.KODS_HIS` (either direction; about 3% of `DEL` addresses; several = split, list all). With no link, the result says "pašreizējā adrese nav zināma" and the object is not resolved automatically.
 3. **`ERR` addresses are never matched.**
 
-**Phase 3 candidate: deleted-address coordinates.**
+**Also (Phase 3, 2026-10-10):**
+- **Current text first:** an existing address matched by its current text wins over an earlier text of another address (VARIS keeps "Ganību iela 86" as the earlier text of 86A–86D after a split).
+- **Fuzzy matches are visible:** an address resolved without an exact text match carries the warning **"ievadīts: '<input>' → atrasts: '<full address>'"**. Only a clear winner with the typed house number resolves automatically; thresholds are in `config/resolve.yaml` (matching settings, not risk rules).
+- **Places outside the pilot:** if the input names a city, municipality ("… novads") or parish ("… pagasts") outside the pilot and no pilot city, the row is `outside_pilot` with the reason **"<vieta> nav pilota teritorijā"**. A city name followed by a street-type word is a street ("Ventspils iela" is in Daugavpils). Suggestions from other cities always show their city.
+- A designation from a cadastral territory outside the pilot, or a map-only object flagged `outside_pilot`, is `outside_pilot` too.
+
+**Phase 3 candidate: deleted-address coordinates (deferred 2026-10-10, not adopted in Phase 3).**
 - VZD's open dataset [`dzesto-adresu-koordinatas`](https://data.gov.lv/dati/lv/dataset/dzesto-adresu-koordinatas) (annual, CC-BY-4.0) gives code, end date, X/Y and full text of deleted addresses.
 - For a `DEL` match **without** a `KODS_HIS` link (about 97% of `DEL` addresses), the point could locate the parcel or building there now and suggest its current address. That suggestion would be match type **"probable"**, with warning "vēsturiska adrese; iespējamā pašreizējā adrese pēc atrašanās vietas: <current>", never resolved automatically.
 - **Before adopting it in Phase 3:** check the CRS of X/Y (LKS-92 or LKS-2020), the coverage of the 32,453 `DEL` addresses, and hit rates against `KODS_HIS` links where both exist. Until then, step 2 applies unchanged.
 
-**Excel leading zeros:** a value that is 1 digit short of 11, 14 or 17 gets a `0` added at the front and the flag "leading zero restored". The fix also handles scientific notation and a trailing `.0`.
+**Excel leading zeros:** a value that is 1 digit short of 11, 14 or 17 gets a `0` added at the front and the flag "leading zero restored". The fix also handles scientific notation and a trailing `.0`. Scientific notation that keeps fewer digits than the number has (Excel keeps at most 15) is flagged `precision_lost` and needs confirmation.
 
 ### 5.2 Endpoints
 - `GET /api/suggest?q=&kind=cadastre|address`: ranked suggestions with type labels
-- `GET /api/property/{number}/units?include_non_existing=false`: linked parcels, buildings and parcel parts (non-existing buildings only on request, §6.3)
-- `GET /api/address/{varis_code}/objects`: cadastre objects for an address
-- `POST /api/resolve`: raw values in; per row: type, match status, suggestions, corrections
+- `GET /api/property/{number}/units?include_non_existing=false`: linked parcels, buildings, parcel parts and premise groups, plus buildings on its parcels that belong to other properties (non-existing buildings only on request, §6.3)
+- `GET /api/address/{varis_code}/objects`: cadastre objects for an address (a deleted address lists its current successors)
+- `POST /api/resolve`: raw values in (max 1,000); per row: type, match status, matches, corrections, warnings, duplicates; plus the dataset versions read. Examples: `docs/runbook.md`
 - `GET /api/sources`: the source registry
 
 ---

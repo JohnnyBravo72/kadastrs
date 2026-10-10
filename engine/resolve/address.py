@@ -173,8 +173,9 @@ def _retrieve(
 
 
 def candidates(conn, v: Versions, places: Places, cfg: AddressSettings, q: Query):
-    """Scored candidates, best first, one per (code, tier); and whether the city
-    filter had to be dropped (a pilot city was named but nothing matched in it)."""
+    """Scored candidates, best first, one per (code, tier): an address can be
+    listed by its current and by an earlier text. Also whether the city filter
+    had to be dropped (a pilot city was named but nothing matched in it)."""
     city = q.places.pilot_city.atvk if q.places.pilot_city else None
     rows = _retrieve(conn, v, q, city, cfg)
     city_dropped = False
@@ -185,15 +186,25 @@ def candidates(conn, v: Versions, places: Places, cfg: AddressSettings, q: Query
     best: dict[tuple[str, str], Candidate] = {}
     for c in rows:
         _score(c, q, city_norms.get(c.city_atvk), cfg.word_match)
-        key = (c.code, "deleted" if c.status == "DEL" else "existing")
-        old = best.get(key)
-        if old is None or (c.score, c.tier == "current") > (old.score, old.tier == "current"):
+        key = (c.code, c.tier)
+        if key not in best or c.score > best[key].score:
             best[key] = c
     ranked = sorted(
         best.values(),
         key=lambda c: (-c.score, not c.words_exact, c.tier != "current", c.full_text),
     )
     return ranked, city_dropped
+
+
+def by_code_once(cands: list[Candidate]) -> list[Candidate]:
+    """Each address once, at its best-ranked entry."""
+    seen: set[str] = set()
+    out = []
+    for c in cands:
+        if c.code not in seen:
+            seen.add(c.code)
+            out.append(c)
+    return out
 
 
 def _norm_city(places: Places, atvk: str) -> str | None:
@@ -321,12 +332,21 @@ def decide(
     outside = q.places.outside_pilot
     if outside is not None:
         return AddressDecision(status="outside_pilot", reason=notes.outside_pilot(outside.name)), q
-    ranked, city_dropped = candidates(conn, v, places, cfg, q)
+    entries, city_dropped = candidates(conn, v, places, cfg, q)
+    ranked = by_code_once(entries)
+    current = [c for c in entries if c.tier == "current"]
     existing = [c for c in ranked if c.status == "EKS"]
     deleted = [c for c in ranked if c.status == "DEL"]
 
-    if _clear_winner(existing, cfg, city_dropped):
-        best = existing[0]
+    # current texts first (PLAN.md §5.1): an address split into 86A-86D keeps
+    # "86" as their earlier text, but the address now called 86 wins
+    winner = None
+    if _clear_winner(current, cfg, city_dropped):
+        winner = current[0]
+    elif _clear_winner(existing, cfg, city_dropped):
+        winner = existing[0]
+    if winner is not None:
+        best = winner
         warnings = []
         if not best.exact:
             warnings.append(notes.fuzzy_address(raw, best.matched_text))
@@ -443,7 +463,8 @@ def suggest(
     outside = q.places.outside_pilot
     if outside is not None:
         notices.append(Note(code="outside_pilot", message=notes.outside_pilot(outside.name)))
-    ranked, city_dropped = candidates(conn, v, places, cfg, q)
+    entries, city_dropped = candidates(conn, v, places, cfg, q)
+    ranked = by_code_once(entries)
     if city_dropped:
         notices.append(
             Note(

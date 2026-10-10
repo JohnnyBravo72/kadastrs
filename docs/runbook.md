@@ -125,6 +125,51 @@ Import history:
 docker compose exec db psql -U kadastrs -d kadastrs -c "SELECT id, source_id, status, started_at, message FROM import_log ORDER BY id DESC LIMIT 20"
 ```
 
+## Input resolution (API)
+
+The API turns raw values (kadastra numuri, apzīmējumi, VARIS codes, addresses) into cadastre objects (PLAN.md §5). It reads the **live** versions of `cadastre_text`, `cadastre_spatial`, `varis_addresses` and `admin_boundaries`; if one is not imported, the endpoints answer **503**. Nothing is stored. Matching thresholds are in `config/resolve.yaml` (mounted, no rebuild needed); code changes need `docker compose up -d --build --wait`. Interactive docs: `http://127.0.0.1:8000/docs`.
+
+Use `curl.exe`, not `curl` (in Windows PowerShell 5.1, `curl` is an alias of `Invoke-WebRequest`):
+
+```powershell
+# type-ahead: designations by prefix (from 3 digits; a prefix without its leading zero is also tried)
+curl.exe -s "http://127.0.0.1:8000/api/suggest?kind=cadastre&q=0500004100"
+
+# type-ahead: addresses (diacritic-, case- and typo-tolerant; every entry carries its city)
+curl.exe -s -G "http://127.0.0.1:8000/api/suggest" --data-urlencode "kind=address" --data-urlencode "q=riga tautas"
+
+# units of a property (buildings marked non-existing only on request)
+curl.exe -s "http://127.0.0.1:8000/api/property/05000041006/units"
+curl.exe -s "http://127.0.0.1:8000/api/property/09000360220/units?include_non_existing=true"
+
+# cadastre objects at a VARIS address code
+curl.exe -s "http://127.0.0.1:8000/api/address/101765287/objects"
+
+# bulk: raw values in, one row per value out (max 1,000 rows)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)   # send ā, ē, ... as UTF-8
+'{"values": ["5.000041006E9", "05000040014", "Prohorova iela 28A, Jelgava", "riga tautas"]}' |
+  curl.exe -s -X POST "http://127.0.0.1:8000/api/resolve" -H "Content-Type: application/json" --data-binary "@-"
+
+# the same with a column kind per row ("auto" | "cadastre" | "address")
+'{"rows": [{"value": "Tautas iela 11, Daugavpils", "kind": "address"}, {"value": "5000041006", "kind": "cadastre"}]}' |
+  curl.exe -s -X POST "http://127.0.0.1:8000/api/resolve" -H "Content-Type: application/json" --data-binary "@-"
+```
+
+How `/api/resolve` reads a value:
+
+| Input | Read as |
+|---|---|
+| 11 digits | property number **or** parcel; both are looked up. If the parcel belongs to another property: `ambiguous`, both listed |
+| 14 / 15 digits | building / parcel part (14 digits that are no building are also tried as a parcel part that lost its leading 0) |
+| 17 digits | premise group → its building (first 14 digits), warning `premise_group_to_building` |
+| 10 / 13 / 16 digits | a lost leading zero is restored (correction `leading_zero_restored`) |
+| 9 digits | VARIS address code |
+| `5.000041006E9`, `05000041006.0`, `0500 004 1006`, `'05000041006` | Excel damage undone, each step listed in `corrections`; scientific notation with dropped digits gives `precision_lost` and is never resolved without confirmation |
+| text | address: current text → earlier text (`earlier_name`) → deleted address (`historical_address`, resolved only through a single `KODS_HIS` successor); a fuzzy auto-match carries `ievadīts: '…' → atrasts: '…'` |
+| a city, municipality or parish outside the pilot named in the text | `outside_pilot`, reason "<vieta> nav pilota teritorijā" (a city name followed by "iela", "prospekts", … is a street) |
+
+Row statuses: `resolved`, `ambiguous` (pick from `matches`), `not_found`, `unresolved` (deleted address without a known successor), `outside_pilot`, `invalid`, `empty`. Repeated objects get `duplicate_of`. The response lists the dataset `versions` it read.
+
 ## Run the tests
 
 ```powershell
@@ -133,7 +178,7 @@ docker compose --profile test run --rm tests
 
 This builds the test image if needed, starts `db`, `migrate`, `api`, `db-nogrid` and `migrate-test`, and runs pytest with the repo mounted at `/src`. Code changes need no rebuild.
 
-The ETL rule tests (`tests/etl`) import synthetic files through a fake data.gov.lv into the separate `kadastrs_test` database, so they never touch your data.
+The ETL rule tests (`tests/etl`) import synthetic files through a fake data.gov.lv into the separate `kadastrs_test` database, so they never touch your data. The resolution tests (`tests/resolve`) load a small synthetic pilot (seed objects, ambiguous numbers, renamed and deleted addresses) into the same database and call the API in-process.
 
 **The `pilot` tests check the real import in the dev database** (row counts against the source files, geometry, seed objects, and that a second run created no new versions). They **fail when nothing is imported**, so import twice first:
 
@@ -143,13 +188,15 @@ docker compose run --rm etl import all
 docker compose --profile test run --rm tests
 ```
 
-The pilot tests take about 3 minutes. The BIS and encumbrance checks (`tests/pilot/test_pilot_bis_encumbrances.py`) recount rows from the raw files, compare every stored designation and ATVK with the raw file (no lost leading zero), check the BIS join counts and that the DAP `ATIS_CODE` values are classifier codes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
+The pilot tests take about 3 minutes. The resolution checks (`tests/pilot/test_pilot_resolve.py`) cover the seed objects, every real property-or-parcel ambiguity, all leading-zero lengths, Excel-mangled inputs, typos and diacritics, renamed and deleted addresses, 300 random existing addresses, and `/api/suggest` p95 under 300 ms (printed with `-s`). The BIS and encumbrance checks (`tests/pilot/test_pilot_bis_encumbrances.py`) recount rows from the raw files, compare every stored designation and ATVK with the raw file (no lost leading zero), check the BIS join counts and that the DAP `ATIS_CODE` values are classifier codes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
 
 Without real data, run everything else:
 
 ```powershell
 docker compose --profile test run --rm tests python -m pytest -p no:cacheprovider -m "not pilot"
-``` A subset or extra pytest options:
+```
+
+A subset or extra pytest options:
 
 ```powershell
 docker compose --profile test run --rm tests python -m pytest -p no:cacheprovider tests/test_crs.py -v

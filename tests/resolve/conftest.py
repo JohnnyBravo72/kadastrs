@@ -52,6 +52,8 @@ ADDRESSES = [
     ("101000007", "EKS", "Druvu iela 29, Jelgava, LV-3002", "Jelgava"),
     ("101765287", "EKS", "Institūta iela 4, Jelgava, LV-3004", "Jelgava"),
     ("101000010", "EKS", "Druvu iela 31, Jelgava, LV-3002", "Jelgava"),
+    ("101061534", "EKS", "Ganību iela 86, Jelgava, LV-3007", "Jelgava"),
+    ("105979687", "EKS", "Ganību iela 86A, Jelgava, LV-3007", "Jelgava"),
     ("101000011", "EKS", "Druvu iela 31, Jelgava, LV-3002", "Jelgava"),
     ("102485506", "EKS", "Strēlnieku prospekts 28, Jūrmala, LV-2015", "Jūrmala"),
     ("102485599", "EKS", "Lauku iela 4, Jūrmala, LV-2015", "Jūrmala"),
@@ -68,6 +70,7 @@ HISTORY = [
     ("101154013", "101000005", "Salnas iela 22A, Jelgava, LV-3008"),  # DEL -> EKS
     ("101000006", "101766801", "Druvu iela 27, Jelgava, LV-3002"),  # EKS -> DEL
     ("101000007", "101766801", "Druvu iela 29, Jelgava, LV-3002"),
+    ("105979687", None, "Ganību iela 86, Jelgava, LV-3007"),  # 86 was split, 86A kept the text
 ]
 # number, kind, name, [(object, object_kind)]
 PROPERTIES = [
