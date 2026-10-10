@@ -23,6 +23,8 @@ RESET = """
 TRUNCATE ref.admin_area, ref.address, ref.address_history, ref.kk_parcel, ref.kk_parcel_part,
          ref.kk_building, ref.kk_servitude, ref.parcel, ref.parcel_part, ref.building,
          ref.building_parcel, ref.property, ref.property_object,
+         ref.bis_case, ref.bis_object, ref.encumbrance, ref.atis_classifier,
+         ref.encumbrance_frozen,
          import_log, dataset_version, source, allowed_external_resource RESTART IDENTITY CASCADE
 """
 

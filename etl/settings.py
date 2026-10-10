@@ -29,6 +29,7 @@ def database_url() -> str:
 class EtlConfig:
     ckan_api: str
     pilot_atvk: tuple[str, ...]
+    pilot_cadastral_territory: dict[str, str]  # ATVK -> first 4 digits of designations
     files: dict[str, dict[str, str]]  # source id -> role -> CKAN resource id
     options: dict[str, dict]  # source id -> importer options
 
@@ -43,8 +44,17 @@ def etl_config(path: Path | None = None) -> EtlConfig:
         sid: {str(k): str(v) for k, v in s["files"].items()} for sid, s in data["sources"].items()
     }
     options = {sid: dict(s.get("options") or {}) for sid, s in data["sources"].items()}
+    territory = {str(k): str(v) for k, v in data["pilot_cadastral_territory"].items()}
+    if sorted(territory) != sorted(atvk) or not all(
+        len(v) == 4 and v.isdigit() for v in territory.values()
+    ):
+        raise ValueError("pilot_cadastral_territory needs a 4-digit code (text) per pilot ATVK")
     return EtlConfig(
-        ckan_api=data["ckan_api"], pilot_atvk=tuple(atvk), files=files, options=options
+        ckan_api=data["ckan_api"],
+        pilot_atvk=tuple(atvk),
+        pilot_cadastral_territory=territory,
+        files=files,
+        options=options,
     )
 
 

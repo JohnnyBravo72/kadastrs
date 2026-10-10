@@ -65,3 +65,13 @@ class Ckan:
         raise LookupError(
             f"resource {resource_id} not in {dataset}: re-verify (docs/data-sources.md, rule 2)"
         )
+
+    def find_resource(self, datasets: list[str], resource_id: str) -> Resource:
+        """The resource in whichever of the source's datasets lists it (BIS spans two)."""
+        for dataset in datasets:
+            pkg = self.package(dataset)
+            if any(r["id"] == resource_id for r in pkg["resources"]):
+                return self.resource(dataset, resource_id)
+        raise LookupError(
+            f"resource {resource_id} not in {datasets}: re-verify (docs/data-sources.md, rule 2)"
+        )

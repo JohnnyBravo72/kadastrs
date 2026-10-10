@@ -123,8 +123,9 @@ def run_import(
     ctx: Context | None = None
     try:
         ckan = Ckan(client, cfg.ckan_api)
-        dataset = source.datagov.dataset_ids[0]
-        resources = {role: ckan.resource(dataset, rid) for role, rid in roles.items()}
+        datasets = source.datagov.dataset_ids
+        dataset = datasets[0]
+        resources = {role: ckan.find_resource(datasets, rid) for role, rid in roles.items()}
         with conn_factory() as c:
             live = c.execute(
                 "SELECT id, files FROM dataset_version WHERE source_id = %s AND status = 'live'",
@@ -145,8 +146,10 @@ def run_import(
         )
         urls = [r.url for r in resources.values()]
         licence = ckan.package(dataset).get("license_id")
-        if source.licence and licence and licence != source.licence:
-            ctx.notes.append(f"licence on data.gov.lv is {licence}, registry says {source.licence}")
+        for ds in datasets:
+            lic = ckan.package(ds).get("license_id")
+            if source.licence and lic and lic != source.licence:
+                ctx.notes.append(f"licence of {ds} is {lic}, registry says {source.licence}")
         _log(
             conn_factory,
             "UPDATE import_log SET resource_urls = %s, licence = %s,"

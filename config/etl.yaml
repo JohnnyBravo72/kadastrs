@@ -6,6 +6,11 @@ ckan_api: "https://data.gov.lv/dati/api/3/action/"
 
 # Pilot area (PLAN.md §9): Daugavpils, Jelgava, Jūrmala. ATVK codes are text.
 pilot_atvk: ["0002000", "0003000", "0004000"]
+# Cadastral territory code of each pilot city: the first 4 digits of its parcel and
+# building designations (checked on the cadastre text, docs/data-sources.md §7.1).
+# Sources without an ATVK per row (BIS objects, frozen encumbrances) are cut to the
+# pilot by designation prefix.
+pilot_cadastral_territory: {"0002000": "0500", "0003000": "0900", "0004000": "1300"}
 
 sources:
   admin_boundaries:
@@ -53,10 +58,6 @@ sources:
     files:            # two datasets; the runner finds each resource in the source's datasets
       cases: "4f5648b2-fed8-4722-987f-9a36dfa331dc"
       objects: "f41f3ee3-5040-4c65-8c80-f71495c817d9"
-    options:
-      # Pilot scope of a case object: its ATVK (zero-padded to 7) is a pilot city, or the
-      # first 4 digits of its designation are the city's cadastral territory code.
-      cadastral_territory: {"0002000": "0500", "0003000": "0900", "0004000": "1300"}
   cadastre_encumbrances:
     files:            # national zip; only the pilot members are fetched (HTTP Range)
       encumbrance: "ca8a415c-a894-427f-b14d-d1e44c582620"

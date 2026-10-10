@@ -273,6 +273,7 @@ check(subject, dataset_version) -> {
 
 ### 6.5 Snapshots and evidence
 - Each run stores its results and the dataset versions used. Old reports can be reproduced and are never silently changed by a data refresh.
+- **Derived links are functions of versions, not stored tables.** Matches that combine sources are SQL functions of the dataset versions they read, deterministic for the same version ids: BIS links `ref.bis_links(bis_version, cadastre_text_version)` (module 5) and frozen-encumbrance status `ref.encumbrance_frozen_status(frozen_version, encumbrance_version, cadastre_text_version)` (module 6). The `_current` views call them with the live versions. **A check result stores every version id it used** (for module 5 both the BIS and the cadastre text version id; for module 6 the encumbrance, frozen-list and cadastre text version ids) in its `run` / `check_result` record, so an old report is rebuilt by calling the same functions with the stored ids. Superseded versions keep their rows (E8), so this works for any past run.
 - Re-running creates a new run. The UI shows "results from <date>; newer data available" when relevant.
 
 ---

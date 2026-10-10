@@ -37,8 +37,13 @@ class FileRecord:
     members: list[MemberRecord] = field(default_factory=list)  # Range-fetched zips
     central_directory_sha256: str | None = None
     range_supported: bool | None = None
+    # National files cut to the pilot (BIS): SHA-256 of the canonical pilot rows.
+    # It is the version identity, so a change elsewhere in Latvia makes no version.
+    pilot_sha256: str | None = None
 
     def content_identity(self) -> dict:
+        if self.pilot_sha256 is not None:
+            return {"role": self.role, "pilot_sha256": self.pilot_sha256}
         if self.sha256 is not None:
             return {"role": self.role, "sha256": self.sha256}
         return {
