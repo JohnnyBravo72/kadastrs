@@ -48,3 +48,26 @@ sources:
   nature_habitats:
     files:
       shp: "e52b8094-f563-4706-b59f-401f7113a133"
+  # --- Phase 2c -------------------------------------------------------------
+  bis_cases:
+    files:            # two datasets; the runner finds each resource in the source's datasets
+      cases: "4f5648b2-fed8-4722-987f-9a36dfa331dc"
+      objects: "f41f3ee3-5040-4c65-8c80-f71495c817d9"
+    options:
+      # Pilot scope of a case object: its ATVK (zero-padded to 7) is a pilot city, or the
+      # first 4 digits of its designation are the city's cadastral territory code.
+      cadastral_territory: {"0002000": "0500", "0003000": "0900", "0004000": "1300"}
+  cadastre_encumbrances:
+    files:            # national zip; only the pilot members are fetched (HTTP Range)
+      encumbrance: "ca8a415c-a894-427f-b14d-d1e44c582620"
+  atis_classifier:
+    files:
+      classifier: "072603f8-243f-4910-8994-8e8de8665bd7"
+  encumbrances_frozen:
+    files:            # only the regional files that hold the pilot cities (data-sources.md §7.3)
+      latgale_parcel: "70e5bb02-187e-4d30-be45-54a5b8680948"
+      latgale_part: "89b4b594-e43d-4802-bf89-d2205f11d648"
+      riga_parcel: "f3566de0-39f9-4017-b844-9f6c96c49aa7"
+      riga_part: "89ace2d7-2bf1-4b51-843a-82aee7730f2d"
+      zemgale_parcel: "9ede9729-b682-4eeb-8779-3329e802a832"
+      zemgale_part: "06533bca-0146-4b7d-a4ae-9ca750e28e51"

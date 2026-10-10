@@ -162,6 +162,83 @@ sources:
       resource_ids: ["e52b8094-f563-4706-b59f-401f7113a133"]   # SHP zip
     licence: CC0-1.0
 
+  # --- Phase 2c: BIS and encumbrances (verified 2026-10-10, docs/data-sources.md §7) ---
+  - id: bis_cases
+    names:
+      lv: "Būvniecības lietas (BIS)"
+      en: "Construction cases (BIS)"
+    owner: BVKB
+    group: Būvniecība
+    order: 50
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Pilot cities: case objects by ATVK or designation prefix, and their cases (excl. stage Ideja and restricted cases)"
+    max_age: P2D
+    datagov:
+      dataset_id: [bis_jlyakg7hgslonjnwyrwc6w, bis_tln9s3hrpjlnucmjip9r3g]
+      resource_ids:
+        - "4f5648b2-fed8-4722-987f-9a36dfa331dc"   # Būvniecības lietu saraksts (CSV)
+        - "f41f3ee3-5040-4c65-8c80-f71495c817d9"   # Būvniecības lietu objekti (CSV)
+    licence: CC0-1.0
+  - id: cadastre_encumbrances
+    names:
+      lv: "Reģistrētie apgrūtinājumi"
+      en: "Registered encumbrances"
+    owner: VZD
+    group: Kadastrs
+    order: 60
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Pilot cities: encumbrances registered on parcels and parcel parts (text and area, no geometry)"
+    max_age: P14D
+    datagov:
+      dataset_id: kadastra-informacijas-sistemas-atvertie-dati
+      resource_ids: ["ca8a415c-a894-427f-b14d-d1e44c582620"]   # encumbrance.zip
+    licence: CC-BY-4.0
+  - id: atis_classifier
+    names:
+      lv: "ATIS un kadastra apgrūtinājumu klasifikators"
+      en: "ATIS and cadastre encumbrance classifier"
+    owner: VZD
+    group: Kadastrs
+    order: 61
+    type: reference
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Whole classifier"
+    max_age: P13M
+    datagov:
+      dataset_id: atis-datu-un-kadastra-objektu-apgrutinajumu-klasifikators
+      resource_ids: ["072603f8-243f-4910-8994-8e8de8665bd7"]   # classifier CSV
+    licence: CC-BY-4.0
+  # Frozen list of encumbrances registered until 2025-01-31. Imported because some of
+  # them are not in the current encumbrance data (data-sources.md §7.3); whether those
+  # are still valid cannot be told from open data, so they are always shown as frozen.
+  - id: encumbrances_frozen
+    names:
+      lv: "Apgrūtinājumi, kas reģistrēti līdz 31.01.2025 (iesaldēts saraksts)"
+      en: "Encumbrances registered until 2025-01-31 (frozen list)"
+    owner: VZD
+    group: Kadastrs
+    order: 62
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage: "Pilot cities: parcels and parcel parts (regional files Latgale, Rīga, Zemgale); frozen on 2025-01-31, never updated"
+    max_age: P100Y      # frozen on 2025-01-31 by VZD (frequency NEVER): freshness does not apply
+    datagov:
+      dataset_id: apgrutinajumi-kas-kadastra-registreti-lidz-2025-gada-31-janvarim
+      resource_ids:
+        - "70e5bb02-187e-4d30-be45-54a5b8680948"   # 3. zemes vienībām Latgalē (Daugavpils)
+        - "89b4b594-e43d-4802-bf89-d2205f11d648"   # 4. zemes vienību daļām Latgalē
+        - "f3566de0-39f9-4017-b844-9f6c96c49aa7"   # 5. zemes vienībām Rīgā (Jūrmala)
+        - "89ace2d7-2bf1-4b51-843a-82aee7730f2d"   # 6. zemes vienību daļām Rīgā
+        - "9ede9729-b682-4eeb-8779-3329e802a832"   # 9. zemes vienībām Zemgalē (Jelgava)
+        - "06533bca-0146-4b7d-a4ae-9ca750e28e51"   # 10. zemes vienību daļām Zemgalē
+    licence: CC-BY-4.0
+
 # Example entry (placeholder values, not verified):
 #
 # sources:

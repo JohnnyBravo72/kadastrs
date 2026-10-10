@@ -9,6 +9,12 @@ csv:
   aw_eka_his.csv: [KODS, KODS_HIS, TIPS_CD, DAT_SAK, DAT_MOD, DAT_BEIG, STD, NOSAUKUMS, VKUR_CD, VKUR_TIPS]
   aw_iela.csv: [KODS, TIPS_CD, NOSAUKUMS, VKUR_CD, VKUR_TIPS, APSTIPR, APST_PAK, STATUSS, SORT_NOS, DAT_SAK, DAT_MOD, DAT_BEIG, ATRIB, STD]
   aw_pilseta.csv: [KODS, TIPS_CD, NOSAUKUMS, VKUR_CD, VKUR_TIPS, APSTIPR, APST_PAK, STATUSS, SORT_NOS, DAT_SAK, DAT_MOD, DAT_BEIG, ATRIB, STD]
+  # Phase 2c (verified 2026-10-10, docs/data-sources.md §7). BIS file names carry the
+  # export date, so these entries are keyed by role, not by file name.
+  bis_cases: [Atbildigas_iestades_nosaukums, Buvniecibas_lietas_numurs, Buvniecibas_iesnieguma_veids, Objekta_nosaukums, Aktuala_stadija, Buvniecibas_veids, Lietas_izveidosanas_datums]
+  bis_objects: [Buvniecibas_lietas_numurs, Buves_kadastra_apzimejums, Objekta_identifikators_inzenierbuvem, Melioracijas_kadastra_numurs, Buves_atrasanas_vieta_geografiskais_garums, Buves_atrasanas_vieta_geografiskais_platums, Buves_nosaukums, Buves_objekta_adreses_teksts, Buves_objekta_adreses_kods, Buvniecibas_veids, Administrativas_teritorijas_kods, Administrativas_teritorijas_nosaukums]
+  atis_classifier: [Dati, Grupa, Veids, Kods, Apraksts, Elements, DatiKadastra, Visparpieejami_dati, Ierobezoti_dati]
+  encumbrances_frozen: [ADMRKIND, ADMTKIND, CAD_NR, ENCD_ID, DESCRIPTION, NR, ENC_DATE, ENC_SIZE, MEASURE]
 
 # SHP layers: [name, DBF type, width]. CRS: EPSG code the .prj must name (or
 # the exact PROJCS name, for .prj files without an AUTHORITY clause).
@@ -304,6 +310,23 @@ xml:
       - PropertyContentData/ObjectList/ObjectData/ObjectCadastreNrData
       - PropertyContentData/ObjectList/ObjectData/ObjectKindData
       - PropertyContentData/ObjectList/ObjectData/ShareParts
+  encumbrance:
+    root: EncumbranceFullData
+    root_children: [ATVK, EncumbranceItemList, FilePartCount, FilePartNr, PacketId, PreparedDate]
+    item: EncumbranceItemData
+    paths:
+      - EncumbranceList
+      - EncumbranceList/EncumbranceRowData
+      - EncumbranceList/EncumbranceRowData/EncumbranceArea
+      - EncumbranceList/EncumbranceRowData/EncumbranceEstablishDate
+      - EncumbranceList/EncumbranceRowData/EncumbranceKind
+      - EncumbranceList/EncumbranceRowData/EncumbranceKind/EncumbranceKindId
+      - EncumbranceList/EncumbranceRowData/EncumbranceKind/EncumbranceKindName
+      - EncumbranceList/EncumbranceRowData/EncumbranceMeasure
+      - EncumbranceList/EncumbranceRowData/EncumbranceNr
+      - ObjectRelation
+      - ObjectRelation/ObjectCadastreNr
+      - ObjectRelation/ObjectType
 
 # --- Phase 2b (verified 2026-10-09, docs/data-sources.md §6) ---
 # DAP nature SHP: .prj named LKS_1992_Latvia_TM without AUTHORITY -> EPSG:3059.

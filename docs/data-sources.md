@@ -448,7 +448,7 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
 ## 4. Not done here (next steps)
 - **Phase 0 step 2:** done for the MVP sources (2026-10-09, Jelgava). Still open:
   - TAPIS WFS `DescribeFeatureType` (module 8 is not MVP);
-  - DAP `ATIS_CODE` vs cadastre `EncumbranceKindId`.
+  - ~~DAP `ATIS_CODE` vs cadastre `EncumbranceKindId`~~: done 2026-10-10, same code system (§7.4).
 - **Decisions:** D1, D5, D6, D9 and D1 E7 (LVĢMC MapServer) were decided on 2026-10-09; D3 has interim answers until Phase 10 (`docs/decisions.md`).
 - **D1 follow-up:** open geolatvija.lv products 309 and 361 and check for a stable SHP download URL.
 
@@ -548,3 +548,66 @@ Checked before coding (CLAUDE.md rule 2). Registry entries: `config/sources.yaml
   - The LĢIA grid stays mandatory: without it the checked function raises, like the strict one (`tests/test_crs.py`), so the silent null shift of D9 cannot return.
 - `lks92_to_lks2020()` itself is unchanged and strict.
 - On the 2026-04-07 DAP files, **67 objects are flagged `outside_grid`**, all reaching beyond Latvia's land extent (at sea). The farthest are 44 habitats **1170 "Akmeņu sēkļi jūrā"** (reefs), 30–50 km off the Kurzeme coast. The grid itself reaches a few km offshore, so objects just beyond the land extent can still be inside it. The pilot test allows the land extent + 150 km and checks that no flagged object lies on land.
+
+---
+
+## 7. Phase 2c import verification (2026-10-10)
+
+Checked before coding (CLAUDE.md rule 2) with [`etl/discovery/verify_2c.py`](../etl/discovery/verify_2c.py) (runs in the etl container; `show`, `fetch`, `bis`, `enc`, `frozen`), on today's files and the pilot members of `encumbrance.zip` (HTTP Range). Registry: `config/sources.yaml`; roles and options: `config/etl.yaml`; expected columns and paths: `config/schemas.yaml`.
+
+| Registry id | Dataset(s) | Resources (id → file) | `last_modified` | Licence |
+|---|---|---|---|---|
+| `bis_cases` | `bis_jlyakg7hgslonjnwyrwc6w` (cases), `bis_tln9s3hrpjlnucmjip9r3g` (case objects) | `4f5648b2-…` `buvniecibas-lietu-saraksts-10.10.2026.csv` (73.4 MB); `f41f3ee3-…` `translation-missing-lv.activerecord.attributes.case_building.csv.filename` (70.6 MB, a CSV despite the name) | 2026-10-10 00:14 / 00:15 | CC0-1.0 |
+| `cadastre_encumbrances` | `kadastra-informacijas-sistemas-atvertie-dati` | `ca8a415c-…` `encumbrance.zip` (56.3 MB, 85 members, Range answered 206) | 2026-09-28 | CC-BY-4.0 |
+| `atis_classifier` | `atis-datu-un-kadastra-objektu-apgrutinajumu-klasifikators` | `072603f8-…` `atis_un_kadastra_-klasifikators_27012026.csv` (119 KB) | 2026-01-27 | CC-BY-4.0 |
+| `encumbrances_frozen` | `apgrutinajumi-kas-kadastra-registreti-lidz-2025-gada-31-janvarim` | Latgale `70e5bb02-…` / `89b4b594-…`, Rīga `f3566de0-…` / `89ace2d7-…`, Zemgale `9ede9729-…` / `06533bca-…` (parcels / parcel parts, `…_20250131.csv`) | 2025-02-02 | CC-BY-4.0 |
+
+- **Several datasets per source:** `bis_cases` spans two CKAN datasets; the runner now finds each resource in whichever of the source's listed datasets holds it.
+- **Publish times:** BIS republishes daily at about 00:15 (CKAN time), the cadastre weekly, the classifier about yearly, the frozen list never. The Monday pilot workflow (03:00 UTC, two runs) sees one BIS file.
+- CKAN `size` for the case list is stale (69.4 MB listed, 73.4 MB served); sizes are not used for identity.
+
+### 7.1 BIS (raw CSVs, never the DataStore)
+- `lietas` (cases): 328,056 rows, UTF-8 **without** BOM, all fields quoted. Case numbers are unique; 18,638 are `TMP-<n>-<n>` instead of `BIS-…` (text either way). `Lietas_izveidosanas_datums` is always `YYYY-MM-DD`. Stages: Ekspluatācija 178,924, Būvdarbi 69,246, … (no "Ideja": excluded by BVKB).
+- `objekti` (case objects): **425,473 rows** (the DataStore copy has 48,000), UTF-8 with BOM.
+  - `Buves_kadastra_apzimejums`: 248,572 × 14 digits, **40,262 × 17 digits** (room groups), 136,639 empty, 4 values that are only spaces (treated as empty); **61,312 start with `0`**. No 13- or 16-digit values today, but rule E2 restoration still applies.
+  - **`Administrativas_teritorijas_kods` has lost its leading zeros in the raw file:** 4 digits (126,017, e.g. `4000` = Jūrmala `0004000`), 5 digits (285,898, e.g. `30000` = Jelgavas novads `0030000`), 6 digits (9, `801800` Inčukalna novads), 13,549 empty. Each code has exactly one name. The importer pads to 7 digits and flags the row **`atvk_zero_padded`** (E2 restores only one missing zero; ATVK lost up to three).
+  - `Buves_objekta_adreses_kods`: 9 digits or empty (87,441). Coordinates: WGS84 degrees, 299,420 rows filled.
+  - **34,040 rows are exact duplicates of another row** (2,909 in the pilot). They are kept as published (key = CSV row number) and counted.
+- **Pilot scope** (config `cadastral_territory`): a case object is in the pilot when its padded ATVK is a pilot city **or** the first 4 digits of its designation are the city's cadastral territory code (`0500` Daugavpils, `0900` Jelgava, `1300` Jūrmala; every pilot building in the cadastre text starts with its city's code). It needs no other source, so a BIS version never depends on cadastre or VARIS versions.
+  - Today: **39,448 object rows** (25,378 by both rules, 13,040 by ATVK only, 1,030 by prefix only), of which 13,036 have no designation (the address code is their only route) and 4,513 are room groups (cut to 14 digits, flag **`room_group_cut`**). **23,388 cases**, all present in the case list.
+- **Version identity:** SHA-256 of the canonical pilot rows (cases and objects); the whole-file SHA-256 is recorded too. A change elsewhere in Latvia creates no version.
+- **Personal data:** no person fields. Names are building and object descriptions and authority names.
+
+### 7.2 Cadastre encumbrances and the ATIS classifier
+- Pilot members `Encumbrance/0002000_20260926_…`, `0003000_…`, `0004000_…` (45.7 / 25.1 / 52.8 MB), root `EncumbranceFullData`, `PreparedDate` 2026-09-26, one part each.
+- **Items: 45,297** (Daugavpils 19,216, Jelgava 12,474, Jūrmala 13,607); **rows: 278,798**.
+- `ObjectType`: `PARCEL` 44,224 (11 digits), `PARCEL PART` 421 (15), **`BUILDING` 652 (14)**: encumbrances are also registered on buildings, which the Phase 0 sample did not show.
+- Row elements: `EncumbranceKindId` (10 digits) + `EncumbranceKindName`, `EncumbranceEstablishDate` (707 empty), `EncumbranceArea` + `EncumbranceMeasure` (`ha` 277,982; `m` 5; `km` 1; missing 810), `EncumbranceNr` (rare). No other element paths occur; they match `EncumbranceFullData.xsd`.
+- **Dates:** 276,471 of the current object/code pairs have an establish date on or after 2025-02-01 and only 1,862 before: the current list was re-registered from ATIS in 2025.
+- **Classifier:** 432 rows (ATIS 426, Kadastrs 6), columns `Dati, Grupa, Veids, Kods, Apraksts, Elements, DatiKadastra, Visparpieejami_dati, Ierobezoti_dati`; `Kods` unique, always 10 digits; UTF-8 with BOM. All 123 kind ids in the pilot encumbrances are classifier codes; for 21 of them the name in the XML differs from `Apraksts` (case, wording), so both texts are kept.
+
+### 7.3 Frozen pre-2025 list vs current encumbrances
+- Files per planning region, parcels and parcel parts, columns `ADMRKIND, ADMTKIND, CAD_NR, ENCD_ID, DESCRIPTION, NR, ENC_DATE, ENC_SIZE, MEASURE`, UTF-8 with BOM. The pilot cities are only in the Latgale (`ADMTKIND` "Daugavpils"), Rīga ("Jūrmala") and Zemgale ("Jelgava") files: **79,960 pilot rows** (parcels 79,279, parcel parts 681). `ENCD_ID` has 10 digits (current ATIS codes) but also 6 and 8 digits (codes of the earlier classifier, e.g. `020401`, `14010103`); stored as published, never padded.
+- **Comparison per object and code** (pilot, current cadastre text of 2026-09-26):
+
+| Frozen pilot rows | Count |
+|---|---|
+| same object, same code also in the current list | 28,642 |
+| object no longer in the cadastre | 976 |
+| old 6- / 8-digit code (cannot be matched by code) | 22,771 / 923 |
+| 10-digit code not in the current classifier | 6,954 |
+| **current classifier code, object still exists, code absent from the current list** | **19,694** |
+
+- Of those 19,694, 14,265 have classifier codes marked `Ierobezoti_dati = Jā` and 5,429 `Nē`; the commonest are protection zones of sewers (2,615), drains and ditches (2,356) and overhead power lines (2,140). Dates 1994–2024.
+- 1,061 pilot objects have encumbrances in the frozen list but **none** in the current list.
+- **Conclusion:** the current data does **not** contain every encumbrance of the frozen list. Whether the missing ones are still valid (not yet re-registered from ATIS, not published, or removed) cannot be told from open data. **Decided 2026-10-10 (Phase 2c): the frozen list is imported** for the pilot cities as source `encumbrances_frozen`, every row flagged `frozen` with its as-of date 2025-01-31. Module 6 must show frozen-only encumbrances separately ("reģistrēts līdz 31.01.2025; pašreizējā sarakstā nav"), never as current.
+
+### 7.4 DAP `ATIS_CODE` vs cadastre encumbrance codes (open item from §4)
+- Compared on the live DAP versions (2026-04-07 files, whole country) with the classifier and the pilot encumbrances.
+- **They are the same code system.** All 24,537 non-empty DAP `ATIS_CODE` values (48 distinct codes) are classifier codes, e.g. `7313100100` mikrolieguma teritorija (all 3,112 microreserves), `7313100200` buffer zones, `7313080300` dižkoka teritorija (16,384 monuments). 17 of the 48 codes occur in the pilot encumbrances (e.g. `7313020600` national park neutral zone, 915 rows).
+- Empty codes: all 174,999 habitats (`Biotopi` has no ATIS code), 75 protected areas, 27 zoning polygons, 1 buffer zone. One buffer zone has the code in its description field.
+- DAP descriptions equal `Apraksts` apart from case, plural forms and non-breaking spaces.
+- **Consequence:** modules 3 (nature overlap) and 6 (registered encumbrances) can be cross-referenced by code, e.g. "the parcel lies in a microreserve (DAP) and has, or lacks, the registered encumbrance `7313100100`".
+
+### 7.5 Colleagues' BIS example
+PLAN §6.1 cites "13 cases, only 3 exact". No document in the repo (PLAN history, test-set templates) names the object or the case numbers, so it is **not** a regression case yet. Add it to `tests/data/` when the object is known.
