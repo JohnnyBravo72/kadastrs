@@ -534,3 +534,16 @@ Checked before coding (CLAUDE.md rule 2). Registry entries: `config/sources.yaml
 - **Key: `GlobalID`** (C38), unique in every layer, never empty. `ID` (N10) is not unique in habitats; `MRCODE` (N10) links buffer zones to microreserves. Both are kept as text attributes.
 - **Personal data:** no field holds a natural person's name, code or birth date (field lists in `config/schemas.yaml`). `LOCALNAME` (monuments) is a place name.
 - Geometry: self-intersections in every layer except monuments; 1 empty geometry in buffer zones; 1 zero-area habitat ring (Phase 0, §3.6). Repair counts are logged per layer.
+
+### 6.3 Geometry repair method (rule E5)
+- The flood pilot extent holds very large polygons: layer 3 object 17691 has 1.56 M vertices, layer 0 object 24562 1.21 M (the 216 km² polygon of §3.5); both are invalid as published.
+- PostGIS `ST_MakeValid` with the default `method=linework` did **not finish in 12 hours** on object 17691. With **`method=structure`** (rings treated as shells and holes; collapsed parts dropped) it takes 2–5 minutes, and the repaired area equals the published area exactly (425,750,600.3 m² for 17691; 215,958,237.4 m² for 24562).
+- All imports therefore use `method=structure`. The bow-tie and spike fixtures of T-E5 give the same results with both methods. Live versions imported before the change keep their geometry until their source data changes (the version identity is the raw content).
+- Union per key runs only for keys with several parts (`ST_UnaryUnion(ST_Collect(…))`); a single polygon is not overlaid with itself.
+
+### 6.4 Outside the LĢIA grid (rule E5, D9)
+- Found on the first DAP import (2026-10-10): `nature_protected_areas` and `nature_habitats` stopped with PROJ error 2052 *"Coordinate to transform falls outside grid"*. Marine protected areas and coastal habitats reach into the Baltic Sea and the Gulf of Riga, beyond the extent of `lv_lgia_lks92to2020.tif`.
+- **`lks92_to_lks2020_checked()`** (migration `20261010080000`) tries the strict EPSG:10838 pipeline. Only on that error it uses the same pipeline with the grid chain `lv_lgia_lks92to2020.tif,@null`: the LĢIA grid wherever it has values, a **zero shift outside it**, and the object gets the flag **`outside_grid`** (counted in `import_log` and the version's `processing`).
+  - Error outside the grid: at most the LKS-92 → LKS-2020 shift itself (≈ 10 cm at Odukalns), and only at sea.
+  - The LĢIA grid stays mandatory: without it the checked function raises, like the strict one (`tests/test_crs.py`), so the silent null shift of D9 cannot return.
+- `lks92_to_lks2020()` itself is unchanged and strict.

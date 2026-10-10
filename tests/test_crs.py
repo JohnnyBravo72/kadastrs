@@ -138,6 +138,7 @@ def nogrid(nogrid_conn):
     assert size is None, "db-nogrid still has the grid file"
     with nogrid_conn.transaction(force_rollback=True):
         nogrid_conn.execute(_migration_up_sql("20261009120000_extensions_and_crs.sql"))
+        nogrid_conn.execute(_migration_up_sql("20261010080000_lks_transform_outside_grid.sql"))
         yield nogrid_conn
 
 
@@ -155,3 +156,31 @@ def test_without_grid_st_transform_misses_1cm(nogrid, path_sql):
 def test_without_grid_import_function_raises(nogrid):
     with pytest.raises(psycopg.errors.InternalError), nogrid.transaction():
         nogrid.execute(f"SELECT {IMPORT_FUNCTION_PATH}")
+
+
+# --- lks92_to_lks2020_checked: zero shift outside the LĢIA grid, never without it ------
+
+OFFSHORE_3059 = (200000.0, 300000.0)  # Baltic Sea west of Latvia, outside the grid
+
+
+def test_checked_transform_equals_strict_inside_the_grid(db_conn):
+    d, outside = db_conn.execute(
+        f"SELECT ST_Distance((t).geom, {IMPORT_FUNCTION_PATH}), (t).outside_grid"
+        f" FROM (SELECT lks92_to_lks2020_checked({_point(ODUKALNS_3059, 3059)}) t) s"
+    ).fetchone()
+    assert d == 0 and outside is False
+
+
+def test_checked_transform_zero_shift_outside_the_grid(db_conn):
+    with pytest.raises(psycopg.errors.InternalError, match="outside grid"), db_conn.transaction():
+        db_conn.execute(f"SELECT lks92_to_lks2020({_point(OFFSHORE_3059, 3059)})")
+    x, y, outside = db_conn.execute(
+        f"SELECT ST_X((t).geom), ST_Y((t).geom), (t).outside_grid"
+        f" FROM (SELECT lks92_to_lks2020_checked({_point(OFFSHORE_3059, 3059)}) t) s"
+    ).fetchone()
+    assert (round(x, 6), round(y, 6), outside) == (*OFFSHORE_3059, True)
+
+
+def test_without_grid_checked_transform_raises(nogrid):
+    with pytest.raises(psycopg.errors.InternalError), nogrid.transaction():
+        nogrid.execute(f"SELECT lks92_to_lks2020_checked({_point(ODUKALNS_3059, 3059)})")

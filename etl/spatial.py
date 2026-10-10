@@ -1,8 +1,12 @@
 """SHP reading and geometry normalisation (rule E5).
 
 SHP files are read with pyshp (pure Python) into a staging table as GeoJSON.
+make_valid uses GEOS method=structure (rings as shells/holes, collapsed parts
+dropped): the default `linework` method did not finish in 12 h on the largest
+flood polygon (1.56 M vertices); `structure` took 173 s with identical area.
 All geometry work happens in PostGIS, in this order:
-  assign the source SRID explicitly -> ST_MakeValid -> polygon parts only ->
+  assign the source SRID explicitly -> (rings pyshp cannot assemble: ST_BuildArea)
+  -> ST_MakeValid(method=structure) -> polygon parts only ->
   union per key -> MultiPolygon -> lks92_to_lks2020() if the source is EPSG:3059
   -> validity check.
 """
@@ -30,13 +34,31 @@ class Layer:
     srid: int
     reader: shapefile.Reader
 
+    rings_rebuilt: int = 0
+
     def records(self) -> Iterator[tuple[dict, str | None]]:
-        """(attributes, GeoJSON or None for a null shape)."""
+        """(attributes, GeoJSON or None for a null shape).
+
+        If pyshp cannot assemble a polygon's rings (e.g. a zero-area ring:
+        RingSamplingError, one DAP habitat), the raw rings are passed on as a
+        MultiLineString; normalise_into() builds the area with ST_BuildArea."""
         for sr in self.reader.iterShapeRecords():
             shape = sr.shape
             geo = None
             if shape.shapeType != shapefile.NULL and shape.points:
-                geo = json.dumps(shape.__geo_interface__, separators=(",", ":"))
+                try:
+                    gi = shape.__geo_interface__
+                except Exception:  # pyshp ring assembly failed
+                    self.rings_rebuilt += 1
+                    bounds = [*shape.parts, len(shape.points)]
+                    gi = {
+                        "type": "MultiLineString",
+                        "coordinates": [
+                            [list(p[:2]) for p in shape.points[a:b]]
+                            for a, b in zip(bounds, bounds[1:], strict=False)
+                        ],
+                    }
+                geo = json.dumps(gi, separators=(",", ":"))
             yield sr.record.as_dict(), geo
 
 
@@ -107,9 +129,26 @@ def normalise_into(
     """
     if source_srid not in (STORAGE_SRID, LKS92_SRID):
         raise SchemaMismatch(f"unsupported source SRID {source_srid}")
-    transform = "lks92_to_lks2020(geom)" if source_srid == LKS92_SRID else "geom"
+    if source_srid == LKS92_SRID:
+        if "flags" not in aggregates:
+            raise ValueError("a 3059 source needs a `flags` aggregate (outside_grid flag)")
+        # Strict EPSG:10838 grid; vertices outside the LĢIA grid get a zero shift
+        # and the object the flag outside_grid (migration 20261010080000).
+        transform = (
+            "SELECT (t).geom AS g, (t).outside_grid AS outside"
+            " FROM (SELECT lks92_to_lks2020_checked(u.geom) AS t) z"
+        )
+    else:
+        transform = "SELECT u.geom AS g, false AS outside"
     key_list = sql.SQL(", ").join(sql.Identifier(k) for k in keys)
+    u_keys = sql.SQL(", ").join(sql.SQL("u.{}").format(sql.Identifier(k)) for k in keys)
     agg_cols = sql.SQL(", ").join(sql.Identifier(c) for c in aggregates)
+    u_agg_cols = sql.SQL(", ").join(
+        sql.SQL("CASE WHEN x.outside THEN array_append(u.flags, 'outside_grid') ELSE u.flags END")
+        if c == "flags"
+        else sql.SQL("u.{}").format(sql.Identifier(c))
+        for c in aggregates
+    )
     agg_exprs = sql.SQL(", ").join(
         sql.SQL("{} AS {}").format(sql.SQL(e), sql.Identifier(c)) for c, e in aggregates.items()
     )
@@ -124,25 +163,35 @@ def normalise_into(
         sql.SQL(
             """
             INSERT INTO {target} (dataset_version_id, {keys}, {agg_cols}, parts, geom)
-            SELECT {version}, {keys}, {agg_cols}, parts,
-                   ST_Multi(ST_CollectionExtract({transform}, 3))
+            SELECT {version}, {u_keys}, {u_agg_cols}, u.parts,
+                   ST_Multi(ST_CollectionExtract(x.g, 3))
             FROM (
                 SELECT {keys}, {agg_exprs}, count(*) AS parts,
-                       ST_CollectionExtract(ST_Union(g), 3) AS geom
+                       -- union only keys with several parts: an overlay of one huge
+                       -- polygon with itself is expensive and changes nothing
+                       ST_CollectionExtract(CASE WHEN count(*) > 1
+                                                 THEN ST_UnaryUnion(ST_Collect(g))
+                                                 ELSE ST_Collect(g) END, 3) AS geom
                 FROM (
-                    SELECT *, ST_CollectionExtract(ST_MakeValid(
-                               ST_SetSRID(ST_GeomFromGeoJSON(geojson), {srid})), 3) AS g
-                    FROM {stage} WHERE geojson IS NOT NULL
+                    SELECT *, ST_CollectionExtract(ST_MakeValid(ST_SetSRID(
+                               CASE WHEN GeometryType(raw) = 'MULTILINESTRING'
+                                    THEN ST_BuildArea(raw) ELSE raw END, {srid}),
+                               'method=structure'), 3) AS g
+                    FROM (SELECT *, ST_GeomFromGeoJSON(geojson) AS raw
+                          FROM {stage} WHERE geojson IS NOT NULL) r
                 ) s
                 WHERE NOT ST_IsEmpty(g)
                 GROUP BY {keys}
             ) u
-            WHERE NOT ST_IsEmpty(geom)
+            CROSS JOIN LATERAL ({transform}) x
+            WHERE NOT ST_IsEmpty(u.geom)
             """
         ).format(
             target=sql.SQL(target),
             keys=key_list,
+            u_keys=u_keys,
             agg_cols=agg_cols,
+            u_agg_cols=u_agg_cols,
             agg_exprs=agg_exprs,
             version=sql.Literal(version_id),
             transform=sql.SQL(transform),
@@ -166,6 +215,14 @@ def normalise_into(
         raise ValueError(
             f"{target}: {bad} geometries invalid or not MULTIPOLYGON after normalisation"
         )
+    outside_grid = 0
+    if "flags" in aggregates:
+        outside_grid = conn.execute(
+            sql.SQL(
+                "SELECT count(*) FROM {target} WHERE dataset_version_id = {v}"
+                " AND 'outside_grid' = ANY(flags)"
+            ).format(target=sql.SQL(target), v=sql.Literal(version_id))
+        ).fetchone()[0]
     return {
         "source_records": stats[0],
         "null_shapes": stats[1],
@@ -175,4 +232,6 @@ def normalise_into(
         # keys whose records were all null shapes or empty after make_valid:
         # these objects have no geometry (warning no_geometry, PLAN §6.3)
         "keys_without_geometry": distinct_keys - inserted,
+        # 3059 objects with vertices outside the LĢIA grid (zero shift there)
+        "outside_grid": outside_grid,
     }

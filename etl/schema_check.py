@@ -41,7 +41,7 @@ def check_prj(name: str, prj: str, spec: dict) -> int:
     crs_name = spec["crs_name"]
     if not flat.startswith(f"PROJCS[{crs_name},"):
         raise SchemaMismatch(f"{name}: .prj is not {crs_name}: {prj[:120]}")
-    return int(crs_name.rsplit("_", 1)[1])  # ..._EPSG_10306
+    return int(spec["crs_srid"])  # .prj without AUTHORITY: SRID assigned by name
 
 
 def check_xml_paths(name: str, seen: set[str], expected: list[str], required: list[str]) -> None:

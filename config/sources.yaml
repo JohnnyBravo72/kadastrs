@@ -256,7 +256,7 @@ allowed_external_resources:
         effect: "Area change < 0.001% on the largest polygon (215.96 -> 215.958 km2)"
         report_lv: "Ģeometrija iegūta ar 1 cm vienkāršošanu (servera ierobežojums); laukuma izmaiņa < 0,001 %."
       - id: make_valid
-        what: "Invalid geometries repaired with make_valid (ring self-intersections)"
+        what: "Invalid geometries repaired with PostGIS ST_MakeValid(method=structure) (ring self-intersections)"
         why: "About 5% of polygons are invalid at the source (Jelgava sample: 37 of 749)"
         effect: "Total area unchanged in the Jelgava sample (216.904 km2 before and after)"
         report_lv: "Nederīgas ģeometrijas (pašpārklāšanās) labotas automātiski; kopējais laukums nemainās."
