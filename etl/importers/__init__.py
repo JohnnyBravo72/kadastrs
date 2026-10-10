@@ -1,11 +1,14 @@
 """Importers by registry id, in the order `import all` runs them.
 
-flood_10y needs the live admin_boundaries version (pilot city extents)."""
+flood_10y needs the live admin_boundaries version (pilot city extents). The
+Phase 2c sources need none at import time; their links to the cadastre are SQL
+functions of versions (ref.bis_links, ref.encumbrance_frozen_status)."""
 
 from etl.importers.admin import AdminBoundaries
 from etl.importers.bis import BisCases
 from etl.importers.cadastre_spatial import CadastreSpatial
 from etl.importers.cadastre_text import CadastreText
+from etl.importers.encumbrances import AtisClassifier, CadastreEncumbrances, EncumbrancesFrozen
 from etl.importers.flood import Flood10y
 from etl.importers.nature import (
     NatureHabitats,
@@ -25,5 +28,8 @@ IMPORTERS = {
     "nature_microreserves": NatureMicroreserves,
     "nature_monuments": NatureMonuments,
     "nature_habitats": NatureHabitats,
+    "atis_classifier": AtisClassifier,
+    "cadastre_encumbrances": CadastreEncumbrances,
+    "encumbrances_frozen": EncumbrancesFrozen,
     "bis_cases": BisCases,
 }

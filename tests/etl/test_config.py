@@ -2,6 +2,7 @@
 
 from etl.importers import IMPORTERS
 from etl.importers.cadastre_text import REQUIRED
+from etl.importers.encumbrances import REQUIRED as ENCUMBRANCE_REQUIRED
 from etl.settings import etl_config, schemas
 from etl.sources import load_config
 
@@ -34,3 +35,12 @@ def test_pilot_atvk_are_text():
 def test_required_xml_paths_are_expected():
     for role, required in REQUIRED.items():
         assert set(required) <= set(schemas()["xml"][role]["paths"]), role
+    assert set(ENCUMBRANCE_REQUIRED) <= set(schemas()["xml"]["encumbrance"]["paths"])
+
+
+def test_pilot_cadastral_territory_per_city():
+    assert etl_config().pilot_cadastral_territory == {
+        "0002000": "0500",
+        "0003000": "0900",
+        "0004000": "1300",
+    }

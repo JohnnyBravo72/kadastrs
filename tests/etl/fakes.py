@@ -514,12 +514,14 @@ ROOTS = {
     "parcelpart": ("ParcelPartFullData", "ParcelPartItemList"),
     "building": ("BuildingFullData", "BuildingItemList"),
     "property": ("PropertyFullData", "PropertyItemList"),
+    "encumbrance": ("EncumbranceFullData", "EncumbranceItemList"),
 }
 KINDS = {
     "parcel": "Parcel",
     "parcelpart": "ParcelPart",
     "building": "Building",
     "property": "Property",
+    "encumbrance": "Encumbrance",
 }
 
 
@@ -811,3 +813,133 @@ def bis_cadastre_docs(role: str) -> dict[str, bytes]:
         return docs
     docs["0003000"] = xml_doc(role, "0003000", items)
     return docs
+
+
+# --- Encumbrances: cadastre XML, ATIS classifier, frozen list (§7.2-7.3) -------------
+
+
+def encumbrance_row(
+    kind="7312050201",
+    name="ekspluatācijas aizsargjoslas teritorija gar elektrisko tīklu kabeļu līniju",
+    date="2025-08-15",
+    area="0.012",
+    measure="ha",
+    nr=None,
+) -> str:
+    nr_el = f"<EncumbranceNr>{nr}</EncumbranceNr>" if nr else ""
+    date_el = f"<EncumbranceEstablishDate>{date}</EncumbranceEstablishDate>" if date else ""
+    area_el = (
+        f"<EncumbranceArea>{area}</EncumbranceArea><EncumbranceMeasure>{measure}"
+        "</EncumbranceMeasure>"
+        if area
+        else ""
+    )
+    return (
+        f"<EncumbranceRowData><EncumbranceKind><EncumbranceKindId>{kind}</EncumbranceKindId>"
+        f"<EncumbranceKindName>{name}</EncumbranceKindName></EncumbranceKind>"
+        f"{nr_el}{date_el}{area_el}</EncumbranceRowData>"
+    )
+
+
+def encumbrance_item(code: str, object_type: str = "PARCEL", rows=None) -> str:
+    rows = rows if rows is not None else [encumbrance_row()]
+    return (
+        f"<EncumbranceItemData><ObjectRelation><ObjectCadastreNr>{code}</ObjectCadastreNr>"
+        f"<ObjectType>{object_type}</ObjectType></ObjectRelation>"
+        f"<EncumbranceList>{''.join(rows)}</EncumbranceList></EncumbranceItemData>"
+    )
+
+
+def encumbrance_docs(jelgava_items=None, namespace=True, prepared="2026-09-26"):
+    """Pilot members: Jelgava with the given items, the other cities one parcel each."""
+    out = {}
+    for atvk, prefix in (("0002000", "0500"), ("0003000", "0900"), ("0004000", "1300")):
+        items = [encumbrance_item(f"{prefix}0000001")]
+        if atvk == "0003000" and jelgava_items is not None:
+            items = jelgava_items
+        out[atvk] = xml_doc("encumbrance", atvk, items, prepared=prepared, namespace=namespace)
+    return out
+
+
+def publish_encumbrances(server, docs=None, **kw):
+    docs = encumbrance_docs() if docs is None else docs
+    body = text_zip("encumbrance", docs, other={"0011000": xml_doc("encumbrance", "0011000", [])})
+    server.publish("cadastre_encumbrances", "encumbrance", "encumbrance.zip", body, **kw)
+
+
+def classifier_row(
+    code, description, group="Elektriskie tīkli un to aizsargjoslas", restricted="Nē"
+) -> dict:
+    return {
+        "Dati": "ATIS",
+        "Grupa": group,
+        "Veids": "Elektriskie tīkli",
+        "Kods": code,
+        "Apraksts": description,
+        "Elements": "daudzstūris",
+        "DatiKadastra": "Jā",
+        "Visparpieejami_dati": "Neattiecas",
+        "Ierobezoti_dati": restricted,
+    }
+
+
+CLASSIFIER = [
+    classifier_row(
+        "7312050201", "ekspluatācijas aizsargjoslas teritorija gar elektrisko tīklu kabeļu līniju"
+    ),
+    classifier_row(
+        "7312010300",
+        "ekspluatācijas aizsargjoslas teritorija gar pašteces kanalizācijas vadu",
+        group="Ūdensapgādes un kanalizācijas tīkli",
+        restricted="Jā",
+    ),
+    classifier_row(
+        "7313100100", "mikrolieguma teritorija", group="Īpaši aizsargājamas dabas teritorijas"
+    ),
+]
+
+
+def publish_classifier(server, rows=None, **kw):
+    body = csv_bytes("atis_classifier", CLASSIFIER if rows is None else rows)
+    server.publish("atis_classifier", "classifier", "atis_klasifikators_27012026.csv", body, **kw)
+
+
+def frozen_row(cad, code, territory="Jelgava", date="2009-10-12", size="0.05", measure="ha"):
+    return {
+        "ADMRKIND": territory,
+        "ADMTKIND": territory,
+        "CAD_NR": cad,
+        "ENCD_ID": code,
+        "DESCRIPTION": "aizsargjoslas teritorija",
+        "NR": "1",
+        "ENC_DATE": date,
+        "ENC_SIZE": size,
+        "MEASURE": measure,
+    }
+
+
+# Default frozen rows (tests/etl/test_encumbrances.py).
+FROZEN_FILES = {
+    "zemgale_parcel": [
+        frozen_row("09000360220", "7312050201"),  # also in the current list
+        frozen_row("09000360220", "7312010300"),  # current code, missing now: frozen only
+        frozen_row("9000360221", "020401", date=""),  # lost zero; old 6-digit code
+        frozen_row("09000999999", "7312010300"),  # parcel no longer in the cadastre
+        frozen_row("54000010001", "7312010300", territory="Jelgavas novads"),  # outside pilot
+    ],
+    "zemgale_part": [frozen_row("090003602200001", "14010103", size="", measure="")],
+    "latgale_parcel": [frozen_row("05000010002", "7314020102", territory="Daugavpils")],
+    "latgale_part": [],
+    "riga_parcel": [frozen_row("13000102702", "7311010100", territory="Jūrmala")],
+    "riga_part": [],
+}
+
+
+def publish_frozen(server, files=None, date="20250131", **kw):
+    for role, rows in (FROZEN_FILES if files is None else files).items():
+        region, kind = role.split("_")
+        what = "zemes_vienibu_dalas" if kind == "part" else "zemes_vienibas"
+        name = f"apgrutinajumi_{what}_{region}_{date}.csv"
+        server.publish(
+            "encumbrances_frozen", role, name, csv_bytes("encumbrances_frozen", rows), **kw
+        )

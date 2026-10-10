@@ -26,6 +26,7 @@ ITEMS = {
     "parcelpart": "ParcelPartItemData",
     "building": "BuildingItemData",
     "property": "PropertyItemData",
+    "encumbrance": "EncumbranceItemData",  # cadastre_encumbrances (etl/importers/encumbrances.py)
 }
 # Elements the importer reads; each must exist in the file (schema check).
 REQUIRED = {
@@ -102,6 +103,81 @@ def iter_file_items(path: Path, role: str, seen_paths: set[str], root_children: 
         depth -= 1
 
 
+def fetch_pilot_members(ctx, roles) -> list[FileRecord]:
+    """Fetch the pilot members of national cadastre text zips by HTTP Range (whole
+    zip if Range is ignored). Raises RemoteUnchanged when the zips' remote
+    fingerprints equal the live version's (docs/data-sources.md §5.4)."""
+    pilot = set(ctx.cfg.pilot_atvk)
+    zips, records = {}, []
+    for role in roles:
+        res = ctx.resources[role]
+        rz = RemoteZip(ctx.client, res.url, ctx.workdir / "_full").open()
+        if not rz.range_supported:
+            ctx.notes.append(f"range_unsupported: {role} downloaded in full")
+        zips[role] = rz
+        records.append(
+            FileRecord(
+                role=role,
+                resource_id=res.id,
+                url=res.url,
+                last_modified=iso(res.last_modified),
+                size=rz.total_size,
+                central_directory_sha256=rz.central_directory_sha256,
+                range_supported=rz.range_supported,
+            )
+        )
+    live = ctx.live_fingerprints()
+    if live is not None and live == fingerprints(records):
+        raise RemoteUnchanged()
+
+    for rec in records:
+        rz = zips[rec.role]
+        found = pilot_members(rz.members, pilot)
+        missing = pilot - {a for a, _ in found}
+        if missing:
+            raise ValueError(f"{rec.role}.zip has no member for ATVK {sorted(missing)}")
+        for _atvk, m in sorted(found, key=lambda x: x[1].name):
+            rel = f"{rec.role}/{Path(m.name).name}"
+            sha = rz.extract(m, ctx.workdir / rel)
+            rec.members.append(
+                MemberRecord(name=m.name, crc32=m.crc32, size=m.usize, sha256=sha, path=rel)
+            )
+    for rz in zips.values():
+        if rz.local_copy is not None:
+            rz.local_copy.unlink(missing_ok=True)
+    return records
+
+
+def prepared_date(ctx, files) -> date:
+    """The files' own PreparedDate (rule E7): the oldest across members."""
+    dates = []
+    for f in files:
+        for m in f.members:
+            d = scan_header(ctx.workdir / m.path).get("PreparedDate")
+            if not d:
+                raise SchemaMismatch(f"{m.name}: no PreparedDate")
+            dates.append(date.fromisoformat(d))
+    return min(dates)
+
+
+def check_parts(workdir: Path, role: str, members) -> None:
+    """A city may be split into several members: all parts 1..FilePartCount present."""
+    parts = defaultdict(list)
+    for m in members:
+        h = scan_header(workdir / m.path)
+        parts[h["ATVK"]].append(int(h.get("FilePartNr") or 0))
+        if int(h.get("FilePartCount") or 0) < 1:
+            raise SchemaMismatch(f"{m.name}: FilePartCount missing")
+    for m in members:
+        h = scan_header(workdir / m.path)
+        expected = int(h["FilePartCount"])
+        if sorted(parts[h["ATVK"]]) != list(range(1, expected + 1)):
+            raise ValueError(
+                f"{role} ATVK {h['ATVK']}: parts {sorted(parts[h['ATVK']])}, "
+                f"FilePartCount {expected}"
+            )
+
+
 def _code(value, length, what):
     code, flags = codes.normalize_code(value, length)
     if code is None:
@@ -133,59 +209,11 @@ def _int(value: str | None) -> str | None:
 class CadastreText:
     source_id = "cadastre_text"
 
-    # -- fetch -----------------------------------------------------------------
-
     def fetch(self, ctx):
-        pilot = set(ctx.cfg.pilot_atvk)
-        zips, records = {}, []
-        for role in ROLES:
-            res = ctx.resources[role]
-            rz = RemoteZip(ctx.client, res.url, ctx.workdir / "_full").open()
-            if not rz.range_supported:
-                ctx.notes.append(f"range_unsupported: {role} downloaded in full")
-            zips[role] = rz
-            records.append(
-                FileRecord(
-                    role=role,
-                    resource_id=res.id,
-                    url=res.url,
-                    last_modified=iso(res.last_modified),
-                    size=rz.total_size,
-                    central_directory_sha256=rz.central_directory_sha256,
-                    range_supported=rz.range_supported,
-                )
-            )
-        live = ctx.live_fingerprints()
-        if live is not None and live == fingerprints(records):
-            raise RemoteUnchanged()
-
-        for rec in records:
-            rz = zips[rec.role]
-            found = pilot_members(rz.members, pilot)
-            missing = pilot - {a for a, _ in found}
-            if missing:
-                raise ValueError(f"{rec.role}.zip has no member for ATVK {sorted(missing)}")
-            for _atvk, m in sorted(found, key=lambda x: x[1].name):
-                rel = f"{rec.role}/{Path(m.name).name}"
-                sha = rz.extract(m, ctx.workdir / rel)
-                rec.members.append(
-                    MemberRecord(name=m.name, crc32=m.crc32, size=m.usize, sha256=sha, path=rel)
-                )
-        for rz in zips.values():
-            if rz.local_copy is not None:
-                rz.local_copy.unlink(missing_ok=True)
-        return records
+        return fetch_pilot_members(ctx, ROLES)
 
     def version_date(self, ctx, files) -> date:
-        """The files' own PreparedDate (rule E7): the oldest across members."""
-        dates = []
-        for f in files:
-            for m in f.members:
-                d = scan_header(ctx.workdir / m.path).get("PreparedDate")
-                if not d:
-                    raise SchemaMismatch(f"{m.name}: no PreparedDate")
-                dates.append(date.fromisoformat(d))
-        return min(dates)
+        return prepared_date(ctx, files)
 
     # -- load ------------------------------------------------------------------
 
@@ -195,20 +223,7 @@ class CadastreText:
             role = f.role
             spec = schemas()["xml"][role]
             seen, root_children = set(), set()
-            parts = defaultdict(list)
-            for m in f.members:
-                h = scan_header(ctx.workdir / m.path)
-                parts[h["ATVK"]].append(int(h.get("FilePartNr") or 0))
-                if int(h.get("FilePartCount") or 0) < 1:
-                    raise SchemaMismatch(f"{m.name}: FilePartCount missing")
-            for m in f.members:
-                h = scan_header(ctx.workdir / m.path)
-                expected = int(h["FilePartCount"])
-                if sorted(parts[h["ATVK"]]) != list(range(1, expected + 1)):
-                    raise ValueError(
-                        f"{role} ATVK {h['ATVK']}: parts {sorted(parts[h['ATVK']])}, "
-                        f"FilePartCount {expected}"
-                    )
+            check_parts(ctx.workdir, role, f.members)
             handler = getattr(self, f"_load_{role}")
             c = handler(conn, version_id, ctx.workdir, f.members, seen, root_children)
             check_xml_paths(role, seen, spec["paths"], REQUIRED[role])
