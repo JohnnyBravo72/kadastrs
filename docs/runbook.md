@@ -115,7 +115,7 @@ docker compose run --rm etl status                                 # live versio
   ```powershell
   docker compose run --rm etl bis-links
   ```
-  prints how many pilot case objects match exactly (building in the cadastre), probably (designation prefix = a parcel), only by address code, or not at all.
+  prints how many **distinct** pilot cases match exactly (building in the cadastre), probably (designation prefix = a parcel), only by address code, or not at all. Duplicate rows in the BIS file are stored as published but never counted twice: `ref.bis_links` has one row per case and target, with the source row numbers in `row_nos`.
 - **Encumbrances:** `ref.encumbrance_current` (current list joined with the classifier text) and `ref.encumbrance_frozen_current` (frozen list with `in_current`, `object_in_cadastre`, `frozen_only`). Frozen-only rows are never shown as current encumbrances.
 - The ETL runs the checked-out code (mounted read-only), so code changes need no rebuild. Rebuild after dependency changes: `docker compose --profile etl build etl`.
 

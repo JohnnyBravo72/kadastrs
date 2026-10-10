@@ -103,37 +103,47 @@ def test_bis_atvk_padded_like_the_raw_file(db_conn, live):
 
 
 def test_bis_join_report(db_conn, live):
-    """How many pilot case objects join exactly, probably, only by address, or not at all
-    (printed by `etl bis-links`; numbers recorded in docs/data-sources.md §7.6)."""
+    """How many distinct pilot cases join exactly, probably, only by address, or not at
+    all (printed by `etl bis-links`; numbers recorded in docs/data-sources.md §7.6).
+    Counts are per distinct case, never per raw row (the CSV has duplicate rows)."""
     counts = dict(
         db_conn.execute(
-            "SELECT best_match, count(*) FROM ref.bis_object_best_match(%s, %s) GROUP BY 1",
+            "SELECT best_match, count(*) FROM ref.bis_case_best_match(%s, %s) GROUP BY 1",
             (live["bis_cases"], live["cadastre_text"]),
         ).fetchall()
     )
-    total = one(
+    cases = one(
         db_conn,
-        "SELECT count(*) FROM ref.bis_object WHERE dataset_version_id = %s",
+        "SELECT count(DISTINCT case_number) FROM ref.bis_object WHERE dataset_version_id = %s",
         live["bis_cases"],
     )
-    assert sum(counts.values()) == total
+    assert sum(counts.values()) == cases
     assert set(counts) <= {"exact", "probable", "address_only", "none"}
     for kind in ("exact", "probable", "address_only", "none"):
         assert counts.get(kind, 0) > 0, (kind, counts)
     # Phase 0 (Jelgava): the cadastre knows ~94% of designated buildings
     with_designation = one(
         db_conn,
-        "SELECT count(*) FROM ref.bis_object WHERE dataset_version_id = %s"
+        "SELECT count(DISTINCT case_number) FROM ref.bis_object WHERE dataset_version_id = %s"
         " AND building_code IS NOT NULL",
         live["bis_cases"],
     )
     assert counts["exact"] > 0.8 * with_designation, counts
 
 
-def test_bis_links_cover_the_cadastre_link_and_prefix_rule(db_conn, live):
-    """exact_building rows equal BIS building codes found in the cadastre text, and
-    probable_parcel rows never point at a building the cadastre knows."""
+def test_bis_links_are_distinct_and_cover_the_rules(db_conn, live):
+    """One link row per case and target; exact_building links equal the distinct
+    (case, building) pairs found in the cadastre text; probable_parcel never points
+    at a building the cadastre knows."""
     bis, cad = live["bis_cases"], live["cadastre_text"]
+    total, distinct, duplicated_rows = db_conn.execute(
+        "SELECT count(*), count(DISTINCT (case_number, route, match_type, building_code,"
+        " parcel_code)), count(*) FILTER (WHERE cardinality(row_nos) > 1)"
+        " FROM ref.bis_links(%s, %s)",
+        (bis, cad),
+    ).fetchone()
+    assert total == distinct
+    assert duplicated_rows > 0  # duplicate source rows collapse into one link (§7.1)
     exact = one(
         db_conn,
         "SELECT count(*) FROM ref.bis_links(%s, %s) WHERE match_type = 'exact_building'",
@@ -142,8 +152,8 @@ def test_bis_links_cover_the_cadastre_link_and_prefix_rule(db_conn, live):
     )
     found = one(
         db_conn,
-        "SELECT count(*) FROM ref.bis_object o JOIN ref.building b"
-        " ON b.dataset_version_id = %s AND b.code = o.building_code"
+        "SELECT count(DISTINCT (o.case_number, o.building_code)) FROM ref.bis_object o"
+        " JOIN ref.building b ON b.dataset_version_id = %s AND b.code = o.building_code"
         " WHERE o.dataset_version_id = %s",
         cad,
         bis,

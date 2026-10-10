@@ -3,7 +3,7 @@
 docker compose run --rm etl import all
 docker compose run --rm etl import cadastre_text varis_addresses
 docker compose run --rm etl status
-docker compose run --rm etl bis-links      # BIS objects by best cadastre match
+docker compose run --rm etl bis-links      # distinct BIS cases by best cadastre match
 """
 
 import argparse
@@ -74,38 +74,40 @@ def cmd_status() -> int:
     return 0
 
 
+# Distinct cases, never raw rows: the case-objects CSV has exact duplicate rows
+# (docs/data-sources.md §7.1). DEL addresses are counted against live VARIS (report only).
 BIS_LINKS_SQL = """
-WITH v AS (SELECT ref.live_version('bis_cases') AS bis, ref.live_version('cadastre_text') AS cad),
-best AS (
-    SELECT b.*, o.address_code, o.building_code
-    FROM v, ref.bis_object_best_match(v.bis, v.cad) b
-    JOIN ref.bis_object o ON o.dataset_version_id = (SELECT bis FROM v) AND o.row_no = b.row_no
+WITH best AS (
+    SELECT * FROM ref.bis_case_best_match(%(bis)s, %(cad)s)
+), del AS (
+    SELECT DISTINCT o.case_number FROM ref.bis_object o
+    JOIN ref.address_current a ON a.code = o.address_code AND a.status = 'DEL'
+    WHERE o.dataset_version_id = %(bis)s
 )
-SELECT best_match, count(*) AS objects, count(DISTINCT case_number) AS cases,
-       count(*) FILTER (WHERE building_code IS NULL) AS without_designation,
-       count(*) FILTER (WHERE address_code IN (
-           SELECT code FROM ref.address_current WHERE status = 'DEL')) AS del_address
+SELECT best_match, count(*) AS cases,
+       count(*) FILTER (WHERE NOT has_designation) AS without_designation,
+       count(*) FILTER (WHERE case_number IN (SELECT case_number FROM del)) AS del_address
 FROM best GROUP BY best_match
 ORDER BY array_position(ARRAY['exact', 'probable', 'address_only', 'none'], best_match)
 """
 
 
 def cmd_bis_links() -> int:
-    """BIS objects of the live version by best match against the live cadastre text."""
+    """Distinct pilot BIS cases by best match against the live cadastre text."""
     with psycopg.connect(database_url()) as c:
-        vids = c.execute(
+        bis, cad = c.execute(
             "SELECT ref.live_version('bis_cases'), ref.live_version('cadastre_text')"
         ).fetchone()
-        if None in vids:
+        if bis is None or cad is None:
             print("bis_cases and cadastre_text need live versions", file=sys.stderr)
             return 1
-        rows = c.execute(BIS_LINKS_SQL).fetchall()
+        rows = c.execute(BIS_LINKS_SQL, {"bis": bis, "cad": cad}).fetchall()
     total = sum(r[1] for r in rows)
-    print(f"BIS v{vids[0]} x cadastre_text v{vids[1]}: {total} pilot case objects")
-    head = ("best match", "objects", "share", "cases", "no desig.", "DEL addr")
-    print("{:14} {:>8} {:>7} {:>7} {:>9} {:>8}".format(*head))
-    for best, n, cases, nodes, dels in rows:
-        print(f"{best:14} {n:8} {n / total:7.1%} {cases:7} {nodes:9} {dels:8}")
+    print(f"BIS v{bis} x cadastre_text v{cad}: {total} distinct pilot cases")
+    head = ("best match", "cases", "share", "no desig.", "DEL addr")
+    print("{:14} {:>8} {:>7} {:>9} {:>8}".format(*head))
+    for best, n, nodes, dels in rows:
+        print(f"{best:14} {n:8} {n / total:7.1%} {nodes:9} {dels:8}")
     return 0
 
 
@@ -115,7 +117,7 @@ def main(argv=None) -> int:
     imp = sub.add_parser("import", help="import sources (or all)")
     imp.add_argument("sources", nargs="+")
     sub.add_parser("status", help="live versions and last import per source")
-    sub.add_parser("bis-links", help="BIS objects by best cadastre match (live versions)")
+    sub.add_parser("bis-links", help="distinct BIS cases by best cadastre match (live versions)")
     args = p.parse_args(argv)
     if args.cmd == "import":
         return cmd_import(args.sources)

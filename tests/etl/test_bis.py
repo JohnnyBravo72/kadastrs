@@ -109,32 +109,31 @@ def test_bis_links_and_match_types(run, server, q):
     assert run("cadastre_text").status == "succeeded"
     assert run("bis_cases").status == "succeeded"
     links = q(
-        "SELECT row_no, route, match_type, building_code, parcel_code"
-        " FROM ref.bis_object_link_current WHERE row_no <= 5"
-        " ORDER BY row_no, route, match_type, parcel_code"
+        "SELECT case_number, route, match_type, building_code, parcel_code, row_nos"
+        " FROM ref.bis_object_link_current ORDER BY case_number, route, match_type, parcel_code"
     )
     assert links == [
-        (1, "building_link", "building_on_parcel", "09000360220001", "09000360220"),
-        (1, "building_link", "building_on_parcel", "09000360220001", "09000360221"),
-        (1, "building_link", "exact_building", "09000360220001", None),
-        (2, "building_link", "building_on_parcel", "09000360220001", "09000360220"),
-        (2, "building_link", "building_on_parcel", "09000360220001", "09000360221"),
-        (2, "building_link", "exact_building", "09000360220001", None),
-        (3, "designation_prefix", "probable_parcel", "09000360221099", "09000360221"),
-        (4, "address_code", "same_address_code", None, "09000360221"),
+        # rows 1 and 7 are the same published row: one link per case and target
+        ("BIS-1", "building_link", "building_on_parcel", "09000360220001", "09000360220", [1, 7]),
+        ("BIS-1", "building_link", "building_on_parcel", "09000360220001", "09000360221", [1, 7]),
+        ("BIS-1", "building_link", "exact_building", "09000360220001", None, [1, 7]),
+        ("BIS-2", "building_link", "building_on_parcel", "09000360220001", "09000360220", [2]),
+        ("BIS-2", "building_link", "building_on_parcel", "09000360220001", "09000360221", [2]),
+        ("BIS-2", "building_link", "exact_building", "09000360220001", None, [2]),
+        ("BIS-3", "designation_prefix", "probable_parcel", "09000360221099", "09000360221", [3]),
+        ("BIS-4", "address_code", "same_address_code", None, "09000360221", [4]),
     ]
     best = q(
-        "SELECT row_no, best_match FROM ref.bis_object_best_match("
+        "SELECT case_number, best_match, has_designation FROM ref.bis_case_best_match("
         " ref.live_version('bis_cases'), ref.live_version('cadastre_text'))"
     )
     assert best == [
-        (1, "exact"),
-        (2, "exact"),
-        (3, "probable"),
-        (4, "address_only"),
-        (5, "none"),
-        (7, "exact"),
-        (8, "none"),
+        ("BIS-1", "exact", True),
+        ("BIS-2", "exact", True),
+        ("BIS-3", "probable", True),
+        ("BIS-4", "address_only", False),
+        ("BIS-5", "none", True),
+        ("BIS-7", "none", False),
     ]
     # Each link row carries the two version ids a check result must store (PLAN §6.5).
     live = q("SELECT ref.live_version('bis_cases'), ref.live_version('cadastre_text')")
@@ -160,6 +159,41 @@ def test_bis_links_are_deterministic_per_version(run, server, q):
     assert q("SELECT ref.live_version('cadastre_text')")[0][0] != cad_v
     assert q("SELECT * FROM ref.bis_links(%s, %s)", bis_v, cad_v) == before
     assert not q("SELECT 1 FROM ref.bis_object_link_current WHERE route = 'building_link'")
+
+
+def test_bis_duplicate_rows_kept_raw_but_counted_once(run, server, q):
+    """A case whose object row is published three times (plus a second, different
+    object): raw rows are kept, links and counts are per distinct case."""
+    rows = [
+        fakes.bis_object("BIS-1", "09000360220001", "3000"),
+        fakes.bis_object("BIS-1", "09000360220001", "3000"),
+        fakes.bis_object("BIS-1", "09000360220001", "3000"),
+        fakes.bis_object("BIS-1", "", "3000", "101000002"),  # same case, address-only object
+        fakes.bis_object("BIS-4", "", "3000", "101000002"),
+    ]
+    publish_cadastre(server)
+    fakes.publish_bis(server, objects=rows)
+    run("cadastre_text")
+    assert run("bis_cases").status == "succeeded"
+    assert q("SELECT count(*) FROM ref.bis_object_current") == [(5,)]  # as published
+    (processing,) = q(
+        "SELECT processing FROM dataset_version WHERE source_id = 'bis_cases' AND status = 'live'"
+    )[0]
+    assert {p["id"]: p for p in processing}["duplicate_rows"]["duplicate_rows"] == 2
+    exact = q(
+        "SELECT case_number, row_nos FROM ref.bis_object_link_current"
+        " WHERE match_type = 'exact_building'"
+    )
+    assert exact == [("BIS-1", [1, 2, 3])]
+    assert q(
+        "SELECT count(*), count(DISTINCT (case_number, route, match_type, building_code,"
+        " parcel_code)) FROM ref.bis_object_link_current"
+    ) == [(5, 5)]  # BIS-1: exact, 2 parcels, address; BIS-4: address; none duplicated
+    best = q(
+        "SELECT best_match, count(*) FROM ref.bis_case_best_match("
+        " ref.live_version('bis_cases'), ref.live_version('cadastre_text')) GROUP BY 1 ORDER BY 1"
+    )
+    assert best == [("address_only", 1), ("exact", 1)]  # 2 cases, not 5 rows
 
 
 def test_bis_e1_redated_urls_in_two_datasets(run, server, q):

@@ -34,7 +34,7 @@ jobs:
       - name: BIS join report
         run: |
           docker compose run --rm etl bis-links | tee bis-links.txt
-          { echo '### BIS case objects by cadastre match'; echo '```'; cat bis-links.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '### BIS cases (distinct) by cadastre match'; echo '```'; cat bis-links.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Run all tests including pilot
         run: docker compose --profile test run --rm tests
       - name: Service logs

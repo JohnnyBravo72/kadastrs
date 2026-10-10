@@ -615,14 +615,17 @@ Checked before coding (CLAUDE.md rule 2) with [`etl/discovery/verify_2c.py`](../
 - Every encumbered parcel, parcel part and building is in the cadastre text of the same date. Encumbered objects outside the city prefix are the known registered `4460…` (Daugavpils, 9 rows) and `1340…` (Jūrmala, 11 rows) parcels of §5.2.
 - **BIS join (`etl bis-links`, BIS 2026-10-10 × cadastre text 2026-09-26):**
 
-| Best match | Case objects | Share | Cases | Without designation | Address code is `DEL` |
-|---|---|---|---|---|---|
-| exact (building in the cadastre; its parcels via the cadastre link) | 24,273 | 61.5 % | 15,389 | 0 | 41 |
-| probable (building not in the cadastre; prefix = a parcel) | 1,823 | 4.6 % | 853 | 0 | 78 |
-| only via address code | 10,306 | 26.1 % | 7,328 | 10,058 | 0 |
-| none | 3,046 | 7.7 % | 2,278 | 2,978 | 66 |
+  **Counted per distinct case** (decided 2026-10-10): the case-objects CSV repeats rows, so raw rows are stored as published but links and every number shown to users count distinct cases. A case's best match is the best over all its objects.
 
-  Of the 26,412 objects with a designation, 91.9 % join exactly (Phase 0, Jelgava: 94 % of designated buildings were in the cadastre). Most objects without a designation still join by address code; 66 unmatched objects carry a `DEL` (deleted) VARIS address, which the cadastre no longer uses.
+| Best match per case | Cases | Share | No object with a designation | An object has a `DEL` address |
+|---|---|---|---|---|
+| exact (building in the cadastre; its parcels via the cadastre link) | 15,389 | 65.8 % | 0 | 53 |
+| probable (building not in the cadastre; prefix = a parcel) | 382 | 1.6 % | 0 | 24 |
+| only via address code | 5,714 | 24.4 % | 5,639 | 7 |
+| none | 1,903 | 8.1 % | 1,883 | 33 |
+| **total** | **23,388** | | | |
+
+  Of the 15,866 cases with at least one designation, 15,389 (97.0 %) join exactly. Most cases without a designation still join by address code. (Per raw object row, before deduplication: 24,273 exact, 1,823 probable, 10,306 address only, 3,046 none of 39,448; "probable" falls to 382 per case because most cases with a prefix-only object also have an exact one.)
 
 ### 7.5 Colleagues' BIS example
 PLAN §6.1 cites "13 cases, only 3 exact". No document in the repo (PLAN history, test-set templates) names the object or the case numbers, so it is **not** a regression case yet. Add it to `tests/data/` when the object is known.
