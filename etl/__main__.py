@@ -3,6 +3,7 @@
 docker compose run --rm etl import all
 docker compose run --rm etl import cadastre_text varis_addresses
 docker compose run --rm etl status
+docker compose run --rm etl bis-links      # BIS objects by best cadastre match
 """
 
 import argparse
@@ -73,14 +74,52 @@ def cmd_status() -> int:
     return 0
 
 
+BIS_LINKS_SQL = """
+WITH v AS (SELECT ref.live_version('bis_cases') AS bis, ref.live_version('cadastre_text') AS cad),
+best AS (
+    SELECT b.*, o.address_code, o.building_code
+    FROM v, ref.bis_object_best_match(v.bis, v.cad) b
+    JOIN ref.bis_object o ON o.dataset_version_id = (SELECT bis FROM v) AND o.row_no = b.row_no
+)
+SELECT best_match, count(*) AS objects, count(DISTINCT case_number) AS cases,
+       count(*) FILTER (WHERE building_code IS NULL) AS without_designation,
+       count(*) FILTER (WHERE address_code IN (
+           SELECT code FROM ref.address_current WHERE status = 'DEL')) AS del_address
+FROM best GROUP BY best_match
+ORDER BY array_position(ARRAY['exact', 'probable', 'address_only', 'none'], best_match)
+"""
+
+
+def cmd_bis_links() -> int:
+    """BIS objects of the live version by best match against the live cadastre text."""
+    with psycopg.connect(database_url()) as c:
+        vids = c.execute(
+            "SELECT ref.live_version('bis_cases'), ref.live_version('cadastre_text')"
+        ).fetchone()
+        if None in vids:
+            print("bis_cases and cadastre_text need live versions", file=sys.stderr)
+            return 1
+        rows = c.execute(BIS_LINKS_SQL).fetchall()
+    total = sum(r[1] for r in rows)
+    print(f"BIS v{vids[0]} x cadastre_text v{vids[1]}: {total} pilot case objects")
+    head = ("best match", "objects", "share", "cases", "no desig.", "DEL addr")
+    print("{:14} {:>8} {:>7} {:>7} {:>9} {:>8}".format(*head))
+    for best, n, cases, nodes, dels in rows:
+        print(f"{best:14} {n:8} {n / total:7.1%} {cases:7} {nodes:9} {dels:8}")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python -m etl")
     sub = p.add_subparsers(dest="cmd", required=True)
     imp = sub.add_parser("import", help="import sources (or all)")
     imp.add_argument("sources", nargs="+")
     sub.add_parser("status", help="live versions and last import per source")
+    sub.add_parser("bis-links", help="BIS objects by best cadastre match (live versions)")
     args = p.parse_args(argv)
-    return cmd_import(args.sources) if args.cmd == "import" else cmd_status()
+    if args.cmd == "import":
+        return cmd_import(args.sources)
+    return cmd_bis_links() if args.cmd == "bis-links" else cmd_status()
 
 
 if __name__ == "__main__":

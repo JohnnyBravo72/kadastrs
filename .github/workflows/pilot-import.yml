@@ -1,12 +1,13 @@
 name: Pilot import
 
-# Real import of the pilot cities (data.gov.lv ~900 MB + LVĢMC flood service),
+# Real import of the pilot cities (data.gov.lv ~1.2 GB + LVĢMC flood service),
 # twice, then the full test suite including the `pilot` tests (row counts
 # against the source files, geometry, seed objects, second run unchanged).
 on:
   workflow_dispatch:
   schedule:
-    # Mondays 03:00 UTC: before VARIS republishes (~05:20 UTC), so the two runs see the same files
+    # Mondays 03:00 UTC: before VARIS republishes (~05:20 UTC) and after BIS (~00:15),
+    # so the two runs see the same files
     - cron: "0 3 * * 1"
 
 permissions:
@@ -19,7 +20,7 @@ concurrency:
 jobs:
   pilot:
     runs-on: ubuntu-24.04   # pinned; upgrade deliberately (docs/runbook.md)
-    timeout-minutes: 180   # nine sources, imported twice; flood repair takes minutes
+    timeout-minutes: 200   # thirteen sources, imported twice; flood repair takes minutes
     steps:
       - uses: actions/checkout@v5
       - name: Build and start db, migrate, api
@@ -30,6 +31,10 @@ jobs:
         run: docker compose run --rm etl import all
       - name: Status
         run: docker compose run --rm etl status
+      - name: BIS join report
+        run: |
+          docker compose run --rm etl bis-links | tee bis-links.txt
+          { echo '### BIS case objects by cadastre match'; echo '```'; cat bis-links.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Run all tests including pilot
         run: docker compose --profile test run --rm tests
       - name: Service logs

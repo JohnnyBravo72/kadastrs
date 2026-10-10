@@ -609,5 +609,20 @@ Checked before coding (CLAUDE.md rule 2) with [`etl/discovery/verify_2c.py`](../
 - DAP descriptions equal `Apraksts` apart from case, plural forms and non-breaking spaces.
 - **Consequence:** modules 3 (nature overlap) and 6 (registered encumbrances) can be cross-referenced by code, e.g. "the parcel lies in a microreserve (DAP) and has, or lacks, the registered encumbrance `7313100100`".
 
+### 7.6 Pilot import results (2026-10-10)
+- First run: `atis_classifier` 432 rows; `cadastre_encumbrances` 45,297 items / 278,798 rows (PARCEL 44,224, PARCEL PART 421, BUILDING 652 items); `encumbrances_frozen` 79,960 rows (Latgale 26,049 + 220, Rīga 31,321 + 174, Zemgale 21,909 + 287); `bis_cases` 39,448 objects (38,424 `atvk_zero_padded`, 4,513 `room_group_cut`, 0 `leading_zero_restored`) and 23,388 cases. About 3 minutes in all.
+- Second run: all four `unchanged`, no new versions.
+- Every encumbered parcel, parcel part and building is in the cadastre text of the same date. Encumbered objects outside the city prefix are the known registered `4460…` (Daugavpils, 9 rows) and `1340…` (Jūrmala, 11 rows) parcels of §5.2.
+- **BIS join (`etl bis-links`, BIS 2026-10-10 × cadastre text 2026-09-26):**
+
+| Best match | Case objects | Share | Cases | Without designation | Address code is `DEL` |
+|---|---|---|---|---|---|
+| exact (building in the cadastre; its parcels via the cadastre link) | 24,273 | 61.5 % | 15,389 | 0 | 41 |
+| probable (building not in the cadastre; prefix = a parcel) | 1,823 | 4.6 % | 853 | 0 | 78 |
+| only via address code | 10,306 | 26.1 % | 7,328 | 10,058 | 0 |
+| none | 3,046 | 7.7 % | 2,278 | 2,978 | 66 |
+
+  Of the 26,412 objects with a designation, 91.9 % join exactly (Phase 0, Jelgava: 94 % of designated buildings were in the cadastre). Most objects without a designation still join by address code; 66 unmatched objects carry a `DEL` (deleted) VARIS address, which the cadastre no longer uses.
+
 ### 7.5 Colleagues' BIS example
 PLAN §6.1 cites "13 cases, only 3 exact". No document in the repo (PLAN history, test-set templates) names the object or the case numbers, so it is **not** a regression case yet. Add it to `tests/data/` when the object is known.

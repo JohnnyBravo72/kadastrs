@@ -94,6 +94,10 @@ All imports run in the `etl` container (CLAUDE.md rule 12), never with the host 
 | `nature_microreserves` | DAP microreserves and buffer zones (whole country) | ~15 s |
 | `nature_monuments` | DAP nature monuments (whole country) | ~1.5 min |
 | `nature_habitats` | DAP protected habitats, 175,000 polygons (whole country) | ~9 min |
+| `atis_classifier` | ATIS and cadastre encumbrance classifier (432 codes) | ~2 s |
+| `cadastre_encumbrances` | encumbrances registered on pilot parcels, parcel parts and buildings (code, text, area, date; no geometry) | ~1 min (pilot members only, by HTTP Range) |
+| `encumbrances_frozen` | the frozen list of encumbrances registered until 2025-01-31, pilot rows, flagged `frozen` (`docs/data-sources.md` §7.3) | ~1 min (175 MB download; never changes) |
+| `bis_cases` | BIS construction cases and case objects of the pilot cities (raw CSVs, never the DataStore) | ~1 min (145 MB download) |
 
 ```powershell
 docker compose run --rm etl import all
@@ -107,6 +111,12 @@ docker compose run --rm etl status                                 # live versio
 - The exit code is 1 if any source failed.
 - **Flood (`flood_10y`)** asks the LVĢMC MapServer (D1 E7) for the features in each pilot city's extent + 1 km, 25 at a time, with 1 cm simplification; it prints its progress. A batch that fails is retried and then fetched one object at a time. Layer 3 (200-year extent) is stored only as the coverage mask (`ref.flood_coverage_current`), never as a finding.
 - Geometry repair uses PostGIS `ST_MakeValid(method=structure)`; the largest flood polygons (over a million vertices) take a few minutes each (`docs/data-sources.md` §6.3).
+- **BIS (`bis_cases`)** downloads the national case list and case objects and keeps only the pilot: objects whose ATVK is a pilot city or whose designation starts with the city's cadastral territory code (`pilot_cadastral_territory` in `config/etl.yaml`), and their cases. A new version is created only when the pilot rows change. Links to the cadastre are not stored: `ref.bis_object_link_current` computes them from the live BIS and cadastre text versions (`ref.bis_links(bis_version, cadastre_text_version)` for any past pair). Report:
+  ```powershell
+  docker compose run --rm etl bis-links
+  ```
+  prints how many pilot case objects match exactly (building in the cadastre), probably (designation prefix = a parcel), only by address code, or not at all.
+- **Encumbrances:** `ref.encumbrance_current` (current list joined with the classifier text) and `ref.encumbrance_frozen_current` (frozen list with `in_current`, `object_in_cadastre`, `frozen_only`). Frozen-only rows are never shown as current encumbrances.
 - The ETL runs the checked-out code (mounted read-only), so code changes need no rebuild. Rebuild after dependency changes: `docker compose --profile etl build etl`.
 
 Import history:
@@ -133,7 +143,7 @@ docker compose run --rm etl import all
 docker compose --profile test run --rm tests
 ```
 
-The pilot tests take about 2 minutes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
+The pilot tests take about 3 minutes. The BIS and encumbrance checks (`tests/pilot/test_pilot_bis_encumbrances.py`) recount rows from the raw files, compare every stored designation and ATVK with the raw file (no lost leading zero), check the BIS join counts and that the DAP `ATIS_CODE` values are classifier codes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
 
 Without real data, run everything else:
 
