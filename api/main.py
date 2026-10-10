@@ -1,4 +1,4 @@
-"""FastAPI app. Phase 1: health check only."""
+"""FastAPI app: health check (Phase 1) and input resolution (Phase 3, api/resolve.py)."""
 
 import platform
 from contextlib import asynccontextmanager
@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, Response
 from pydantic import BaseModel
 
 from api.db import create_pool
+from api.resolve import router as resolve_router
 
 # Minimum PROJ for EPSG:10306 and EPSG:10838 (decision D9).
 MIN_PROJ = (9, 8)
@@ -48,6 +49,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Kadastra pārbaude", version="0.1.0", lifespan=lifespan)
+app.include_router(resolve_router)
 
 
 def _version_tuple(text: str) -> tuple[int, ...]:

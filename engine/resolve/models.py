@@ -79,3 +79,46 @@ class ResolvedRow(BaseModel):
     warnings: list[Note] = Field(default_factory=list)
     reason: str | None = None
     duplicate_of: int | None = None
+
+
+class Suggestion(BaseModel):
+    """One type-ahead entry. `label` always names the object type; addresses
+    carry their city, also when it differs from the one typed."""
+
+    type: Literal["property", "parcel", "building", "parcel_part", "premise_group", "address"]
+    designation: str
+    label: str
+    description: str | None = None
+    city: str | None = None
+    match_type: MatchType
+    score: float | None = None
+    status: Literal["EKS", "DEL"] | None = None  # addresses
+    current_address: str | None = None  # earlier-name and deleted-address entries
+
+
+class SuggestResponse(BaseModel):
+    query: str
+    kind: Literal["cadastre", "address"]
+    suggestions: list[Suggestion]
+    notices: list[Note] = Field(default_factory=list)
+
+
+class PropertyUnits(BaseModel):
+    number: str
+    kind: str | None
+    name: str | None
+    corrections: list[Correction] = Field(default_factory=list)
+    units: list[CadastreObject]
+    # buildings on the property's parcels that belong to other properties
+    # (cadastre building -> parcel link), e.g. a separate building property
+    buildings_on_parcels: list[CadastreObject] = Field(default_factory=list)
+    counts: dict[str, int]
+    non_existing_excluded: int  # buildings marked non-existing left out (both lists)
+
+
+class AddressObjects(BaseModel):
+    address: AddressRef
+    objects: list[CadastreObject]
+    current_addresses: list[AddressRef] = Field(default_factory=list)  # deleted addresses
+    non_existing_excluded: int
+    warnings: list[Note] = Field(default_factory=list)

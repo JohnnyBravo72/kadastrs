@@ -1,0 +1,31 @@
+# Input resolution settings (PLAN.md §5, Phase 3). These are matching
+# thresholds, not risk rules: risk levels come only from rules.yaml.
+# Scores are 0..1. Changing a value changes which inputs resolve without
+# asking; the pilot tests (tests/pilot/test_pilot_resolve.py) pin the cases.
+
+address:
+  # A typed word must reach this pg_trgm word_similarity with the address to
+  # make the row a candidate (all typed words, AND). Lower = more typo-tolerant
+  # and slower.
+  retrieval_threshold: 0.5
+  # Candidates ranked per tier (current text, earlier texts, deleted addresses).
+  max_candidates: 300
+  # Resolve automatically only when the best address scores at least this,
+  # its house number equals the typed one, and it leads the next different
+  # address by the margin. Otherwise the row is "ambiguous" with suggestions.
+  auto_resolve_score: 0.85
+  auto_resolve_margin: 0.05
+  # A typed word "matches" a word of the address at this similarity
+  # (difflib ratio); used for the share of address words the input covers.
+  word_match: 0.8
+  # A typed word of 5+ letters this close to a pilot city name is taken as
+  # that city (e.g. "daugavpls"), unless a street-type word follows it.
+  pilot_city_fuzzy: 0.8
+  suggest_limit: 10
+
+cadastre:
+  suggest_limit: 15
+
+resolve:
+  # Rows per POST /api/resolve (PLAN.md §8.1: MVP limit 1,000).
+  max_rows: 1000
