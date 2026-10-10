@@ -18,7 +18,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from engine.resolve import places
+from engine.resolve import address, places
 from etl.sources import load_config, sync_registry
 from tests.etl.conftest import ETL_DB, RESET
 
@@ -32,7 +32,7 @@ CITIES = {
     "Rīga": ("0001000", "100003003", 500000, 300000, "pilseta"),
     "Ventspils": ("0027000", "100003100", 310000, 380000, "pilseta"),
     "Jelgavas nov.": ("0030000", "100009001", 440000, 250000, "novads"),
-    "Daugavpils nov.": ("0040000", "100009002", 620000, 140000, "novads"),
+    "Augšdaugavas nov.": ("0040000", "100009002", 620000, 140000, "novads"),
     "Valgundes pag.": ("0030010", "100010001", 450000, 260000, "pagasts"),
 }
 CITY_XY = {name: (x, y) for name, (_, _, x, y, _) in CITIES.items()}
@@ -52,6 +52,7 @@ ADDRESSES = [
     ("101000007", "EKS", "Druvu iela 29, Jelgava, LV-3002", "Jelgava"),
     ("101765287", "EKS", "Institūta iela 4, Jelgava, LV-3004", "Jelgava"),
     ("102485506", "EKS", "Strēlnieku prospekts 28, Jūrmala, LV-2015", "Jūrmala"),
+    ("102485599", "EKS", "Lauku iela 4, Jūrmala, LV-2015", "Jūrmala"),
     ("101154013", "DEL", "Salnas iela 22A, Jelgava, LV-3008", "Jelgava"),
     ("101766801", "DEL", "Kalnciema ceļš 80, Jelgava, LV-3002", "Jelgava"),
     ("105632385", "DEL", "Cukura iela 6A, Jelgava, LV-3002", "Jelgava"),
@@ -110,6 +111,7 @@ def _sq(x, y, size=10):
 
 def seed(conn) -> None:
     places._cache.clear()
+    address._vocabulary.clear()
     conn.execute(RESET)
     sync_registry(conn, load_config())
     for source, vid in V.items():

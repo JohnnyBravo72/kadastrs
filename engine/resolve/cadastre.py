@@ -439,3 +439,34 @@ def property_units(
         counts=counts,
         non_existing_excluded=excluded,
     )
+
+
+# --- objects at an address ------------------------------------------------------------
+
+
+def objects_at_addresses(
+    conn, v: Versions, varis_codes: list[str], include_non_existing: bool
+) -> dict[str, tuple[list[CadastreObject], int]]:
+    """Parcels and buildings whose cadastre text carries each VARIS code, and
+    how many buildings marked non-existing were left out."""
+    pairs = conn.execute(
+        """SELECT varis_code, code FROM ref.parcel
+           WHERE dataset_version_id = %(t)s AND varis_code = ANY(%(c)s)
+           UNION ALL
+           SELECT varis_code, code FROM ref.building
+           WHERE dataset_version_id = %(t)s AND varis_code = ANY(%(c)s)
+           ORDER BY 1, 2""",
+        {"t": v.cadastre_text, "c": varis_codes},
+    ).fetchall()
+    f = fetch(conn, v, [code for _, code in pairs])
+    out: dict[str, tuple[list[CadastreObject], int]] = {c: ([], 0) for c in varis_codes}
+    for varis, code in pairs:
+        objects, excluded = out[varis]
+        obj = f.parcels.get(code) if len(code) == 11 else f.buildings.get(code)
+        if obj is None:
+            continue
+        if obj.not_exist and not include_non_existing:
+            out[varis] = (objects, excluded + 1)
+            continue
+        objects.append(obj)
+    return out
