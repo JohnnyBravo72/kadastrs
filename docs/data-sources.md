@@ -518,7 +518,7 @@ Checked before coding (CLAUDE.md rule 2). Registry entries: `config/sources.yaml
 - **No date in the service:** no `editingInfo` on the layers, no date in `documentInfo`. The version date (rule E7) therefore comes from the data.gov.lv listing of the same data, `3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1` (`metadata_modified` 2026-08-19, CC0-1.0), read with `package_show` on every run. The version identity is the content (canonical GeoJSON per layer), so a metadata-only change of the listing creates no version.
 - **Coverage:** no designated flood risk areas (APSFR) or modelled-area polygons are open (listing `…-kartes1`: 3 WMS proxies + geolatvija links; `pldu-riska-zonas(-wfs)`: flood-management units only; `udens`: links to the LVĢMC website and EU reporting, 2019 cycle). Layer 3 (200-year extent) is the coverage mask (D1 E7, decided 2026-10-09).
 - **Fetch recipe** (Phase 0, §3.5): `returnIdsOnly` within each pilot city's extent + 1 km (transformed to 3059), then `objectIds` in batches of 25 with `outSR=3059`, `maxAllowableOffset=0.01` (1 cm), `f=geojson`.
-- **E6 (geolatvija products 309 / 361):** `/api/v1/geoproducts/{id}` answers **401**; files come through orders. Login-protected, so not usable (rule 1). The E6/E7 comparison is blocked (`docs/decisions.md`).
+- **E6 (geolatvija products 309 / 361):** `/api/v1/geoproducts/{id}` answers **401**; files come through orders. Login-protected, so not usable (rule 1); **E6 withdrawn 2026-10-10**. The E6/E7 comparison is blocked (`docs/decisions.md`).
 
 ### 6.2 DAP nature (SHP zips on data.gov.lv, CC0, annual)
 

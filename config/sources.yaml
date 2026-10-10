@@ -229,8 +229,8 @@ allowed_external_resources:
       - "https://geolatvija.lv/main?geoProductId=361"
     host: geolatvija.lv
     datagov_dataset: [pldu-riska-karu-atvrtie-dati-un-servisi, 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes]
-    status: allowed
-    note: "Checked 2026-10-09: product API answers 401 (login + order), so the files are login-protected and not usable under CLAUDE.md rule 1. Status change pending decision (docs/decisions.md, E6)."
+    status: withdrawn       # decided 2026-10-10 (docs/decisions.md, E6)
+    note: "Withdrawn 2026-10-10: geolatvija product files require login (HTTP 401), not open data under rule 1. Re-add (status: allowed) if the files become open."
   - id: E7
     name: "LVĢMC ArcGIS Pavasara_pludu_kartes_3_cikls (layers 0, 1 = 10-year; layer 3 = coverage mask)"
     url: "https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer"
@@ -242,7 +242,7 @@ allowed_external_resources:
     status: allowed         # decided 2026-10-09 (docs/decisions.md, E7); layer 3 added 2026-10-09
     licence: CC0-1.0        # per data.gov.lv listing of the same data: 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1
     access: snapshot        # imported as a versioned snapshot; never queried live
-    fallback: E6
+    # no fallback: E6 withdrawn 2026-10-10
     # Source processing notes: listed on the report's "Avoti" sheet (PLAN §7.1).
     processing:
       - id: coverage_mask
