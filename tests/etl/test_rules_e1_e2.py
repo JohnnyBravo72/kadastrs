@@ -88,7 +88,7 @@ def test_e2_fixture_rows_import_with_restored_zeros(run, server, q):
 
 
 def test_e2_no_code_column_is_numeric(q):
-    code_like = r"(^|_)(code|codes|number|atvk|nr)$|^code_his$"
+    code_like = r"(^|_)(code|codes|number|atvk|nr|designation)$|^(code_his|kind_id)$"
     rows = q(
         "SELECT table_name, column_name, data_type FROM information_schema.columns"
         " WHERE table_schema = 'ref' AND column_name ~ %s AND data_type <> 'text'"

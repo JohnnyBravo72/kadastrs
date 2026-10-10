@@ -27,6 +27,14 @@ DATASETS = {
     "nature_microreserves": "mikroliegumi",
     "nature_monuments": "dabas-pieminekli",
     "nature_habitats": "aizsargajamas-dzivotnes-biotopi",
+    "cadastre_encumbrances": "kadastra-informacijas-sistemas-atvertie-dati",
+    "atis_classifier": "atis-datu-un-kadastra-objektu-apgrutinajumu-klasifikators",
+    "encumbrances_frozen": "apgrutinajumi-kas-kadastra-registreti-lidz-2025-gada-31-janvarim",
+}
+# Sources whose resources sit in several CKAN datasets (config/sources.yaml).
+ROLE_DATASETS = {
+    ("bis_cases", "cases"): "bis_jlyakg7hgslonjnwyrwc6w",
+    ("bis_cases", "objects"): "bis_tln9s3hrpjlnucmjip9r3g",
 }
 # Licences as on data.gov.lv: VZD data CC-BY-4.0 (FakeServer.licence), these CC0-1.0.
 CC0_DATASETS = {
@@ -38,7 +46,7 @@ CC0_DATASETS = {
         "nature_monuments",
         "nature_habitats",
     )
-}
+} | {ds: "CC0-1.0" for ds in ROLE_DATASETS.values()}
 # D1 E7 service (config/sources.yaml); the fake answers it, no network in tests.
 E7_BASE = "https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer"
 
@@ -78,7 +86,7 @@ class FakeServer:
             "url": url,
             "last_modified": last_modified,
             "size": len(body),
-            "_dataset": DATASETS[source_id],
+            "_dataset": ROLE_DATASETS.get((source_id, role)) or DATASETS[source_id],
         }
         return url
 
@@ -534,13 +542,15 @@ def xml_doc(
     ).encode()
 
 
-def parcel_item(code: str, atvk: str = "0003000", area: str = "1234") -> str:
+def parcel_item(
+    code: str, atvk: str = "0003000", area: str = "1234", varis: str = "101000001"
+) -> str:
     return (
         f"<ParcelItemData><ParcelBasicData><ParcelCadastreNr>{code}</ParcelCadastreNr>"
         f"<ATVKCode>{atvk}</ATVKCode><ParcelArea>{area}</ParcelArea>"
         "<ParcelStatus><ParcelStatusKindId>1</ParcelStatusKindId>"
         "<ParcelStatusKindName>nekustamais īpašums</ParcelStatusKindName></ParcelStatus>"
-        "<ParcelVARISCode>101000001</ParcelVARISCode></ParcelBasicData>"
+        f"<ParcelVARISCode>{varis}</ParcelVARISCode></ParcelBasicData>"
         "<LandPurposeList><LandPurposeData><LandPurposeArea>1234</LandPurposeArea>"
         "<LandPurposeExplicationData><AgricultDetails/><UnderWaterDetails/></LandPurposeExplicationData>"
         "<LandPurposeKind><LandPurposeKindId>0601</LandPurposeKindId>"
@@ -560,7 +570,12 @@ def parcelpart_item(code: str, parcel: str) -> str:
 
 
 def building_item(
-    code: str, parcel: str, name: str = "Dzīvojamā māja", extra_parcels=(), not_exist=False
+    code: str,
+    parcel: str,
+    name: str = "Dzīvojamā māja",
+    extra_parcels=(),
+    not_exist=False,
+    varis: str = "101000001",
 ) -> str:
     plist = ""
     if extra_parcels:
@@ -576,7 +591,7 @@ def building_item(
         "<BuildingUseKind><BuildingUseKindId>1110</BuildingUseKindId>"
         "<BuildingUseKindName>Viena dzīvokļa mājas</BuildingUseKindName></BuildingUseKind>"
         f"<BuildingArea>120.5</BuildingArea><BuildingGroundFloors>2</BuildingGroundFloors>"
-        f"<BuildingExploitYear>1985</BuildingExploitYear><VARISCode>101000001</VARISCode>{ne}{plist}"
+        f"<BuildingExploitYear>1985</BuildingExploitYear><VARISCode>{varis}</VARISCode>{ne}{plist}"
         "</BuildingBasicData><BuildingHistoricalData/><ImprovementItemData><ImprovementCommonData/>"
         "</ImprovementItemData><BuildingOrPremiseGroupExplicationData><TotalAreaDetails>"
         "<ExpedientAreaDetails><FlatTotalAreaDetails><FlatAreaDetails/></FlatTotalAreaDetails>"
@@ -704,3 +719,95 @@ def dap_zip(source_id: str, records: dict[str, list[tuple[dict, list]]]) -> byte
                 fields=schemas()["shp_dap"][layer]["fields"],
             )
     return buf.getvalue()
+
+
+# --- BIS case list + case objects (docs/data-sources.md §7.1) ------------------------
+
+
+def bis_object(case, designation="", atvk="", address="", name="Dzīvojamā māja", **extra):
+    return {
+        "Buvniecibas_lietas_numurs": case,
+        "Buves_kadastra_apzimejums": designation,
+        "Buves_atrasanas_vieta_geografiskais_garums": "23.7181",
+        "Buves_atrasanas_vieta_geografiskais_platums": "56.6511",
+        "Buves_nosaukums": name,
+        "Buves_objekta_adreses_teksts": "Elektriķu iela 4, Jelgava, LV-3001" if address else "",
+        "Buves_objekta_adreses_kods": address,
+        "Buvniecibas_veids": "Jauna būvniecība",
+        "Administrativas_teritorijas_kods": atvk,
+        "Administrativas_teritorijas_nosaukums": {"3000": "Jelgava", "4000": "Jūrmala"}.get(
+            atvk, "Ādažu novads" if atvk else ""
+        ),
+        **extra,
+    }
+
+
+# Default rows, one per rule (tests/etl/test_bis.py):
+BIS_OBJECTS = [
+    bis_object("BIS-1", "9000360220001", "3000", "101000009"),  # 1 lost zero; exact building
+    bis_object("BIS-2", "09000360220001005", "3000"),  # 2 room group -> building
+    bis_object("BIS-3", "09000360221099", "3000"),  # 3 not in cadastre; prefix = parcel
+    bis_object("BIS-4", "", "3000", "101000002"),  # 4 address code only
+    bis_object("BIS-5", "05000041006001", ""),  # 5 in scope by prefix only; no match
+    bis_object("BIS-6", "80440040335001", "23000"),  # 6 outside the pilot
+    bis_object("BIS-1", "9000360220001", "3000", "101000009"),  # 7 exact duplicate of row 1
+    bis_object("BIS-7", " ", "4000"),  # 8 designation of spaces only; ATVK scope
+]
+
+
+def bis_case(case, stage="Būvdarbi", created="2024-03-01"):
+    return {
+        "Atbildigas_iestades_nosaukums": "Jelgavas valstspilsētas būvvalde",
+        "Buvniecibas_lietas_numurs": case,
+        "Buvniecibas_iesnieguma_veids": "Būvniecības iesniegums",
+        "Objekta_nosaukums": f"Objekts {case}",
+        "Aktuala_stadija": stage,
+        "Buvniecibas_veids": "Jauna būvniecība",
+        "Lietas_izveidosanas_datums": created,
+    }
+
+
+BIS_CASES = [bis_case(c) for c in ("BIS-1", "BIS-2", "BIS-3", "BIS-4", "BIS-5", "BIS-6")] + [
+    bis_case("BIS-7", stage="Ekspluatācija"),
+    bis_case("TMP-422077-100002", stage="Iecere"),
+]
+
+
+def publish_bis(server, objects=None, cases=None, date="10.10.2026", **kw) -> None:
+    """Both BIS files; file names carry the export date like the real ones."""
+    server.publish(
+        "bis_cases",
+        "cases",
+        f"buvniecibas-lietu-saraksts-{date}.csv",
+        csv_bytes("bis_cases", BIS_CASES if cases is None else cases, bom=False),
+        **kw,
+    )
+    server.publish(
+        "bis_cases",
+        "objects",
+        f"objekti-{date}.csv",
+        csv_bytes("bis_objects", BIS_OBJECTS if objects is None else objects),
+        **kw,
+    )
+
+
+def bis_cadastre_docs(role: str) -> dict[str, bytes]:
+    """Cadastre text for the BIS link tests: Jelgava parcels 09000360220 (VARIS
+    101000001) and 09000360221 (101000002); building 09000360220001 (VARIS
+    101000005) on both."""
+    docs = default_text_docs(role)
+    if role == "parcel":
+        items = [
+            parcel_item("09000360220", varis="101000001"),
+            parcel_item("09000360221", varis="101000002"),
+        ]
+    elif role == "building":
+        items = [
+            building_item(
+                "09000360220001", "09000360220", extra_parcels=["09000360221"], varis="101000005"
+            )
+        ]
+    else:
+        return docs
+    docs["0003000"] = xml_doc(role, "0003000", items)
+    return docs
