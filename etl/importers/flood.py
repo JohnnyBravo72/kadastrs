@@ -300,6 +300,7 @@ class Flood10y:
                 "id": "repair_counts",
                 "invalid_repaired": counts["invalid_repaired"],
                 "outside_grid": counts["outside_grid"],
+                "validated": counts["validated"],
                 "features_by_layer": per_layer,
                 "layer_roles": {str(k): v for k, v in roles.items()},
             },

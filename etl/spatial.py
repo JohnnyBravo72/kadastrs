@@ -232,6 +232,8 @@ def normalise_into(
         # keys whose records were all null shapes or empty after make_valid:
         # these objects have no geometry (warning no_geometry, PLAN §6.3)
         "keys_without_geometry": distinct_keys - inserted,
+        # rows that passed the ST_IsValid / MULTIPOLYGON / SRID check above
+        "validated": inserted,
         # 3059 objects with vertices outside the LĢIA grid (zero shift there)
         "outside_grid": outside_grid,
     }

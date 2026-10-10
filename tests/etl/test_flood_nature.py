@@ -79,6 +79,7 @@ def test_flood_import(run_fast, server, q):
         (3, "7", "coverage_mask", "MULTIPOLYGON", 10306, True),
     ]
     assert out.row_counts["flood_zone"]["invalid_repaired"] == 1
+    assert out.row_counts["flood_zone"]["validated"] == 3
     assert q("SELECT count(*) FROM ref.flood_10y_current") == [(2,)]
     # subdivided copy covers exactly the same area
     assert q("SELECT round(sum(ST_Area(geom))::numeric, 3) FROM ref.flood_zone_part") == q(

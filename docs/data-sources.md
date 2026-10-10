@@ -547,3 +547,4 @@ Checked before coding (CLAUDE.md rule 2). Registry entries: `config/sources.yaml
   - Error outside the grid: at most the LKS-92 → LKS-2020 shift itself (≈ 10 cm at Odukalns), and only at sea.
   - The LĢIA grid stays mandatory: without it the checked function raises, like the strict one (`tests/test_crs.py`), so the silent null shift of D9 cannot return.
 - `lks92_to_lks2020()` itself is unchanged and strict.
+- On the 2026-04-07 DAP files, **67 objects are flagged `outside_grid`**, all reaching beyond Latvia's land extent (at sea). The farthest are 44 habitats **1170 "Akmeņu sēkļi jūrā"** (reefs), 30–50 km off the Kurzeme coast. The grid itself reaches a few km offshore, so objects just beyond the land extent can still be inside it. The pilot test allows the land extent + 150 km and checks that no flagged object lies on land.

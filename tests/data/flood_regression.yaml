@@ -1,0 +1,29 @@
+# Flood regression cases (module 4, Phase 2b). Checked by
+# tests/pilot/test_pilot_flood_nature.py against the live import.
+#
+# Chosen 2026-10-10 from the live data: flood_10y dataset version dated
+# 2026-08-19 (LVĢMC 3rd cycle, D1 E7, pilot extent + 1 km); cadastre map
+# 2026-10-06, cadastre text 2026-09-26. Clear-cut on purpose, so the PLAN §6.3
+# thresholds added in Phase 4 (0.5 m inward buffer, >= 1 m2 or 0.1 %) cannot
+# change the outcome:
+#   found       - at least 90 % of the parcel inside the 10-year zone (layers 0/1)
+#   clear       - the whole parcel inside the coverage mask (200-year extent,
+#                 layer 3) and more than 100 m from any 10-year polygon
+#   not_covered - more than 1 km from the coverage mask; module 4 reason:
+#                 "ārpus plūdu kartēs attēlotās teritorijas – plūdu karte šeit nav
+#                 pieejama vai teritorija nav applūstoša pat 200 gadu scenārijā"
+# If a later flood or cadastre release moves a case, re-check it on the map and
+# replace it with a new clear-cut one; never relax the expectation.
+cases:
+  - parcel: "09000050400"
+    city: Jelgava
+    expect: found
+    note: "1,727 m2, 100 % inside the 10-year zone"
+  - parcel: "09000010048"
+    city: Jelgava
+    expect: clear
+    note: "1,361 m2, inside the 200-year mask, > 100 m from the 10-year zone"
+  - parcel: "05000010069"
+    city: Daugavpils
+    expect: not_covered
+    note: "1,373 m2, 1.1 km from the nearest coverage-mask polygon"

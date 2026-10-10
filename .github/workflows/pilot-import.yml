@@ -1,6 +1,6 @@
 name: Pilot import
 
-# Real import of the pilot cities from data.gov.lv (~700 MB of downloads),
+# Real import of the pilot cities (data.gov.lv ~900 MB + LVĢMC flood service),
 # twice, then the full test suite including the `pilot` tests (row counts
 # against the source files, geometry, seed objects, second run unchanged).
 on:
@@ -19,7 +19,7 @@ concurrency:
 jobs:
   pilot:
     runs-on: ubuntu-24.04   # pinned; upgrade deliberately (docs/runbook.md)
-    timeout-minutes: 90
+    timeout-minutes: 180   # nine sources, imported twice; flood repair takes minutes
     steps:
       - uses: actions/checkout@v5
       - name: Build and start db, migrate, api

@@ -147,6 +147,7 @@ class NatureImporter:
                 "what": "Invalid geometries repaired with make_valid; polygon parts kept",
                 "invalid_repaired": counts["invalid_repaired"],
                 "without_geometry": counts["keys_without_geometry"],
+                "validated": counts["validated"],
                 "rings_rebuilt": rebuilt,
             },
             {

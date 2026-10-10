@@ -79,14 +79,19 @@ docker compose exec api python -m etl.sources load
 
 ## Import data (ETL)
 
-All imports run in the `etl` container (CLAUDE.md rule 12), never with the host Python. Phase 2a sources, imported in this order by `all`:
+All imports run in the `etl` container (CLAUDE.md rule 12), never with the host Python. Sources, imported in this order by `all`:
 
 | Source | What | Takes |
 |---|---|---|
-| `admin_boundaries` | VARIS `aw_shp.zip`: municipalities, cities, parishes (whole country) | ~30 s |
+| `admin_boundaries` | VARIS `aw_shp.zip`: municipalities, cities, parishes (whole country) | ~10–30 s |
 | `varis_addresses` | addresses of the pilot cities (`EKS` + `DEL`) and their earlier texts | ~1.5 min (340 MB download) |
 | `cadastre_spatial` | cadastre map of the pilot cities: parcels, parts, buildings, engineering structures, servitudes | ~40 s |
 | `cadastre_text` | cadastre text of the pilot cities: parcels, parts, buildings, building→parcel links, properties | ~3 min (pilot members only, by HTTP Range) |
+| `flood_10y` | LVĢMC 10-year spring flood (layers 0, 1) and the 200-year coverage mask (layer 3), pilot extent + 1 km; needs `admin_boundaries` | 20–40 min (fetch ~2 min; repairing the largest polygons takes the rest); an unchanged rerun ~2 min |
+| `nature_protected_areas` | DAP protected areas and their zoning (whole country) | ~20 s |
+| `nature_microreserves` | DAP microreserves and buffer zones (whole country) | ~15 s |
+| `nature_monuments` | DAP nature monuments (whole country) | ~1.5 min |
+| `nature_habitats` | DAP protected habitats, 175,000 polygons (whole country) | ~9 min |
 
 ```powershell
 docker compose run --rm etl import all
@@ -98,6 +103,8 @@ docker compose run --rm etl status                                 # live versio
 - Each run writes one `import_log` row per source. New data creates a new `dataset_version`, which becomes `live` in the same transaction as its load; the previous version becomes `superseded`. If nothing changed, the run is `unchanged` and no version is created.
 - **If a source changed its columns or XML elements, the import stops** (`failed`, with the reason in `import_log.message` and in the output), and the last good version stays live. Check the change, re-verify the source (`docs/data-sources.md`), update `config/schemas.yaml`, and import again.
 - The exit code is 1 if any source failed.
+- **Flood (`flood_10y`)** asks the LVĢMC MapServer (D1 E7) for the features in each pilot city's extent + 1 km, 25 at a time, with 1 cm simplification; it prints its progress. A batch that fails is retried and then fetched one object at a time. Layer 3 (200-year extent) is stored only as the coverage mask (`ref.flood_coverage_current`), never as a finding.
+- Geometry repair uses PostGIS `ST_MakeValid(method=structure)`; the largest flood polygons (over a million vertices) take a few minutes each (`docs/data-sources.md` §6.3).
 - The ETL runs the checked-out code (mounted read-only), so code changes need no rebuild. Rebuild after dependency changes: `docker compose --profile etl build etl`.
 
 Import history:
@@ -123,6 +130,8 @@ docker compose run --rm etl import all
 docker compose run --rm etl import all
 docker compose --profile test run --rm tests
 ```
+
+The pilot tests take about 2 minutes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
 
 Without real data, run everything else:
 
