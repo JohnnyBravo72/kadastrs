@@ -1,0 +1,11 @@
+#!/bin/sh
+# Git pre-commit hook: runs all pre-commit hooks in the `lint` container
+# (Linux), never on the Windows host (CLAUDE.md rule 12: Smart App Control
+# blocks unsigned executables such as pre-commit.exe and ruff.exe there).
+# Activate once per clone:  git config core.hooksPath scripts/git-hooks
+if ! docker info >/dev/null 2>&1; then
+    echo "pre-commit: Docker is not running - start Docker Desktop, then commit again." >&2
+    echo "pre-commit: (hooks run in the lint container; they are never skipped)" >&2
+    exit 1
+fi
+exec docker compose --profile lint run --rm -T lint pre-commit run --hook-stage pre-commit

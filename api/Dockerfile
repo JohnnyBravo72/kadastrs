@@ -27,6 +27,14 @@ RUN pip install -c constraints.txt ".[dev]"
 WORKDIR /src
 CMD ["python", "-m", "pytest", "-p", "no:cacheprovider"]
 
+# Lint runner: pre-commit hooks in Linux (git hook scripts/git-hooks/pre-commit).
+FROM test AS lint
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --system --add safe.directory /src
+CMD ["pre-commit", "run", "--all-files"]
+
 # ETL runner: runs the mounted checkout (/src, read-only), CLAUDE.md rule 12.
 FROM base AS etl
 WORKDIR /src

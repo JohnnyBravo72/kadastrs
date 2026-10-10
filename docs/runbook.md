@@ -14,16 +14,18 @@ All commands are for **PowerShell**, run from the repo root (`C:\Users\PC\Downlo
 
 ## One-time setup
 
-Install Docker Desktop, Git and **Python 3.14**. The Python version must match `.python-version`; a pre-commit hook checks it.
+Install Docker Desktop, Git and **Python 3.14** (for the editor). `.python-version` names the Python minor of the api/tests images; a pre-commit hook checks that they match.
 
 ```powershell
 py -3.14 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -c constraints.txt -e ".[dev]"
-pre-commit install
+git config core.hooksPath scripts/git-hooks
 ```
 
-The host venv is for the editor, ruff and pre-commit. **Tests run in a container** (see below). On this PC, Smart App Control blocks psycopg-binary's unsigned `pq` DLL, so psycopg cannot connect from the host Python. In the container it works, and CI uses the same container.
+**Pre-commit hooks run in Linux, in the `lint` container**, never on the host: Smart App Control blocks unsigned executables such as `pre-commit.exe` and `ruff.exe` (2026-10-10). `git config core.hooksPath scripts/git-hooks` makes every `git commit` run `scripts/git-hooks/pre-commit`, which starts `docker compose --profile lint run --rm lint pre-commit run`. **Docker Desktop must be running to commit**; otherwise the hook stops with "start Docker Desktop, then commit again". Never bypass it with `--no-verify`. The hook environments are cached in the `kadastrs_precommit_cache` volume, so only the first commit is slow.
+
+The host venv is for the editor only. **Tests run in a container** (see below). On this PC, Smart App Control blocks psycopg-binary's unsigned `pq` DLL, so psycopg cannot connect from the host Python. In the container it works, and CI uses the same container.
 
 ## Start
 
@@ -152,11 +154,13 @@ docker compose up -d --build --wait
 
 Tests marked `stack` fail, and never skip, when the stack is down. A skipped CRS test would hide a missing grid.
 
-Lint and format (also run on every commit by pre-commit):
+Lint and format (the git hook runs the same on the staged files of every commit):
 
 ```powershell
-pre-commit run --all-files
+docker compose --profile lint run --rm lint pre-commit run --all-files
 ```
+
+After changing `.pre-commit-config.yaml` dependencies or the Dockerfile, rebuild with `docker compose --profile lint build lint`.
 
 **CI runners are pinned to `ubuntu-24.04`** in both workflows (`ubuntu-latest` moves to Ubuntu 26 on 2026-10-19). Upgrade deliberately: change `runs-on` in both files on a branch, run CI and Actions → Pilot import → Run workflow on that branch, and merge only when both are green.
 

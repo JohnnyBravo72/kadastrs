@@ -29,11 +29,11 @@ repos:
         types_or: [python, shell, yaml, dockerfile]
         exclude: ^\.pre-commit-config\.yaml$
 
-      # The host venv (pre-commit's interpreter) must match .python-version,
-      # like the api image and CI.
-      - id: host-python-version
-        name: host Python matches .python-version
-        language: python
-        entry: python -I -c "import pathlib, sys; p = pathlib.Path('.python-version').read_text().strip(); v = '%d.%d' % sys.version_info[:2]; sys.exit(0 if v == p else f'host Python {v} != .python-version {p}')"
+      # Hooks run in the lint container (scripts/git-hooks/pre-commit), built on
+      # the api/tests image base: .python-version must match that Python.
+      - id: image-python-version
+        name: .python-version matches the api/tests image Python
+        language: system
+        entry: python scripts/check_python_version.py
         pass_filenames: false
         always_run: true

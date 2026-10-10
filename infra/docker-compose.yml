@@ -64,6 +64,22 @@ services:
       retries: 12
       start_period: 5s
 
+  # --- lint profile: pre-commit hooks in Linux (CLAUDE.md rule 12) ---------------
+
+  # Used by the git hook scripts/git-hooks/pre-commit; manual run:
+  #   docker compose --profile lint run --rm lint pre-commit run --all-files
+  lint:
+    profiles: [lint]
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+      target: lint
+    image: kadastrs-lint:dev
+    working_dir: /src
+    volumes:
+      - ..:/src
+      - precommit_cache:/root/.cache/pre-commit
+
   # --- etl profile: `docker compose run --rm etl import all` --------------------
 
   # Imports from data.gov.lv (etl/). Runs the mounted checkout; raw files of the
@@ -158,3 +174,4 @@ services:
 volumes:
   dbdata:
   etl_raw:
+  precommit_cache:
