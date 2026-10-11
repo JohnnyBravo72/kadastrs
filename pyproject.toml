@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.12",
     "pyyaml>=6.0",
     "httpx>=0.28",   # CKAN API and downloads (ETL)
+    "openpyxl>=3.1", # Excel: test-set comparison (Phase 4), reports (Phase 5)
     "pyshp>=3.1",    # SHP reading, pure Python; geometry work is done in PostGIS
 ]
 

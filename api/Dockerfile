@@ -1,4 +1,4 @@
-# API image (target `runtime`), ETL runner (target `etl`) and test runner (target `test`).
+# API image (target `runtime`), ETL runner (`etl`), check CLI (`check`) and test runner (`test`).
 # Build context is the repo root (see infra/docker-compose.yml).
 # Python minor must match .python-version (host venv and CI); tests check it.
 FROM python:3.14-slim AS base
@@ -40,6 +40,12 @@ FROM base AS etl
 WORKDIR /src
 USER app
 ENTRYPOINT ["python", "-m", "etl"]
+
+# Check engine CLI: runs the mounted checkout (/src), CLAUDE.md rule 12.
+FROM base AS check
+WORKDIR /src
+USER app
+ENTRYPOINT ["python", "-m", "engine.checks"]
 
 FROM base AS runtime
 ENV KADASTRS_CONFIG_DIR=/app/config

@@ -101,6 +101,25 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # --- check profile: `docker compose run --rm check run|show|replay|compare …` ---
+
+  # Check engine CLI (engine/checks/__main__.py). Runs the mounted checkout; the
+  # repo is writable so `compare` can write its report next to the input file.
+  check:
+    profiles: [check]
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+      target: check
+    image: kadastrs-check:dev
+    environment:
+      DATABASE_URL: *db-url
+    volumes:
+      - ..:/src
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   # --- test profile: `docker compose --profile test run --rm tests` -------------
 
   # Runs pytest on the api image's Python with the repo mounted at /src.

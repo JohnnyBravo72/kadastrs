@@ -1,0 +1,122 @@
+"""The test-set comparison tool on a filled copy of tests/data/test_set_template.xlsx."""
+
+from datetime import date
+from pathlib import Path
+
+import pytest
+from openpyxl import load_workbook
+
+from engine.checks import compare
+
+pytestmark = pytest.mark.stack
+
+TEMPLATE = Path(__file__).resolve().parents[1] / "data" / "test_set_template.xlsx"
+HINT = "‹Ir: … / Nav / Nav datu / Nav pārklājuma›"
+# projekta_nr, vertiba, m1..m6, parbaudes_datums (the template's example rows stay in)
+ROWS = [
+    (
+        "P-1",
+        9000050400,
+        "Ir: zemes vienība",
+        HINT,
+        "Nav",
+        "Ir: plūdu zonā",
+        "Nav",
+        "nav",
+        date(2026, 10, 1),
+    ),
+    ("P-1", "05000010069", "Ir", None, "Nav", "Nav", None, None, date(2026, 1, 1)),
+    (
+        "P-2",
+        "Institūta iela 4, Jelgava",
+        "Ir",
+        "Nav (atbilst)",
+        "Ir: dabas parks",
+        "Nav pārklājuma",
+        "Ir: BIS-A",
+        "Ir",
+        date(2026, 10, 1),
+    ),
+    ("P-3", "12345", "Ir", None, None, None, None, None, None),
+]
+
+
+@pytest.fixture
+def filled(tmp_path):
+    wb = load_workbook(TEMPLATE)
+    ws = wb[compare.SHEET]
+    for r, (project, value, *answers, checked) in enumerate(ROWS, start=4):
+        ws.cell(row=r, column=1, value=project)
+        ws.cell(row=r, column=2, value=value)  # 9000050400 typed as a number: zero lost
+        for c, a in enumerate(answers, start=4):
+            ws.cell(row=r, column=c, value=a)
+        ws.cell(row=r, column=10, value=checked)
+    out = tmp_path / "filled.xlsx"
+    wb.save(out)
+    return out
+
+
+@pytest.mark.parametrize(
+    ("text", "status"),
+    [
+        ("Ir: mikroliegums", "found"),
+        ("Nav", "clear"),
+        ("nav datu", "no_data"),
+        ("Nav pārklājuma – nav kartes", "not_covered"),
+        ("NAV PARKLAJUMA", "not_covered"),
+        (HINT, None),
+        ("", None),
+        (None, None),
+        ("varbūt", None),
+    ],
+)
+def test_parse_answer(text, status):
+    assert compare.parse_answer(text) == status
+
+
+def test_compare_filled_template(engine_db, filled, tmp_path):
+    with engine_db() as conn:
+        report = compare.compare(conn, filled)
+    lines = {(line.row_no, line.module): line for line in report.lines}
+    assert {line.row_no for line in report.lines} == {4, 5, 6, 7}  # examples skipped
+    assert report.rule_set == "1 (draft)"
+
+    flood = lines[(4, "flood_10y")]
+    assert (flood.designation, flood.manual, flood.engine, flood.outcome) == (
+        "09000050400",
+        "found",
+        "found",
+        "agrees",
+    )
+    assert lines[(4, "address_consistency")].outcome == "not_answered"  # hint left in
+    assert lines[(4, "encumbrances")].outcome == "agrees"
+
+    differs = lines[(5, "flood_10y")]
+    assert (differs.manual, differs.engine, differs.outcome) == ("clear", "not_covered", "differs")
+    assert differs.newer_data is True  # data dated after the 2026-01-01 check
+    assert lines[(5, "address_consistency")].outcome == "not_answered"
+
+    addr = lines[(6, "address_consistency")]
+    assert (addr.designation, addr.engine, addr.outcome) == ("09000360220", "clear", "agrees")
+    assert "2 objekti" in addr.note
+    assert lines[(6, "nature")].outcome == "agrees"
+    assert lines[(6, "flood_10y")].outcome == "agrees"
+    assert lines[(6, "bis")].detail.startswith("BIS-A (building_on_parcel)")
+
+    bad = lines[(7, "cadastre_facts")]
+    assert (bad.designation, bad.engine, bad.outcome) == (None, None, "not_comparable")
+
+    counts = report.counts()
+    assert counts["flood_10y"] == {
+        "agrees": 2,
+        "differs": 1,
+        "not_answered": 1,
+        "not_comparable": 0,
+    }
+    assert counts["cadastre_facts"]["not_comparable"] == 1  # row 7 not resolved
+
+    out = tmp_path / "report.xlsx"
+    compare.write_xlsx(report, out)
+    ws = load_workbook(out)["Salidzinajums"]
+    assert ws.cell(row=2, column=4).value == "09000050400"  # text, leading zero kept
+    assert ws.cell(row=2, column=4).number_format == "@"
