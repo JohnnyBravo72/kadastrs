@@ -6,9 +6,18 @@
 
 **Data policy:** all data comes from **data.gov.lv** (section 2).
 
-**Status:** Phase 0 steps 1 and 3 are done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
+**Status (2026-10-11):** Phases 1–3 are done; Phase 4 (check engine v1) is built and tested, risk rules v1 are a draft for review (D4), and the comparison with the colleagues' manual answers waits for the filled test-set files. Earlier: Phase 0 steps 1 and 3 were done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
 
 **Change log**
+- 2026-10-11 (Phase 4): check engine v1 built (§6); modules 1–6 store their results in runs.
+  - Runs pin the live version of every source; modules read only those versions, so `replay` rebuilds an old run after newer imports. `work.check_result` rows are guarded in the DB (no `UPDATE` / `DELETE`; results only for a running run and only with its pinned versions).
+  - Risk rules v1 are a **draft** in `config/rules.yaml` (`status: draft`, reason per rule), awaiting review (D4). Each run stores the whole rule set; the aggregate order is `high > medium > unknown > low > none`.
+  - §6.3 reading: the 0.5 m inward-buffered overlap decides whether there is a finding (≥ 1 m² or ≥ 0.1 %); the m² and % reported are those of the whole unit (a parcel fully in the zone shows 100 %).
+  - Module 2 runs once per target; without a given address it is `no_data` "adrese nav norādīta", **counted as "not applicable", not as a data gap**, in summaries and the Excel report (decided 2026-10-11, Janis).
+  - Module 5 adds "nearby": a BIS object point (WGS84 coordinates as published) within 20 m of the unit (`bis_nearby_m`).
+  - Module 6: an object whose only encumbrances are frozen-only is `found` with reason "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli", never `clear`; the draft rule gives it risk `unknown`.
+  - API `POST /api/runs`, `GET /api/runs/{id}`, `/targets`, `/targets/{no}`; CLI `docker compose run --rm check run|show|replay|compare`.
+  - Comparison tool for the returned test-set templates (`check compare`). Phase 4's "done when" (findings match the colleagues' answers) waits for those files.
 - 2026-10-10 (Phase 3): input resolution built (§5).
   - Endpoints `/api/suggest`, `/api/resolve`, `/api/property/{number}/units`, `/api/address/{varis_code}/objects`; nothing is stored.
   - Classification adds 15 digits (parcel part), 9 digits (VARIS code) and Excel `precision_lost` (scientific notation with dropped digits is never resolved without confirmation).
@@ -430,7 +439,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | D1 | Agency-hosted resources listed on data.gov.lv count as data.gov.lv? | Phase 0 |
 | D2 | Basemap: OSM or plain | Phase 6 |
 | D3 | Hosting, sign-in, security review, retention, maintenance, legal status (section 1; interim answers recorded) | Phase 10 |
-| D4 | Risk rules v1, agreed with the team leads | Phase 4 |
+| D4 | Risk rules v1, agreed with the team leads (draft v1 in `config/rules.yaml`, 2026-10-11) | Phase 4 |
 | D5 | Ownership module: **decided**, owner type only | Phase 8 |
 | D6 | Sanctions: **decided**, legal entities by reg. no. only (module 17) | Phase 8 |
 | D7 | Contents of Avoti and Žurnāls | Phase 6 |

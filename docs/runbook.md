@@ -11,6 +11,7 @@ All commands are for **PowerShell**, run from the repo root (`C:\Users\PC\Downlo
 | `db-nogrid` | same DB image **without** the grid, for negative CRS tests (profile `test`) | — |
 | `migrate-test` | creates and migrates the `kadastrs_test` database used by the ETL tests (profile `test`) | — |
 | `etl` | imports from data.gov.lv (profile `etl`); raw files of live versions in volume `kadastrs_etl_raw` | — |
+| `check` | check engine CLI: `run`, `show`, `replay`, `compare` (profile `check`) | — |
 
 ## One-time setup
 
@@ -170,6 +171,57 @@ How `/api/resolve` reads a value:
 
 Row statuses: `resolved`, `ambiguous` (pick from `matches`), `not_found`, `unresolved` (deleted address without a known successor), `outside_pilot`, `invalid`, `empty`. Repeated objects get `duplicate_of`. The response lists the dataset `versions` it read.
 
+## Checks (runs and results)
+
+The check engine (`engine/checks`, PLAN.md §6) runs modules 1–6 on resolved objects and **stores** every result. A run pins the live version of every source at its start; modules read only those versions. Results are never changed: the database rejects `UPDATE` and `DELETE` on `work.check_result`, `work.run_target` and `work.run_version`, and a finished `work.run` (CLAUDE.md rule 3). Checking again creates a new run.
+
+| Module | id | Status values used |
+|---|---|---|
+| 1 Kadastra dati | `cadastre_facts` | `found`, `no_data` (not in the register) |
+| 2 Adreses atbilstība | `address_consistency` | `clear` (given address linked), `found` "Neatbilst", `no_data` "adrese nav norādīta" (**counted as `not_applicable`** in summaries) |
+| 3 Aizsargājamā daba | `nature` | `found` (one line per feature and kind), `clear`, `no_data` "nav ģeometrijas" |
+| 4 Plūdi (10 gadu) | `flood_10y` | `found`, `clear` (warning `partial_coverage` if part of the unit is outside the mask), `not_covered` (outside the 200-year mask), `no_data` |
+| 5 Būvniecības lietas | `bis` | `found` (one item per distinct case, best match type first), `clear` |
+| 6 Apgrūtinājumi | `encumbrances` | `found`, `found` with reason "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli" (frozen-only, never `clear`), `clear` |
+
+Any module can also give `source_unavailable` (no live version) or `error` (reason holds the exception). **Risk comes only from `config/rules.yaml`** (mounted; edits apply to the next run). Rule set v1 is a **draft** (`status: draft`); each run stores the whole rule set and its SHA-256, and summaries show version and status. Thresholds (§6.3) are in the same file: 0.5 m inward buffer, overlap ≥ 1 m² or ≥ 0.1 %, BIS "nearby" 20 m. The buffered overlap decides whether there is a finding; the m² and % reported are those of the whole unit.
+
+A **property** is checked per unit (parcels and buildings; buildings marked non-existing left out) plus an aggregate with the worst risk (`risk_order` in `rules.yaml`). Module 2 runs once per target. A building without geometry is checked on its parcel (warning `parcel_level`, "pārbaudīts pēc zemes vienības").
+
+API (resolve first, then send the chosen objects; `sources: null` = the registry defaults, max 1,000 targets):
+
+```powershell
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+'{"targets": [{"type": "property", "designation": "05000041006", "given_address": "101808322"},
+              {"type": "parcel", "designation": "09000050400"}],
+  "sources": null}' |
+  curl.exe -s -X POST "http://127.0.0.1:8000/api/runs" -H "Content-Type: application/json" --data-binary "@-"
+
+curl.exe -s "http://127.0.0.1:8000/api/runs/1"             # summary: rule set, versions, counts per module
+curl.exe -s "http://127.0.0.1:8000/api/runs/1/targets"     # one line per object: status and risk per module
+curl.exe -s "http://127.0.0.1:8000/api/runs/1/targets/0"   # all results of one object (units of a property too)
+```
+
+CLI (`check` service, profile `check`; built from the api image like `etl`):
+
+```powershell
+docker compose run --rm check run 09000360220 "Tautas iela 11, Daugavpils"   # resolve + new run
+docker compose run --rm check show 13 [--json]
+docker compose run --rm check replay 13     # recompute from the pinned versions; exit 1 if anything differs
+```
+
+`replay` is the reproducibility check (§6.5): a run is recomputed from its stored versions and rule-set snapshot, also after newer imports. It reproduces runs made by the same engine code; a run from an older engine version prints a note, and differences then show what the code change altered.
+
+### Comparing with the colleagues' answers
+
+When a filled copy of `tests/data/test_set_template.xlsx` comes back, put it in the repo (e.g. `tests/data/returned/`, not committed if it holds anything beyond designations) and run:
+
+```powershell
+docker compose run --rm check compare tests/data/returned/kolegis1.xlsx
+```
+
+It resolves each `vertiba`, checks all objects in one new run (origin `compare`) and writes `<file>_salidzinajums.xlsx` next to the input: one row per object and module with the manual answer, the engine status, **sakrīt / atšķiras / nav atbildes / nav salīdzināms**, the engine's risk and finding, the data dates and the manual check date ("Dati jaunāki par pārbaudi" = a source is newer than the manual check, so the difference may be explained by data dates). Answers are read from their first words: «Ir…» = `found`, «Nav» = `clear`, «Nav datu» = `no_data`, «Nav pārklājuma» = `not_covered`; for module 2, «Ir» means a mismatch was found. The yellow example rows (`PIEMĒRS…`) are skipped. An ambiguous number is checked as its first match and an address with several objects as its parcel, both with a note.
+
 ## Run the tests
 
 ```powershell
@@ -178,7 +230,7 @@ docker compose --profile test run --rm tests
 
 This builds the test image if needed, starts `db`, `migrate`, `api`, `db-nogrid` and `migrate-test`, and runs pytest with the repo mounted at `/src`. Code changes need no rebuild.
 
-The ETL rule tests (`tests/etl`) import synthetic files through a fake data.gov.lv into the separate `kadastrs_test` database, so they never touch your data. The resolution tests (`tests/resolve`) load a small synthetic pilot (seed objects, ambiguous numbers, renamed and deleted addresses) into the same database and call the API in-process.
+The ETL rule tests (`tests/etl`) import synthetic files through a fake data.gov.lv into the separate `kadastrs_test` database, so they never touch your data. The resolution tests (`tests/resolve`) load a small synthetic pilot (seed objects, ambiguous numbers, renamed and deleted addresses) into the same database and call the API in-process. The engine tests (`tests/checks`) add synthetic flood, nature, BIS and encumbrance rows to that pilot (layout in `tests/checks/conftest.py`): every status of modules 1–6, the §6.3 thresholds and geometry fallback, the property aggregate, the database guards, determinism, replay after a new import, the comparison tool and the run API.
 
 **The `pilot` tests check the real import in the dev database** (row counts against the source files, geometry, seed objects, and that a second run created no new versions). They **fail when nothing is imported**, so import twice first:
 
@@ -188,7 +240,7 @@ docker compose run --rm etl import all
 docker compose --profile test run --rm tests
 ```
 
-The pilot tests take about 3 minutes. The resolution checks (`tests/pilot/test_pilot_resolve.py`) cover the seed objects, every real property-or-parcel ambiguity, all leading-zero lengths, Excel-mangled inputs, typos and diacritics, renamed and deleted addresses, 300 random existing addresses, and `/api/suggest` p95 under 300 ms (printed with `-s`). The BIS and encumbrance checks (`tests/pilot/test_pilot_bis_encumbrances.py`) recount rows from the raw files, compare every stored designation and ATVK with the raw file (no lost leading zero), check the BIS join counts and that the DAP `ATIS_CODE` values are classifier codes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
+The pilot tests take about 3 minutes. The resolution checks (`tests/pilot/test_pilot_resolve.py`) cover the seed objects, every real property-or-parcel ambiguity, all leading-zero lengths, Excel-mangled inputs, typos and diacritics, renamed and deleted addresses, 300 random existing addresses, and `/api/suggest` p95 under 300 ms (printed with `-s`). The engine checks (`tests/pilot/test_pilot_checks.py`) run the flood regression parcels (`tests/data/flood_regression.yaml`), the seed objects and 100 parcels (under 30 s, then replayed with identical results); their runs stay in the dev DB like any run. The BIS and encumbrance checks (`tests/pilot/test_pilot_bis_encumbrances.py`) recount rows from the raw files, compare every stored designation and ATVK with the raw file (no lost leading zero), check the BIS join counts and that the DAP `ATIS_CODE` values are classifier codes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
 
 Without real data, run everything else:
 
@@ -205,7 +257,7 @@ docker compose --profile test run --rm tests python -m pytest -p no:cacheprovide
 After changing **dependencies** (`pyproject.toml`, `constraints.txt`) or a **Dockerfile**, rebuild:
 
 ```powershell
-docker compose --profile test --profile etl build
+docker compose --profile test --profile etl --profile check build
 docker compose up -d --build --wait
 ```
 

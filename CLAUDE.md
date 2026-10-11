@@ -34,6 +34,7 @@ Full details in [docs/runbook.md](docs/runbook.md). From the repo root (PowerShe
 - **Start:** `docker compose up -d --build --wait`, then check `http://127.0.0.1:8000/health`.
 - **Stop:** `docker compose --profile test --profile etl down`. **Reset the DB:** add `-v`.
 - **Import data:** `docker compose run --rm etl import all` (or source ids), `docker compose run --rm etl status`.
+- **Checks:** `POST /api/runs` or `docker compose run --rm check run|show|replay|compare …` (engine in `engine/checks`). A run pins dataset versions; `replay <run_id>` must reproduce it. Compare returned test-set files with `check compare <file.xlsx>`.
 - **Tests:** `docker compose --profile test run --rm tests`. Tests run in a container because Smart App Control blocks psycopg's DLL on the host; CI does the same. The `pilot` tests need a real import (twice) in the dev DB; without it use `-m "not pilot"`.
 - **Lint:** `docker compose --profile lint run --rm lint pre-commit run --all-files` (the git hook runs the same container on every commit).
 - **Load the source registry:** `docker compose exec api python -m etl.sources load`.
