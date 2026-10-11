@@ -40,6 +40,7 @@ pyshp==3.1.6
 pytest==9.1.1
 python-discovery==1.6.1
 python-dotenv==1.2.4
+python-multipart==0.0.32
 PyYAML==6.0.3
 ruff==0.16.10
 shapely==2.2.0

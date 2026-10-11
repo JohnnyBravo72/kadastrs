@@ -17,6 +17,7 @@ dependencies = [
     "httpx>=0.28",   # CKAN API and downloads (ETL)
     "openpyxl>=3.1", # Excel: test-set comparison (Phase 4), reports (Phase 5)
     "pyshp>=3.1",    # SHP reading, pure Python; geometry work is done in PostGIS
+    "python-multipart>=0.0.32",  # file uploads (POST /api/batch, Phase 5)
 ]
 
 [project.optional-dependencies]
@@ -30,6 +31,9 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["api*", "etl*", "engine*", "reports*"]
 exclude = ["etl.discovery*", "*.tests*"]
+
+[tool.setuptools.package-data]
+api = ["static/*.html"]  # the plain input page (GET /)
 
 [tool.ruff]
 line-length = 100

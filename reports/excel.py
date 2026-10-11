@@ -18,6 +18,7 @@ Codes are written as text (leading zeros kept, CLAUDE.md rule 8).
 
 import io
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -267,6 +268,10 @@ def _warnings(target: dict[str, Any], results: dict[str, CheckResult]) -> str:
             if w.code == "units_partial":  # engine text lists raw status codes
                 for code, lv in STATUS_LV.items():
                     msg = msg.replace(f"{code}: ", f"{lv}: ")
+            if w.code == "stale_data":  # about a source, not a unit; age in Latvian
+                msg = re.sub(r"\(([^()]*)\)$", lambda m: f"({_age(m.group(1))})", msg)
+                add(msg)
+                continue
             unit = getattr(w, "unit", None)
             add(f"{unit}: {msg}" if unit and unit != target["designation"] else msg)
     if frozen:

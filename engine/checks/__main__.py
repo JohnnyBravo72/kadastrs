@@ -4,11 +4,18 @@
     docker compose run --rm check show 12
     docker compose run --rm check replay 12
     docker compose run --rm check compare tests/data/filled.xlsx [--out report.xlsx]
+    docker compose run --rm check batch saraksts.xlsx [--out parbaude.xlsx]
+    docker compose run --rm -T check batch - < saraksts.txt
+    docker compose run --rm check report 12 [--out parbaude.xlsx] [--replay]
 
 `run` resolves the values like POST /api/resolve (an ambiguous value is checked
 as its first match, with a note) and stores a new run. `replay` recomputes a
 stored run from its pinned versions and exits 1 if anything differs. `compare`
 checks a filled test-set template against the engine (engine/checks/compare.py).
+`batch` reads a CSV / XLSX file or a pasted list on stdin (engine/batch), stores
+a run and writes its Excel report; rows that are not checked are on the
+"Neatrasts" sheet. `report` writes the report of a stored run; with --replay it
+is built from the replayed results (it must equal the stored report).
 """
 
 import argparse
@@ -19,7 +26,11 @@ from pathlib import Path
 import psycopg
 
 from api.db import database_url
+from engine.batch import reader
+from engine.batch.plan import run_batch
 from engine.checks import ENGINE_VERSION, compare, runner, summary
+from engine.resolve.context import resolve_config
+from reports import excel
 
 
 def _connect():
@@ -101,6 +112,48 @@ def cmd_compare(args) -> int:
     return 0
 
 
+def _write_report(conn, run_id: int, out: Path, replay: bool = False) -> None:
+    rows = runner.replay(conn, run_id) if replay else None
+    data = excel.load(conn, run_id, rows=rows)
+    out.write_bytes(excel.to_bytes(data))
+
+
+def cmd_batch(args) -> int:
+    limit = resolve_config().max_rows
+    try:
+        if args.file == "-":
+            rows = reader.read_text(sys.stdin.read(), limit)
+            default = Path.cwd() / "kadastra_parbaude_{}.xlsx"
+        else:
+            path = Path(args.file)
+            rows = reader.read_upload(path.name, path.read_bytes(), limit)
+            default = path.with_name(path.stem + "_parbaude_{}.xlsx")
+    except reader.InputError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    with _connect() as conn:
+        run_id = run_batch(conn, rows, _sources(args.sources))
+        out = Path(args.out) if args.out else Path(str(default).format(run_id))
+        _write_report(conn, run_id, out)
+        inputs = runner.stored_inputs(conn, run_id)
+        not_checked = sum(1 for i in inputs if not i["target_nos"])
+        _print_summary(conn, run_id)
+    print(f"{len(inputs)} rows, {not_checked} not checked (sheet Neatrasts)")
+    print(f"report: {out}")
+    return 0
+
+
+def cmd_report(args) -> int:
+    with _connect() as conn:
+        if summary.run_header(conn, args.run_id) is None:
+            print(f"run {args.run_id} not found", file=sys.stderr)
+            return 1
+        out = Path(args.out) if args.out else Path.cwd() / excel.filename(args.run_id)
+        _write_report(conn, args.run_id, out, replay=args.replay)
+    print(f"report: {out}")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python -m engine.checks")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -120,6 +173,16 @@ def main(argv=None) -> int:
     c.add_argument("--out")
     c.add_argument("--sources")
     c.set_defaults(func=cmd_compare)
+    b = sub.add_parser("batch", help="check a CSV / XLSX file (or - for stdin) and write Excel")
+    b.add_argument("file")
+    b.add_argument("--out")
+    b.add_argument("--sources")
+    b.set_defaults(func=cmd_batch)
+    rep = sub.add_parser("report", help="write the Excel report of a stored run")
+    rep.add_argument("run_id", type=int)
+    rep.add_argument("--out")
+    rep.add_argument("--replay", action="store_true", help="build it from the replayed results")
+    rep.set_defaults(func=cmd_report)
     args = p.parse_args(argv)
     return args.func(args)
 

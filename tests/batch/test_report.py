@@ -281,3 +281,11 @@ def test_thousand_row_batch(conn):
     assert len(runner.stored_inputs(conn, rid)) == 1000
     print(f"1,000 rows (fixture): {elapsed:.1f} s")
     assert elapsed < 120
+
+
+@pytest.mark.parametrize(
+    ("text", "lv"),
+    [("14 days", "14 d."), ("1 year 1 mon", "1 g. 1 mēn."), ("2 days", "2 d."), (None, None)],
+)
+def test_max_age_in_latvian(text, lv):
+    assert excel._age(text) == lv
