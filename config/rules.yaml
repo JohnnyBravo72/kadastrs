@@ -33,8 +33,9 @@ defaults:
 # Conditions:
 #   status / reason / match_type   equal to the value, or one of a list
 #   warning                        a warning with this code (or one of a list) is present
-#   item                           at least one item matches every field test;
-#                                  "<field>_gte" / "<field>_lt" compare numbers
+#   item                           at least one item matches every field test: a value
+#                                  or one of a list; "<field>_gte" / "<field>_lt" compare
+#                                  numbers; "<field>_not_in" = none of the list
 rules:
   # --- 1 Kadastra dati ----------------------------------------------------------
   - id: cadastre_facts_found
@@ -83,12 +84,66 @@ rules:
     text_lv: "Adrese nav norādīta."
 
   # --- 3 Aizsargājamā daba (OZOLS) -----------------------------------------------------
-  - id: nature_protected_area
+  # Protected areas by DAP category (CATEGORY), zones by zone type (NAME). An area
+  # whose zone overlaps the unit is decided by the zone (decided_by_zone: true).
+  # Every value in the DAP data (version 2026-04-07) is mapped explicitly; a value
+  # not listed here gives "unknown" (manual check).
+  #   Categories: DR dabas rezervāts, DL dabas liegums, NP nacionālais parks,
+  #   ML mikroliegums, BR biosfēras rezervāts, DP dabas parks, AAA aizsargājamo
+  #   ainavu apvidus, AJT aizsargājama jūras teritorija, DPie:* dabas pieminekļu
+  #   teritorijas (DA alejas, DS dendroloģiskie stādījumi, ĢĢ ģeoloģiskie, cits).
+  #   Zone types: SRZ stingrā režīma, RRZ regulējamā režīma, DLZ dabas lieguma,
+  #   SLZ sezonas lieguma, DPZ dabas parka, AAZ ainavu aizsardzības, KvZ
+  #   kultūrvēsturiskā, NZ neitrālā, cita (cita režīma zona / ārējā aizsargjosla).
+  #   National-park zones use the same zone types.
+  - id: nature_area_high
     module: nature
     level: high
-    when: {item: {kind: [protected_area, protected_area_zone]}}
-    reason: "Specially protected nature area (ĪADT) or its functional zone: activities are restricted by the area's regulations."
-    text_lv: "Objekts atrodas īpaši aizsargājamā dabas teritorijā vai tās zonā."
+    when: {item: {kind: protected_area, decided_by_zone: false, category: [DR, DL, NP, ML]}}
+    reason: "Dabas rezervāts, dabas liegums or mikroliegums (and a national park where no zone covers the unit): strict protection regimes."
+    text_lv: "Objekts atrodas dabas rezervātā, dabas liegumā vai mikroliegumā."
+  - id: nature_area_medium
+    module: nature
+    level: medium
+    when: {item: {kind: protected_area, decided_by_zone: false, category: [DP, AAA, AJT, BR, "DPie:DA", "DPie:DS", "DPie:ĢĢ", "Dpie:cits"]}}
+    reason: "Dabas parks, aizsargājamo ainavu apvidus, protected marine area, biosphere reserve or a nature-monument territory: restrictions apply, milder than in reserves."
+    text_lv: "Objekts atrodas dabas parkā, aizsargājamo ainavu apvidū vai citā ĪADT."
+  - id: nature_area_unmapped
+    module: nature
+    level: unknown
+    when: {item: {kind: protected_area, decided_by_zone: false, category_not_in: [DR, DL, NP, ML, DP, AAA, AJT, BR, "DPie:DA", "DPie:DS", "DPie:ĢĢ", "Dpie:cits"]}}
+    reason: "ĪADT category not mapped in this rule set (new or empty value): manual check."
+    text_lv: "ĪADT kategorija nav klasificēta – pārbaudīt manuāli."
+  - id: nature_zone_high
+    module: nature
+    level: high
+    when: {item: {kind: protected_area_zone, zone_type: [SRZ, RRZ, DLZ, SLZ]}}
+    reason: "Strict or regulated regime zone, nature-reserve zone or seasonal-reserve zone (also in national parks)."
+    text_lv: "Objekts atrodas stingrā vai regulējamā režīma, dabas lieguma vai sezonas lieguma zonā."
+  - id: nature_zone_medium
+    module: nature
+    level: medium
+    when: {item: {kind: protected_area_zone, zone_type: [DPZ, AAZ, KvZ]}}
+    reason: "Nature-park, landscape-protection or cultural-historical zone."
+    text_lv: "Objekts atrodas dabas parka, ainavu aizsardzības vai kultūrvēsturiskajā zonā."
+  - id: nature_zone_low
+    module: nature
+    level: low
+    when: {item: {kind: protected_area_zone, zone_type: NZ}}
+    reason: "Neutral zone: few nature restrictions beyond general planning."
+    text_lv: "Objekts atrodas ĪADT neitrālajā zonā."
+  - id: nature_zone_other
+    module: nature
+    level: unknown
+    when: {item: {kind: protected_area_zone, zone_type: cita}}
+    reason: "Zone type \"cita\" (another regime zone or a reserve's outer protection belt): the regime is not given in the data, manual check."
+    text_lv: "Cita režīma zona – pārbaudīt manuāli."
+  - id: nature_zone_unmapped
+    module: nature
+    level: unknown
+    when: {item: {kind: protected_area_zone, zone_type_not_in: [SRZ, RRZ, DLZ, SLZ, DPZ, AAZ, KvZ, NZ, cita]}}
+    reason: "Zone type not mapped in this rule set (new or empty value): manual check."
+    text_lv: "Zonas veids nav klasificēts – pārbaudīt manuāli."
   - id: nature_microreserve
     module: nature
     level: high
@@ -127,24 +182,30 @@ rules:
     when: {item: {share_gte: 0.10}}
     reason: "At least 10 % of the parcel lies in the 10-year spring flood zone."
     text_lv: "Vismaz 10 % objekta atrodas 10 gadu plūdu zonā."
-  - id: flood_10y_minor
+  - id: flood_10y_partial
     module: flood_10y
     level: medium
-    when: {status: found}
-    reason: "Part of the parcel (above the overlap thresholds) lies in the 10-year spring flood zone."
-    text_lv: "Daļa objekta atrodas 10 gadu plūdu zonā."
-  - id: flood_not_covered
-    module: flood_10y
-    level: unknown
-    when: {status: not_covered}
-    reason: "Outside the area shown on the flood maps: either not modelled or dry even at 0.5 % (E7); open data cannot tell which."
-    text_lv: "Ārpus plūdu kartēs attēlotās teritorijas."
-  - id: flood_partly_covered
+    when: {item: {share_gte: 0.01, share_lt: 0.10}}
+    reason: "1-10 % of the parcel lies in the 10-year spring flood zone."
+    text_lv: "1–10 % objekta atrodas 10 gadu plūdu zonā."
+  - id: flood_10y_minor
     module: flood_10y
     level: low
+    when: {item: {share_lt: 0.01}}
+    reason: "Less than 1 % of the parcel (but above the overlap thresholds) lies in the 10-year spring flood zone."
+    text_lv: "Mazāk par 1 % objekta atrodas 10 gadu plūdu zonā."
+  - id: flood_not_covered
+    module: flood_10y
+    level: none
+    when: {status: not_covered}
+    reason: "Outside the area shown on the flood maps; the status stays not_covered (never clear) and the text keeps the E7 caveat (decided 2026-10-11)."
+    text_lv: "Ārpus plūdu kartēs attēlotās teritorijas – plūdu karte šeit nav pieejama vai teritorija nav applūstoša pat 200 gadu scenārijā."
+  - id: flood_partly_covered
+    module: flood_10y
+    level: none
     when: {status: clear, warning: partial_coverage}
-    reason: "Only part of the parcel lies inside the mapped area; the rest is not covered."
-    text_lv: "Plūdu karte aptver tikai daļu objekta."
+    reason: "Only part of the parcel lies inside the mapped area, with no 10-year finding there (decided 2026-10-11)."
+    text_lv: "Plūdu karte aptver tikai daļu objekta; 10 gadu plūdu zonā nav."
   - id: flood_clear
     module: flood_10y
     level: none
@@ -153,12 +214,33 @@ rules:
     text_lv: "10 gadu plūdu zonā nav."
 
   # --- 5 Būvniecības lietas (BIS) --------------------------------------------------------
-  - id: bis_exact
+  # stage = Aktuala_stadija; age_years = years from Lietas_izveidosanas_datums to the
+  # run date. Closed: Ekspluatācija (accepted into service), Izbeigta (terminated).
+  # The other six stages in the data (2026-10-10) are active.
+  - id: bis_exact_active
     module: bis
     level: medium
-    when: {item: {match_type: [exact_building, building_on_parcel]}}
-    reason: "A construction case on this building, or on a building the cadastre links to this parcel: possible overlap with the project."
-    text_lv: "Būvniecības lieta uz šī objekta."
+    when: {item: {match_type: [exact_building, building_on_parcel], stage: [Iecere, "Būvniecības ieceres publiskā apspriešana", "Projektēšanas nosacījumu izpilde", "Būvdarbu uzsākšanas nosacījumu izpilde", "Būvdarbi", "Nodošana ekspluatācijā"]}}
+    reason: "An active construction case on this building or on a building on this parcel: possible overlap with the project."
+    text_lv: "Aktīva būvniecības lieta uz šī objekta."
+  - id: bis_exact_recent
+    module: bis
+    level: medium
+    when: {item: {match_type: [exact_building, building_on_parcel], age_years_lt: 5}}
+    reason: "A construction case on this object opened within the last 5 years: recent works may overlap with the project."
+    text_lv: "Pēdējo 5 gadu būvniecības lieta uz šī objekta."
+  - id: bis_exact_closed
+    module: bis
+    level: low
+    when: {item: {match_type: [exact_building, building_on_parcel], stage: ["Ekspluatācija", "Izbeigta"]}}
+    reason: "A closed construction case on this object (in service or terminated); stays low unless it is also less than 5 years old."
+    text_lv: "Noslēgta būvniecības lieta uz šī objekta."
+  - id: bis_exact_stage_unmapped
+    module: bis
+    level: unknown
+    when: {item: {match_type: [exact_building, building_on_parcel], stage_not_in: [Iecere, "Būvniecības ieceres publiskā apspriešana", "Projektēšanas nosacījumu izpilde", "Būvdarbu uzsākšanas nosacījumu izpilde", "Būvdarbi", "Nodošana ekspluatācijā", "Ekspluatācija", "Izbeigta"]}}
+    reason: "Case stage not mapped in this rule set (new or empty value): manual check."
+    text_lv: "Būvniecības lietas stadija nav klasificēta – pārbaudīt manuāli."
   - id: bis_probable
     module: bis
     level: low
@@ -181,11 +263,76 @@ rules:
   # --- 6 Apgrūtinājumi -----------------------------------------------------------------------
   # Items are current encumbrances (frozen: false), or, when ALL of an object's
   # encumbrances are frozen-only, those frozen-only ones (frozen: true).
+  # code = ATIS / cadastre classifier code. Medium: the codes below, chosen from the
+  # 123 codes in the pilot data (version 2026-09-26); every other code is low.
+  - id: encumbrance_medium
+    module: encumbrances
+    level: medium
+    when:
+      item:
+        frozen: false
+        code:
+          # water bodies: Baltic coast (dunes, beach, limited-activity belt), watercourses, lakes, artificial water bodies
+          - "7311010100"
+          - "7311010200"
+          - "7311010300"
+          - "7311020101"
+          - "7311020105"
+          - "7311020206"
+          - "7311020300"
+          # applūstošā (10 % applūduma varbūtība) teritorija
+          - "7311020400"
+          # groundwater intakes: strict-regime and bacteriological belts (the chemical belt 7311090900 stays low)
+          - "7311090700"
+          - "7311090800"
+          # nature: ĪADT and their zones, nature monuments and monument trees, microreserves, city forest belts
+          - "7313020300"
+          - "7313020500"
+          - "7313020600"
+          - "7313040000"
+          - "7313040300"
+          - "7313040600"
+          - "7313040700"
+          - "7313050300"
+          - "7313050400"
+          - "7313050600"
+          - "7313070000"
+          - "7313070300"
+          - "7313070600"
+          - "7313080100"
+          - "7313080300"
+          - "7313100100"
+          - "7313100200"
+          - "7313120100"
+          # construction restriction area set in a planning document (classifier group 7313)
+          - "7313090100"
+          # cultural monuments themselves (architecture, archaeology, art, industrial, historic events, urban planning)
+          - "7314010104"
+          - "7314010105"
+          - "7314010106"
+          - "7314010202"
+          - "7314010204"
+          - "7314010302"
+          - "7314010303"
+          - "7314010304"
+          - "7314010402"
+          - "7314010502"
+          - "7314010503"
+          - "7314010504"
+          - "7314010602"
+          - "7314010603"
+          - "7314010604"
+          # cultural monument protection zones
+          - "7314020101"
+          - "7314020102"
+          - "7314020201"
+    reason: "Water-body, flood-plain, groundwater-source, nature or cultural-heritage protection: restricts building and land use more than utility or road belts."
+    text_lv: "Objektam reģistrēts ūdens, applūšanas, dabas vai kultūras pieminekļu aizsardzības apgrūtinājums."
   - id: encumbrance_registered
     module: encumbrances
     level: low
     when: {item: {frozen: false}}
-    reason: "Encumbrances are registered on the object; the evaluator checks whether they limit the planned works."
+    reason: "Encumbrances are registered on the object (utility and road belts, servitudes, other); the evaluator checks whether they limit the planned works."
     text_lv: "Objektam reģistrēti apgrūtinājumi."
   - id: encumbrance_frozen_alongside_current
     module: encumbrances

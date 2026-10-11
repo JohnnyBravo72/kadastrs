@@ -139,6 +139,7 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
         )
     }
 
+    run_day = ctx.run_at.date()
     out: dict[str, CheckResult] = {}
     for u in units:
         if not u.found:
@@ -161,6 +162,8 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
                     "application_kind": app_kind,
                     "construction_kind": kind,
                     "created_date": created.isoformat() if created else None,
+                    # age at the run date (stored with the run, so a replay agrees)
+                    "age_years": round((run_day - created).days / 365.25, 2) if created else None,
                     "authority": authority,
                 }
             )
@@ -182,7 +185,7 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
 SPEC = ModuleSpec(
     id="bis",
     no=5,
-    version="2",
+    version="3",
     name_lv="Būvniecības lietas (BIS)",
     selectors=("bis_cases",),
     reads=("bis_cases", "cadastre_text", "cadastre_spatial"),

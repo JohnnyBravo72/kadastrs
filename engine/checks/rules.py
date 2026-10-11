@@ -106,6 +106,10 @@ def _one_of(value: Any, expected: Any) -> bool:
 
 def _item_matches(item: dict[str, Any], tests: dict[str, Any]) -> bool:
     for key, expected in tests.items():
+        if key.endswith("_not_in"):
+            if item.get(key[: -len("_not_in")]) in expected:
+                return False
+            continue
         for suffix, op in (("_gte", lambda a, b: a >= b), ("_lt", lambda a, b: a < b)):
             if key.endswith(suffix):
                 value = item.get(key[: -len(suffix)])

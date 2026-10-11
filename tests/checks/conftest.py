@@ -13,7 +13,8 @@ Flood (Jelgava; coverage mask = 472000..476000 x 272000..276000):
   09000050404  100x100 m with a 1.2x1.2 m finding      -> found (1.44 m2 >= 1 m2)
   09000360220  outside the mask                        -> not_covered
 Nature: 13000102702 half in a microreserve (+ a 0.3 m habitat sliver, dropped);
-  09000360220 inside a protected area and its zone (two lines).
+  09000360220 inside dabas parks (DP) and its dabas lieguma zone (DLZ): two lines,
+  the zone decides the area's level.
 BIS: case A twice (duplicate rows) on building 09000360220002; case B by the
   address code 101765287; case C a point 5 m from 13000102702 (nearby); case D
   a building 09000360220099 missing from the cadastre (probable parcel).
@@ -93,7 +94,7 @@ NATURE = [  # version source, global_id, kind, name, envelope
         "nature_protected_areas",
         "pz-1",
         "protected_area_zone",
-        "Dabas lieguma zona",
+        "DLZ",  # zone type in NAME; its area in SITE_NAME (set below)
         (470500, 270500, 471500, 271500),
     ),
 ]
@@ -165,6 +166,11 @@ def seed_checks(conn) -> None:
             f" parts, geom) VALUES (%s, %s, %s, 'test', %s, 1, {env(*box)})",
             (V[source], gid, kind, name),
         )
+    conn.execute(
+        "UPDATE ref.nature_area SET category = 'DP' WHERE global_id = 'pa-1';"
+        ' UPDATE ref.nature_area SET attributes = \'{"SITE_NAME": "Dabas parks"}\''
+        " WHERE global_id = 'pz-1'"
+    )
     b = V["bis_cases"]
     for case in CASES:
         conn.execute(

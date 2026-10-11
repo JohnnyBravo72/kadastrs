@@ -58,7 +58,7 @@ def test_flood_found_reports_area_and_share(flood):
     assert r.items == [
         {"layer": 0, "layer_name": "Pavasara_palu_010_3_cikls", "overlap_m2": 100.0, "share": 1.0}
     ]
-    assert r.risk == "high" and "flood_10y_major" in r.rule_ids
+    assert r.risk == "high" and r.rule_ids == ["flood_10y_major"]
 
 
 def test_flood_clear_inside_the_mask(flood):
@@ -71,13 +71,13 @@ def test_flood_outside_the_mask_is_not_covered_never_clear(flood):
         r = flood[code]
         assert r.status == "not_covered"
         assert r.reason == NOT_COVERED
-        assert r.risk == "unknown" and r.rule_ids == ["flood_not_covered"]
+        assert r.risk == "none" and r.rule_ids == ["flood_not_covered"]
 
 
 def test_flood_partial_coverage_warns(flood):
     r = flood["09000050401"]
     assert r.status == "clear" and "partial_coverage" in codes(r)
-    assert r.risk == "low" and "flood_partly_covered" in r.rule_ids
+    assert r.risk == "none" and "flood_partly_covered" in r.rule_ids
 
 
 def test_inward_buffer_drops_a_boundary_sliver(flood):
@@ -89,7 +89,7 @@ def test_overlap_thresholds(flood):
     r = flood["09000050404"]  # 1.44 m2 passes on area although the share is 0.0144 %
     assert r.status == "found" and r.items[0]["overlap_m2"] == pytest.approx(1.44)
     assert r.items[0]["share"] == pytest.approx(0.000144)
-    assert r.risk == "medium" and r.rule_ids == ["flood_10y_minor"]
+    assert r.risk == "low" and r.rule_ids == ["flood_10y_minor"]  # share < 1 %
 
 
 def test_flood_result_names_its_versions(flood):
@@ -124,6 +124,10 @@ def test_nature_lines_per_kind(conn):
         "Īpaši aizsargājama dabas teritorija",
         "ĪADT funkcionālā zona",
     ]
+    area, zone = r.items
+    assert (area["category"], area["zoned"], area["decided_by_zone"]) == ("DP", True, True)
+    assert (zone["zone_type"], zone["site_name"]) == ("DLZ", "Dabas parks")
+    assert r.risk == "high" and r.rule_ids == ["nature_zone_high"]  # the DP rule does not fire
 
 
 def test_nature_reads_only_selected_layers(conn):

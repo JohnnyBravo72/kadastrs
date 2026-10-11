@@ -49,7 +49,7 @@ def test_flood_regression_parcels(conn):
         if case["expect"] == "found":
             assert r.items[0]["share"] >= 0.9 and r.risk == "high"
         if case["expect"] == "not_covered":
-            assert r.reason == NOT_COVERED and r.risk == "unknown"
+            assert r.reason == NOT_COVERED and r.risk == "none"
         if case["expect"] == "clear":
             assert r.items == [] and r.risk in ("none", "low")
 

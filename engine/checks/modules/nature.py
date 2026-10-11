@@ -5,6 +5,12 @@ its functional zone, microreserve, microreserve buffer zone, nature monument
 and habitat, each kind on its own lines. Overlaps use the inward-buffered unit
 geometry and need >= min_overlap_m2 or >= min_overlap_share of the unit.
 Only the selected nature sources are read.
+
+Protected areas carry their DAP category (CATEGORY: DL, DP, NP, …); zones carry
+their zone type (NAME: SRZ, RRZ, DLZ, NZ, …) and the area they belong to
+(SITE_NAME = the area's NAME). An area item gets `decided_by_zone: true` when the
+unit also overlaps one of that area's zones, so the zone type decides its level
+(rules.yaml); `zoned` says whether the area has zones at all.
 """
 
 from engine.checks.context import RunContext
@@ -46,6 +52,7 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
     for row in ctx.conn.execute(
         """SELECT g.code, g.area_m2, n.kind, n.global_id, n.dap_id, n.mrcode, n.name, n.category,
                   n.atis_code, n.atis_description, n.source_layer,
+                  n.attributes->>'SITE_NAME', n.dataset_version_id,
                   ST_Area(ST_Intersection(g.inner_geom, n.geom)),
                   ST_Area(ST_Intersection(g.geom, n.geom))
            FROM chk_geom g
@@ -54,18 +61,21 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
            WHERE g.code = ANY(%s)""",
         (versions, codes),
     ):
-        code, area, kind, gid, dap_id, mrcode, name, category, atis, atis_desc, layer, inner, ov = (
-            row
-        )
+        (code, area, kind, gid, dap_id, mrcode, name, category, atis, atis_desc, layer, site,
+         vid, inner, ov) = row  # fmt: skip
         if not overlap_passes(ctx, inner, inner / area if area else 0.0):
             continue
         share = ov / area if area else 0.0
+        zone = kind == "protected_area_zone"
         hits.setdefault(code, []).append(
             {
                 "kind": kind,
                 "kind_lv": KINDS[kind],
-                "name": name,
+                "name": site if zone else name,
                 "category": category,
+                "zone_type": name if zone else None,
+                "site_name": site if zone else None,
+                "version": vid,
                 "dap_id": dap_id,
                 "mrcode": mrcode,
                 "atis_code": atis,
@@ -76,6 +86,22 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
                 "share": r6(share),
             }
         )
+    zoned = {
+        (vid, site)
+        for vid, site in ctx.conn.execute(
+            "SELECT DISTINCT dataset_version_id, attributes->>'SITE_NAME' FROM ref.nature_area"
+            " WHERE dataset_version_id = ANY(%s) AND kind = 'protected_area_zone'",
+            (versions,),
+        )
+    }
+    for items in hits.values():
+        in_zones = {(i["version"], i["site_name"]) for i in items if i["zone_type"]}
+        for i in items:
+            if i["kind"] == "protected_area":
+                key = (i["version"], i["name"])
+                i["zoned"] = key in zoned
+                i["decided_by_zone"] = key in in_zones
+            del i["version"]
     order = list(KINDS)
     out: dict[str, CheckResult] = {}
     for u in units:
@@ -104,11 +130,13 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
 SPEC = ModuleSpec(
     id="nature",
     no=3,
-    version="1",
+    version="2",
     name_lv="Aizsargājamā daba (OZOLS)",
     selectors=SOURCES,
     reads=("cadastre_spatial", "cadastre_text"),
     optional=SOURCES,
-    display=Display(kind="table", columns=["kind_lv", "name", "category", "overlap_m2", "share"]),
+    display=Display(
+        kind="table", columns=["kind_lv", "name", "category", "zone_type", "overlap_m2", "share"]
+    ),
     run=run,
 )
