@@ -23,6 +23,18 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 - **No names of natural persons are stored** (nor personal codes or birth dates).
 - Data that is not open (e.g. ATIS geometries, land book) is not used, and the affected check shows as *unavailable*.
 
+## Phase 5: batch input rules (decided 2026-10-11, Janis)
+
+How a batch list becomes checked objects (`engine/batch/plan.py`; runbook "Batch and Excel report"):
+
+1. **Ambiguous values.** An 11-digit number that is a property and a parcel of another property is checked **both ways**: two report rows labelled "divdomīgs: nekustamais īpašums" / "divdomīgs: zemes vienība", with a warning, so nothing has to be re-entered. The optional input column **`veids`** (īpašums | zemes vienība | būve) removes the ambiguity (also in `test_set_template.xlsx` and `check compare`). Values whose Excel precision was lost and unclear addresses are **not checked**; they go to the "Neatrasts" sheet with suggestions.
+2. **Addresses with several objects:** every linked cadastre object is checked, one row each. The 1,000-row limit counts input rows.
+3. **Duplicate rows** are checked again and keep their "atkārtojas" warning.
+4. **`adrese` column:** the given address for module 2. If it does not resolve, the object is still checked, the address is listed on "Neatrasts" and module 2 shows "adrese nav atrasta" (not "nav piemērojams"). Without `adrese`, an address in `vertiba` is the given address.
+5. **`pieteicejs_reg_nr`:** stored only if it has the legal-entity pattern (11 digits, first digit 4, 5 or 9); anything else may be a personal code and is dropped with a note, its value not stored (Policy above, CLAUDE.md rule 5). A `vertiba` shaped like a personal code (`DDMMYY-NNNNN`) is not resolved or stored either.
+
+Module 2 without any address is shown as **"nav piemērojams"** in the report (decided 2026-10-11 in Phase 4). The uploaded file is not stored; the cleaned rows are (`work.run_input`, insert-only like the other run tables), so the report is built from stored data only and a replayed run gives the same report.
+
 ## D1: agency-hosted resources
 
 **Decision:** an official agency resource counts as an allowed source when it is referenced as a resource, or in the description, of a data.gov.lv dataset page. "Referenced" means a link or a service address on that page, or a service the referenced address itself points to. Each such resource is listed below **and** in `config/sources.yaml` (`allowed_external_resources`). Nothing that is missing from both lists may be used.

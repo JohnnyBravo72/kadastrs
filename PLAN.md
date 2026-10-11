@@ -6,9 +6,14 @@
 
 **Data policy:** all data comes from **data.gov.lv** (section 2).
 
-**Status (2026-10-11):** Phases 1–3 are done; Phase 4 (check engine v1) is built and tested, risk rules v1 are agreed (D4, 2026-10-11; to be revised after the test-set comparison), and the comparison with the colleagues' manual answers waits for the filled test-set files. Earlier: Phase 0 steps 1 and 3 were done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
+**Status (2026-10-11):** Phases 1–3 are done; Phase 4 (check engine v1) is built and tested, risk rules v1 are agreed (D4, 2026-10-11; to be revised after the test-set comparison), and the comparison with the colleagues' manual answers waits for the filled test-set files. Phase 5 (batch + Excel) is built and tested; its "done when" (pilot with 2–3 colleagues, time per object vs the baseline) is open. Earlier: Phase 0 steps 1 and 3 were done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
 
 **Change log**
+- 2026-10-11 (Phase 5): batch input and the Excel report (§7.1).
+  - Input: pasted list, CSV or XLSX (`vertiba`, optional `projekta_nr`, `pieteicejs_reg_nr`, `adrese`, new optional `veids`), at most 1,000 rows; via `POST /api/batch`, `check batch` and a plain page at `/` (upload or paste → Excel). The upload is not stored; the cleaned rows are (`work.run_input`, insert-only).
+  - Rows (decided 2026-10-11, Janis; `docs/decisions.md` "Phase 5"): property-or-parcel numbers checked both ways ("divdomīgs: …") unless `veids` decides; precision-lost values and unclear addresses not checked and listed on "Neatrasts"; an address checked on every linked object; duplicates checked with a warning; `adrese` = module 2's given address (unresolved: object still checked, "adrese nav atrasta"); applicant reg. no. only with the legal-entity pattern.
+  - Report built only from the stored run, so a replay gives the same report (`check report <id> --replay`). Sheets Kopsavilkums, Detaļas (a property per unit, fired rule id and text from the run's rule set), Avoti (versions, freshness, coverage and processing notes stored with the run; rule set and thresholds), Neatrasts. `test_set_template.xlsx` gained the `veids` column.
+  - Pilot: 1,000 rows → 1,227 objects → report in about 26 s (target < 5 min).
 - 2026-10-11 (Phase 4): check engine v1 built (§6); modules 1–6 store their results in runs.
   - Runs pin the live version of every source; modules read only those versions, so `replay` rebuilds an old run after newer imports. `work.check_result` rows are guarded in the DB (no `UPDATE` / `DELETE`; results only for a running run and only with its pinned versions).
   - Risk rules v1 in `config/rules.yaml` (reason per rule): **agreed by Janis Bardavskis 2026-10-11** (`status: agreed`, D4), to be revised after the test-set comparison. Each run stores the whole rule set; the aggregate order is `high > medium > unknown > low > none`.
@@ -318,7 +323,8 @@ check(subject, dataset_version) -> {
   - warnings
 - **Sheet "Detaļas":** one row per finding: object, module, item, overlap, match type, risk rule, source, dataset date, data.gov.lv link.
 - **Sheet "Avoti":** each source with dataset version, date, freshness status and coverage note, plus the rule-set version and thresholds.
-- **Sheet "Neatrasts":** inputs that could not be resolved, with a reason.
+- **Sheet "Neatrasts":** inputs that could not be resolved, with a reason and suggestions (also an unresolved `adrese` and a dropped applicant number).
+- Built only from the stored run (`reports/excel.py`); module 2 without an address shows "nav piemērojams". Input rules: `docs/decisions.md` "Phase 5".
 - Footer text (§1): "Informatīvs pārskats, balstīts uz atvērtajiem datiem; nav oficiāls reģistra izraksts." The data dates are on the "Avoti" sheet.
 
 ### 7.2 PDF evidence report (after the MVP)
@@ -409,7 +415,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 2. ETL | Pilot area (Jelgava, Jūrmala, Daugavpils): VARIS, cadastre, admin boundaries, flood (if a vector source is confirmed), nature, cadastre encumbrances, BIS; transform 3059 sources to 10306; dataset versions; schema checks | Row counts match the sources; re-runs are idempotent; a changed schema fails loudly; **ETL rule tests T-E1 to T-E7 (§2.5) pass in CI** |
 | 3. Resolution | `/suggest`, `/resolve`, property units; leading-zero repair | Test-set inputs resolve correctly, including ambiguous ones |
 | 4. Check engine v1 | Modules 1–6, spatial rules, risk rules v1, stored runs and results | The test set's findings match the colleagues' manual answers, with differences explained by data dates |
-| 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report | **Pilot with 2–3 colleagues; measured time per object vs the baseline** |
+| 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report; a plain input page. **Built and tested 2026-10-11** | **Pilot with 2–3 colleagues; measured time per object vs the baseline** (open) |
 | 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list | UI criteria pass for the pilot area |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in) | UI criteria pass |
 | 8. Applicant & funding | Modules 7 and 9–14, and 17 | Each module verified on the test set |

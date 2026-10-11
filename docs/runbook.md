@@ -11,7 +11,7 @@ All commands are for **PowerShell**, run from the repo root (`C:\Users\PC\Downlo
 | `db-nogrid` | same DB image **without** the grid, for negative CRS tests (profile `test`) | — |
 | `migrate-test` | creates and migrates the `kadastrs_test` database used by the ETL tests (profile `test`) | — |
 | `etl` | imports from data.gov.lv (profile `etl`); raw files of live versions in volume `kadastrs_etl_raw` | — |
-| `check` | check engine CLI: `run`, `show`, `replay`, `compare` (profile `check`) | — |
+| `check` | check engine CLI: `run`, `show`, `replay`, `compare`, `batch`, `report` (profile `check`) | — |
 
 ## One-time setup
 
@@ -173,7 +173,7 @@ Row statuses: `resolved`, `ambiguous` (pick from `matches`), `not_found`, `unres
 
 ## Checks (runs and results)
 
-The check engine (`engine/checks`, PLAN.md §6) runs modules 1–6 on resolved objects and **stores** every result. A run pins the live version of every source at its start; modules read only those versions. Results are never changed: the database rejects `UPDATE` and `DELETE` on `work.check_result`, `work.run_target` and `work.run_version`, and a finished `work.run` (CLAUDE.md rule 3). Checking again creates a new run.
+The check engine (`engine/checks`, PLAN.md §6) runs modules 1–6 on resolved objects and **stores** every result. A run pins the live version of every source at its start; modules read only those versions. Results are never changed: the database rejects `UPDATE` and `DELETE` on `work.check_result`, `work.run_target`, `work.run_version` and `work.run_input`, and a finished `work.run` (CLAUDE.md rule 3). Checking again creates a new run.
 
 | Module | id | Status values used |
 |---|---|---|
@@ -220,7 +220,36 @@ When a filled copy of `tests/data/test_set_template.xlsx` comes back, put it in 
 docker compose run --rm check compare tests/data/returned/kolegis1.xlsx
 ```
 
-It resolves each `vertiba`, checks all objects in one new run (origin `compare`) and writes `<file>_salidzinajums.xlsx` next to the input: one row per object and module with the manual answer, the engine status, **sakrīt / atšķiras / nav atbildes / nav salīdzināms**, the engine's risk and finding, the data dates and the manual check date ("Dati jaunāki par pārbaudi" = a source is newer than the manual check, so the difference may be explained by data dates). Answers are read from their first words: «Ir…» = `found`, «Nav» = `clear`, «Nav datu» = `no_data`, «Nav pārklājuma» = `not_covered`; for module 2, «Ir» means a mismatch was found. The yellow example rows (`PIEMĒRS…`) are skipped. An ambiguous number is checked as its first match and an address with several objects as its parcel, both with a note.
+It resolves each `vertiba`, checks all objects in one new run (origin `compare`) and writes `<file>_salidzinajums.xlsx` next to the input: one row per object and module with the manual answer, the engine status, **sakrīt / atšķiras / nav atbildes / nav salīdzināms**, the engine's risk and finding, the data dates and the manual check date ("Dati jaunāki par pārbaudi" = a source is newer than the manual check, so the difference may be explained by data dates). Answers are read from their first words: «Ir…» = `found`, «Nav» = `clear`, «Nav datu» = `no_data`, «Nav pārklājuma» = `not_covered`; for module 2, «Ir» means a mismatch was found. The yellow example rows (`PIEMĒRS…`) are skipped. The optional `veids` column (īpašums | zemes vienība | būve) picks the object when a number has two meanings; without it, an ambiguous number is checked as its first match and an address with several objects as its parcel, both with a note.
+
+## Batch and Excel report (Phase 5)
+
+A list in, a stored run and an Excel report out (PLAN.md §7.1). Input: a pasted list (one value per line, or a table copied from Excel with a header row) or a CSV / XLSX file with the column `vertiba` and optionally `projekta_nr`, `pieteicejs_reg_nr`, `adrese`, `veids` (īpašums | zemes vienība | būve); at most 1,000 rows. CSV: `;` or `,`, UTF-8 (BOM or not) or Windows-1257. XLSX: the sheet `Testa_kopa` if present (the test-set template works as input), else the first sheet; `PIEMĒRS…` rows are skipped. **The uploaded file is not stored**; only the cleaned rows (`work.run_input`) and the results are.
+
+**For colleagues without the command line:** open `http://127.0.0.1:8000/`, upload a file or paste a list, press the button, and the Excel file downloads. A blank input template: `http://127.0.0.1:8000/api/batch/template.xlsx`.
+
+How rows become checked objects (decided 2026-10-11, `docs/decisions.md`):
+- resolved like `POST /api/resolve`; an address is checked on every cadastre object linked to it (one Kopsavilkums row each, "adresei N objekti");
+- an 11-digit number that is a property **and** another property's parcel is checked both ways: two rows "divdomīgs: nekustamais īpašums" / "divdomīgs: zemes vienība", with a warning; `veids` removes the ambiguity;
+- every other row that does not resolve (precision lost in Excel, unclear address, not found, outside the pilot, invalid) is **not checked** and listed on the **Neatrasts** sheet with its reason and suggestions; nothing is dropped;
+- `adrese` is the given address for module 2. If it does not resolve, the object is still checked, the module 2 cell says "adrese nav atrasta (sk. Neatrasts)" and the address is listed on Neatrasts. Without `adrese`, an address in `vertiba` is the given address. Module 2 without any address shows "nav piemērojams";
+- `pieteicejs_reg_nr` is kept only as a legal-entity number (11 digits starting with 4, 5 or 9); anything else may be a personal code and is dropped with a note on Neatrasts (CLAUDE.md rule 5). A `vertiba` shaped like a personal code (`DDMMYY-NNNNN`) is never resolved or stored.
+
+The report is built **only from the stored run**, so the same run always gives the same file, and `check report <id> --replay` (built from the replayed results) gives the same cells. Sheets: **Kopsavilkums** (one row per object, one column per module "status / risk" in risk colours, overall risk, warnings), **Detaļas** (one row per finding; a property per unit; overlap m² / %, match type, fired rule id and text, source, data date, data.gov.lv link; data gaps with their reason), **Avoti** (versions, data dates, freshness, coverage, processing notes; rule-set version, status, SHA-256 and thresholds; risk colours), **Neatrasts**. Codes are text (leading zeros kept); cell text is never a formula; every sheet has the footer "Informatīvs pārskats, balstīts uz atvērtajiem datiem; nav oficiāls reģistra izraksts".
+
+```powershell
+# API: JSON summary with report_url, or the report itself with format=xlsx
+curl.exe -s -F "file=@saraksts.xlsx" "http://127.0.0.1:8000/api/batch"
+curl.exe -s -F "text=09000360220" -F "format=xlsx" -o parbaude.xlsx "http://127.0.0.1:8000/api/batch"
+curl.exe -s -o parbaude.xlsx "http://127.0.0.1:8000/api/runs/30/report.xlsx"
+
+# CLI: the report is written next to the input file (<name>_parbaude_<run>.xlsx) or to --out
+docker compose run --rm check batch tests/data/returned/saraksts.xlsx
+Get-Content saraksts.txt | docker compose run --rm -T check batch - --out parbaude.xlsx
+docker compose run --rm check report 30 --out parbaude.xlsx [--replay]
+```
+
+Timing on the pilot import (`tests/pilot/test_pilot_batch.py`): 1,000 rows (600 parcels, 300 buildings, 100 addresses → 1,227 objects) in about 26 s including the report; the §9 target is under 5 minutes.
 
 ## Run the tests
 
@@ -230,7 +259,7 @@ docker compose --profile test run --rm tests
 
 This builds the test image if needed, starts `db`, `migrate`, `api`, `db-nogrid` and `migrate-test`, and runs pytest with the repo mounted at `/src`. Code changes need no rebuild.
 
-The ETL rule tests (`tests/etl`) import synthetic files through a fake data.gov.lv into the separate `kadastrs_test` database, so they never touch your data. The resolution tests (`tests/resolve`) load a small synthetic pilot (seed objects, ambiguous numbers, renamed and deleted addresses) into the same database and call the API in-process. The engine tests (`tests/checks`) add synthetic flood, nature, BIS and encumbrance rows to that pilot (layout in `tests/checks/conftest.py`): every status of modules 1–6, the §6.3 thresholds and geometry fallback, the property aggregate, the database guards, determinism, replay after a new import, the comparison tool and the run API.
+The ETL rule tests (`tests/etl`) import synthetic files through a fake data.gov.lv into the separate `kadastrs_test` database, so they never touch your data. The resolution tests (`tests/resolve`) load a small synthetic pilot (seed objects, ambiguous numbers, renamed and deleted addresses) into the same database and call the API in-process. The engine tests (`tests/checks`) add synthetic flood, nature, BIS and encumbrance rows to that pilot (layout in `tests/checks/conftest.py`): every status of modules 1–6, the §6.3 thresholds and geometry fallback, the property aggregate, the database guards, determinism, replay after a new import, the comparison tool and the run API. The batch tests (`tests/batch`) cover the input reader (CSV, XLSX, pasted lists, encodings, the row limit), the Phase 5 resolution decisions, the stored inputs, the Excel report (sheets, headers, codes as text, T-E4 Excel half, run vs replay, Neatrasts, the template as input, 1,000 rows), the batch API, the input page and the CLI.
 
 **The `pilot` tests check the real import in the dev database** (row counts against the source files, geometry, seed objects, and that a second run created no new versions). They **fail when nothing is imported**, so import twice first:
 
@@ -240,7 +269,7 @@ docker compose run --rm etl import all
 docker compose --profile test run --rm tests
 ```
 
-The pilot tests take about 3 minutes. The resolution checks (`tests/pilot/test_pilot_resolve.py`) cover the seed objects, every real property-or-parcel ambiguity, all leading-zero lengths, Excel-mangled inputs, typos and diacritics, renamed and deleted addresses, 300 random existing addresses, and `/api/suggest` p95 under 300 ms (printed with `-s`). The engine checks (`tests/pilot/test_pilot_checks.py`) run the flood regression parcels (`tests/data/flood_regression.yaml`), the seed objects and 100 parcels (under 30 s, then replayed with identical results); their runs stay in the dev DB like any run. The BIS and encumbrance checks (`tests/pilot/test_pilot_bis_encumbrances.py`) recount rows from the raw files, compare every stored designation and ATVK with the raw file (no lost leading zero), check the BIS join counts and that the DAP `ATIS_CODE` values are classifier codes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
+The pilot tests take about 3 minutes. The resolution checks (`tests/pilot/test_pilot_resolve.py`) cover the seed objects, every real property-or-parcel ambiguity, all leading-zero lengths, Excel-mangled inputs, typos and diacritics, renamed and deleted addresses, 300 random existing addresses, and `/api/suggest` p95 under 300 ms (printed with `-s`). The engine checks (`tests/pilot/test_pilot_checks.py`) run the flood regression parcels (`tests/data/flood_regression.yaml`), the seed objects and 100 parcels (under 30 s, then replayed with identical results); their runs stay in the dev DB like any run. The batch check (`tests/pilot/test_pilot_batch.py`) runs 1,000 real rows to an Excel report in under 5 minutes (time printed with `-s`). The BIS and encumbrance checks (`tests/pilot/test_pilot_bis_encumbrances.py`) recount rows from the raw files, compare every stored designation and ATVK with the raw file (no lost leading zero), check the BIS join counts and that the DAP `ATIS_CODE` values are classifier codes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
 
 Without real data, run everything else:
 
