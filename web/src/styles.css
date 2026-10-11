@@ -167,7 +167,7 @@ textarea { width: 100%; min-height: 150px; padding: 10px; border: 1px solid #c6d
 .card .units summary { cursor: pointer; color: var(--ink-2); }
 
 table.overview { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; font-size: 13px; }
-table.overview th { position: sticky; top: 52px; background: #f1f4f7; text-align: left; font-weight: 650; padding: 7px 8px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+table.overview th { background: #f1f4f7; text-align: left; font-weight: 650; padding: 7px 8px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
 table.overview td { padding: 5px 8px; border-bottom: 1px solid #eef1f4; vertical-align: middle; }
 table.overview tr.group td { background: #f7f9fb; font-weight: 650; color: var(--brand); }
 table.overview tbody tr.obj { cursor: pointer; }
