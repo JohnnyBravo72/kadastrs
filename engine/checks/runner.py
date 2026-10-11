@@ -167,6 +167,8 @@ def compute(
     modules: list[ModuleSpec],
     targets_in: list[TargetIn],
 ) -> tuple[list[Target], list[Row]]:
+    if not targets_in:  # a batch run where no row could be checked
+        return [], []
     ctx = RunContext(conn, rules, run_at, pinned, selected)
     conn.execute("DROP TABLE IF EXISTS pg_temp.chk_geom, pg_temp.chk_bis")
     targets = expand(ctx, targets_in)
@@ -235,8 +237,10 @@ def start_run(
     sources: list[str] | None = None,
     origin: str = "api",
     rules: RuleSet | None = None,
+    inputs: list[dict[str, Any]] | None = None,
 ) -> int:
-    """Check the targets now and store the run; returns the run id. Commits."""
+    """Check the targets now and store the run; returns the run id. Commits.
+    `inputs`: the cleaned batch input rows (work.run_input), stored with the run."""
     rules = rules or rules_mod.load()
     with conn.transaction():
         run_at = conn.execute("SELECT now()").fetchone()[0]
@@ -270,8 +274,9 @@ def start_run(
         with conn.cursor() as cur:
             cur.executemany(
                 """INSERT INTO work.run_target (run_id, target_no, input, type, designation,
-                       given_address, project_no, warnings, units)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                       given_address, project_no, input_no, label, applicant_reg_no,
+                       warnings, units)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 [
                     (
                         run_id,
@@ -281,6 +286,9 @@ def start_run(
                         t.given.designation,
                         t.given.given_address,
                         t.given.project_no,
+                        t.given.input_no,
+                        t.given.label,
+                        t.given.applicant_reg_no,
                         _j([w.model_dump() for w in t.given.warnings]),
                         _j(
                             [
@@ -297,11 +305,58 @@ def start_run(
                 ],
             )
             cur.executemany(_INSERT_RESULT, [_result_params(run_id, row) for row in rows])
+            cur.executemany(_INSERT_INPUT, [_input_params(run_id, i) for i in inputs or []])
         conn.execute(
             "UPDATE work.run SET status = 'done', finished_at = clock_timestamp() WHERE id = %s",
             (run_id,),
         )
     return run_id
+
+
+_INSERT_INPUT = """
+INSERT INTO work.run_input (run_id, input_no, row_no, value, kind, project_no, address,
+    applicant_reg_no, status, problems, target_nos)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+"""
+
+
+def _input_params(run_id: int, i: dict[str, Any]) -> tuple:
+    return (
+        run_id,
+        i["input_no"],
+        i["row_no"],
+        i.get("value"),
+        i.get("kind"),
+        i.get("project_no"),
+        i.get("address"),
+        i.get("applicant_reg_no"),
+        i["status"],
+        _j(i.get("problems", [])),
+        i.get("target_nos", []),
+    )
+
+
+def stored_inputs(conn, run_id: int) -> list[dict[str, Any]]:
+    cols = (
+        "input_no",
+        "row_no",
+        "value",
+        "kind",
+        "project_no",
+        "address",
+        "applicant_reg_no",
+        "status",
+        "problems",
+        "target_nos",
+    )
+    return [
+        dict(zip(cols, rec, strict=True))
+        for rec in conn.execute(
+            f"SELECT {', '.join(cols)} FROM work.run_input WHERE run_id = %s"  # noqa: S608
+            " ORDER BY input_no",
+            (run_id,),
+        )
+    ]
 
 
 def _result_params(run_id: int, row: Row) -> tuple:
@@ -390,10 +445,19 @@ def stored(conn, run_id: int) -> list[Row]:
 def load_targets(conn, run_id: int) -> list[TargetIn]:
     return [
         TargetIn(
-            type=typ, designation=d, input=inp, given_address=ga, project_no=pno, warnings=warns
+            type=typ,
+            designation=d,
+            input=inp,
+            given_address=ga,
+            project_no=pno,
+            warnings=warns,
+            input_no=ino,
+            label=label,
+            applicant_reg_no=reg,
         )
-        for typ, d, inp, ga, pno, warns in conn.execute(
-            "SELECT type, designation, input, given_address, project_no, warnings"
+        for typ, d, inp, ga, pno, warns, ino, label, reg in conn.execute(
+            "SELECT type, designation, input, given_address, project_no, warnings,"
+            " input_no, label, applicant_reg_no"
             " FROM work.run_target WHERE run_id = %s ORDER BY target_no",
             (run_id,),
         )

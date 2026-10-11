@@ -38,19 +38,24 @@ ROWS = [
         date(2026, 10, 1),
     ),
     ("P-3", "12345", "Ir", None, None, None, None, None, None),
+    # property-or-parcel number; veids picks the parcel
+    ("P-4", "05000040014", "Ir", None, None, None, None, None, None),
 ]
+KIND = {8: "zemes vienība"}  # row -> veids
 
 
 @pytest.fixture
 def filled(tmp_path):
     wb = load_workbook(TEMPLATE)
     ws = wb[compare.SHEET]
+    col = {c.value: c.column for c in ws[1]}  # by header name, not position
     for r, (project, value, *answers, checked) in enumerate(ROWS, start=4):
-        ws.cell(row=r, column=1, value=project)
-        ws.cell(row=r, column=2, value=value)  # 9000050400 typed as a number: zero lost
-        for c, a in enumerate(answers, start=4):
-            ws.cell(row=r, column=c, value=a)
-        ws.cell(row=r, column=10, value=checked)
+        ws.cell(row=r, column=col["projekta_nr"], value=project)
+        ws.cell(row=r, column=col["vertiba"], value=value)  # 9000050400 as a number: zero lost
+        ws.cell(row=r, column=col["veids"], value=KIND.get(r))
+        for name, a in zip(compare.MODULE_COLUMNS, answers, strict=True):
+            ws.cell(row=r, column=col[name], value=a)
+        ws.cell(row=r, column=col["parbaudes_datums"], value=checked)
     out = tmp_path / "filled.xlsx"
     wb.save(out)
     return out
@@ -78,7 +83,7 @@ def test_compare_filled_template(engine_db, filled, tmp_path):
     with engine_db() as conn:
         report = compare.compare(conn, filled)
     lines = {(line.row_no, line.module): line for line in report.lines}
-    assert {line.row_no for line in report.lines} == {4, 5, 6, 7}  # examples skipped
+    assert {line.row_no for line in report.lines} == {4, 5, 6, 7, 8}  # examples skipped
     assert report.rule_set == "1 (agreed)"
 
     flood = lines[(4, "flood_10y")]
@@ -106,11 +111,15 @@ def test_compare_filled_template(engine_db, filled, tmp_path):
     bad = lines[(7, "cadastre_facts")]
     assert (bad.designation, bad.engine, bad.outcome) == (None, None, "not_comparable")
 
+    picked = lines[(8, "cadastre_facts")]  # veids: no "neviennozīmīgs" note
+    assert (picked.designation, picked.engine, picked.note) == ("05000040014", "found", None)
+    assert "Zemes vienība" in picked.detail
+
     counts = report.counts()
     assert counts["flood_10y"] == {
         "agrees": 2,
         "differs": 1,
-        "not_answered": 1,
+        "not_answered": 2,  # rows 7 (not resolved) and 8 (only m1 answered)
         "not_comparable": 0,
     }
     assert counts["cadastre_facts"]["not_comparable"] == 1  # row 7 not resolved

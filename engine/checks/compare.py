@@ -26,6 +26,8 @@ from typing import Any
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
+from engine.batch.plan import ACCEPTS, KINDS
+from engine.batch.reader import fold
 from engine.checks import runner, summary
 from engine.checks.contract import TargetIn, Warning_
 from engine.resolve import service
@@ -101,6 +103,7 @@ class ManualRow:
     answers: dict[str, Any]  # module id -> raw answer
     checked_on: date | None
     notes: str | None
+    kind: str | None = None  # veids: property | parcel | building (removes ambiguity)
 
 
 def read_template(path: Path) -> list[ManualRow]:
@@ -140,6 +143,7 @@ def read_template(path: Path) -> list[ManualRow]:
                 answers={m: get(c) for c, m in MODULE_COLUMNS.items()},
                 checked_on=checked if isinstance(checked, date) else None,
                 notes=_text(get("avots_piezimes")),
+                kind=KINDS.get(fold(_text(get("veids")) or "")),
             )
         )
     return out
@@ -169,10 +173,12 @@ def resolve_rows(conn, rows: list[ManualRow]) -> list[Resolved]:
             out.append(Resolved(row, None, f"{rr.status}: {rr.reason or ''}".strip(": ")))
             continue
         m = rr.matches[0]
+        if row.kind:
+            m = next((x for x in rr.matches if x.type in ACCEPTS[row.kind]), m)
         notes = [Warning_(code=w.code, message=w.message) for w in rr.warnings]
         notes += [Warning_(code=c.code, message=c.message) for c in rr.corrections]
         note = None
-        if rr.status == "ambiguous":
+        if rr.status == "ambiguous" and not (row.kind and m.type in ACCEPTS[row.kind]):
             note = f"neviennozīmīgs; pārbaudīts kā {m.label} {m.designation}"
         if m.type == "address":
             objects = sorted(m.objects, key=lambda o: (o.type != "parcel", o.designation))

@@ -21,7 +21,7 @@ ETL_DB = os.environ.get(
 )
 RESET = """
 SET kadastrs.allow_truncate = on;
-TRUNCATE work.check_result, work.run_target, work.run_version, work.run,
+TRUNCATE work.check_result, work.run_input, work.run_target, work.run_version, work.run,
          ref.admin_area, ref.address, ref.address_history, ref.kk_parcel, ref.kk_parcel_part,
          ref.kk_building, ref.kk_servitude, ref.parcel, ref.parcel_part, ref.building,
          ref.building_parcel, ref.property, ref.property_object,

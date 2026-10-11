@@ -72,3 +72,9 @@ class TargetIn(BaseModel):
     given_address: str | None = Field(default=None, pattern=r"^[0-9]{9}$")  # VARIS code
     project_no: str | None = None
     warnings: list[Warning_] = Field(default_factory=list)  # carried over from resolution
+    # batch input (Phase 5): the input row, how the value was read when it had two
+    # meanings (e.g. "divdomīgs: zemes vienība"), and the applicant's reg. no.
+    # (legal-entity pattern only, CLAUDE.md rule 5)
+    input_no: int | None = None
+    label: str | None = None
+    applicant_reg_no: str | None = Field(default=None, pattern=r"^[459][0-9]{10}$")

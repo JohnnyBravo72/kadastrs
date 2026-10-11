@@ -41,30 +41,34 @@ def test_set():
     wb = Workbook()
     ws = wb.active
     ws.title = "Testa_kopa"
-    cols = ["projekta_nr", "vertiba", "pieteicejs_reg_nr",
+    cols = ["projekta_nr", "vertiba", "veids", "pieteicejs_reg_nr",
             "m1_kadastra_dati", "m2_adreses_atbilstiba", "m3_aizsargajama_daba", "m4_pludi_10_gadi",
             "m5_buvniecibas_lietas", "m6_apgrutinajumi", "parbaudes_datums", "avots_piezimes"]
-    header(ws, cols, [16, 30, 18, 34, 28, 34, 30, 34, 34, 16, 44])
+    header(ws, cols, [16, 30, 16, 18, 34, 28, 34, 30, 34, 34, 16, 44])
     hint = "‹Ir: … / Nav / Nav datu / Nav pārklājuma›"
     examples = [
-        ["PIEMĒRS-1 (izdzēst)", "05000041006", "90000077325", hint, hint, hint, hint, hint, hint, None,
+        ["PIEMĒRS-1 (izdzēst)", "05000041006", "īpašums", "90000077325", hint, hint, hint, hint, hint, hint, None,
          "Piemērs no sākotnējiem datiem: Daugavpils, Tautas iela 11. Atbildes aizpilda kolēģis."],
-        ["PIEMĒRS-2 (izdzēst)", "09000360220", None, hint, hint, hint, hint, hint, hint, None,
+        ["PIEMĒRS-2 (izdzēst)", "09000360220", None, None, hint, hint, hint, hint, hint, hint, None,
          "Piemērs no sākotnējiem datiem: Jelgava. Atbildes aizpilda kolēģis."],
     ]
     for r, row in enumerate(examples, 2):
         for c, v in enumerate(row, 1):
             cell = ws.cell(row=r, column=c, value=v)
             cell.fill, cell.alignment = EXAMPLE_FILL, WRAP
-    for col in "ABC":   # codes are text: keep leading zeros
+    for col in "ABCD":   # codes are text: keep leading zeros
         for r in range(2, 502):
             ws[f"{col}{r}"].number_format = "@"
     for r in range(2, 502):
-        ws[f"J{r}"].number_format = "yyyy-mm-dd"
+        ws[f"K{r}"].number_format = "yyyy-mm-dd"
     dv = DataValidation(type="date", operator="greaterThan", formula1="DATE(2020,1,1)", allow_blank=True,
                         error="Ievadiet datumu (GGGG-MM-DD).", errorTitle="Datums")
     ws.add_data_validation(dv)
-    dv.add("J2:J501")
+    dv.add("K2:K501")
+    kinds = DataValidation(type="list", formula1='"īpašums,zemes vienība,būve"', allow_blank=True,
+                           error="Izvēlieties: īpašums, zemes vienība vai būve.", errorTitle="Veids")
+    ws.add_data_validation(kinds)
+    kinds.add("C2:C501")
 
     info = wb.create_sheet("Instrukcija", 0)
     instructions(info, [
@@ -76,7 +80,9 @@ def test_set():
         "• Viena rinda = viens objekts. Ja projektā ir vairāki objekti, katram sava rinda ar to pašu projekta_nr.",
         "• projekta_nr: projekta numurs (brīvs teksts).",
         "• vertiba: kadastra numurs (11 cipari), kadastra apzīmējums (11, 14 vai 17 cipari) vai adrese. "
-        "Kolonnas A–C ir teksta formātā: ievadiet ciparus ar sākuma nullēm (piem., 05000041006).",
+        "Kolonnas A–D ir teksta formātā: ievadiet ciparus ar sākuma nullēm (piem., 05000041006).",
+        "• veids (neobligāts): īpašums, zemes vienība vai būve. Aizpildiet, ja 11 ciparu numurs var būt gan "
+        "īpašuma numurs, gan citam īpašumam piederošas zemes vienības apzīmējums; bez tā rīks pārbauda abus.",
         "• pieteicejs_reg_nr: pieteicēja juridiskās personas reģistrācijas numurs (ja ir). "
         "Fizisko personu vārdus un personas kodus neievadiet.",
         "• m1–m6: jūsu manuālās pārbaudes atbilde katram modulim. Sāciet ar vienu no: "

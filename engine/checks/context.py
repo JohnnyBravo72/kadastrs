@@ -23,7 +23,8 @@ class Pinned:
 
     source_id: str
     version_id: int
-    info: dict[str, Any]  # {id, name, dataset_date, datagov_url, max_age, stale}
+    # {id, name, dataset_date, datagov_url, max_age, stale, coverage, processing}
+    info: dict[str, Any]
 
     def ref(self) -> SourceRef:
         return SourceRef(
@@ -39,13 +40,20 @@ def pin_live(conn, run_at: datetime) -> dict[str, Pinned]:
     """The live version of every source, with what the report shows about it."""
     rows = conn.execute(
         """SELECT v.source_id, v.id, v.version_date, s.name_lv, s.datagov_dataset_ids,
-                  s.max_age::text, (v.version_date + s.max_age) < %s::date
+                  s.max_age::text, (v.version_date + s.max_age) < %s::date, s.coverage,
+                  -- processing notes of the source's D1 resources (sources.yaml)
+                  ARRAY(SELECT p->>'report_lv'
+                        FROM allowed_external_resource e,
+                             jsonb_array_elements(coalesce(e.config->'processing', '[]')) p
+                        WHERE e.id = ANY(s.external_resource_ids) AND e.status = 'allowed'
+                              AND p->>'report_lv' IS NOT NULL
+                        ORDER BY e.id)
            FROM dataset_version v JOIN source s ON s.id = v.source_id
            WHERE v.status = 'live' ORDER BY v.source_id""",
         (run_at,),
     ).fetchall()
     out = {}
-    for source_id, vid, vdate, name, datasets, max_age, stale in rows:
+    for source_id, vid, vdate, name, datasets, max_age, stale, coverage, processing in rows:
         out[source_id] = Pinned(
             source_id,
             vid,
@@ -56,6 +64,9 @@ def pin_live(conn, run_at: datetime) -> dict[str, Pinned]:
                 "datagov_url": DATASET_URL.format(datasets[0]) if datasets else None,
                 "max_age": max_age,
                 "stale": bool(stale),
+                # shown on the report's "Avoti" sheet; stored with the run
+                "coverage": coverage,
+                "processing": list(processing),
             },
         )
     missing = [s for s in REFERENCE if s not in out]
