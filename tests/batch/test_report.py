@@ -213,6 +213,8 @@ def test_sources_sheet_has_versions_rule_set_and_thresholds(wb, batch_db, run):
         sha = c.execute("SELECT rule_set_sha256 FROM work.run WHERE id = %s", (run,)).fetchone()[0]
     assert sha in cells and "saskaņoti" in cells
     assert any(isinstance(v, str) and "1 cm" in v for v in cells)  # flood processing note
+    assert "Visa valsts (tikai kartētie biotopi)" in cells  # coverage in Latvian
+    assert not any(isinstance(v, str) and v.startswith("Whole country") for v in cells)
     assert excel.THRESHOLD_LV["min_overlap_m2"] in cells
     ids = [ws.cell(r, 2).value for r in range(2, 20)]
     assert "flood_10y" in ids and "cadastre_text" in ids

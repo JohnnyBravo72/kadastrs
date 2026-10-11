@@ -222,6 +222,15 @@ docker compose run --rm check compare tests/data/returned/kolegis1.xlsx
 
 It resolves each `vertiba`, checks all objects in one new run (origin `compare`) and writes `<file>_salidzinajums.xlsx` next to the input: one row per object and module with the manual answer, the engine status, **sakrīt / atšķiras / nav atbildes / nav salīdzināms**, the engine's risk and finding, the data dates and the manual check date ("Dati jaunāki par pārbaudi" = a source is newer than the manual check, so the difference may be explained by data dates). Answers are read from their first words: «Ir…» = `found`, «Nav» = `clear`, «Nav datu» = `no_data`, «Nav pārklājuma» = `not_covered`; for module 2, «Ir» means a mismatch was found. The yellow example rows (`PIEMĒRS…`) are skipped. The optional `veids` column (īpašums | zemes vienība | būve) picks the object when a number has two meanings; without it, an ambiguous number is checked as its first match and an address with several objects as its parcel, both with a note.
 
+## Before a pilot session
+
+Allow about 45 minutes for the import (step 2); do it before the session, not during it.
+
+1. **Start Docker Desktop**, then the stack: `docker compose up -d --build --wait` and check `Invoke-RestMethod http://127.0.0.1:8000/health` gives `"status": "ok"`.
+2. **Refresh the data:** `docker compose run --rm etl import all` (only changed files make new versions).
+3. **Check freshness:** `docker compose run --rm etl status` must say `fresh` for every source and print no `stale:` line. In any report, the **Avoti** sheet's "Svaigums" column must say "aktuāli" for every source; "novecojuši" means the data is older than the source's allowed age (also shown as a warning on Kopsavilkums). If a source stays stale although the import said `unchanged`, the publisher has not released a newer file: we already have the newest one. Tell the colleagues (the report says so too), do not change `max_age` to hide it. Example: on 2026-10-11 the cadastre text and encumbrance files on data.gov.lv were from 2026-09-26 (resources last modified 2026-09-28, frequency WEEKLY).
+4. **Open `http://127.0.0.1:8000/`** and run one known object (e.g. `09000360220`) to see that a report downloads.
+
 ## Batch and Excel report (Phase 5)
 
 A list in, a stored run and an Excel report out (PLAN.md §7.1). Input: a pasted list (one value per line, or a table copied from Excel with a header row) or a CSV / XLSX file with the column `vertiba` and optionally `projekta_nr`, `pieteicejs_reg_nr`, `adrese`, `veids` (īpašums | zemes vienība | būve); at most 1,000 rows. CSV: `;` or `,`, UTF-8 (BOM or not) or Windows-1257. XLSX: the sheet `Testa_kopa` if present (the test-set template works as input), else the first sheet; `PIEMĒRS…` rows are skipped. **The uploaded file is not stored**; only the cleaned rows (`work.run_input`) and the results are.

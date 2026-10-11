@@ -41,13 +41,16 @@ def pin_live(conn, run_at: datetime) -> dict[str, Pinned]:
     rows = conn.execute(
         """SELECT v.source_id, v.id, v.version_date, s.name_lv, s.datagov_dataset_ids,
                   s.max_age::text, (v.version_date + s.max_age) < %s::date, s.coverage,
-                  -- processing notes of the source's D1 resources (sources.yaml)
-                  ARRAY(SELECT p->>'report_lv'
-                        FROM allowed_external_resource e,
-                             jsonb_array_elements(coalesce(e.config->'processing', '[]')) p
-                        WHERE e.id = ANY(s.external_resource_ids) AND e.status = 'allowed'
-                              AND p->>'report_lv' IS NOT NULL
-                        ORDER BY e.id)
+                  -- Latvian processing notes (sources.yaml): the source's own
+                  -- processing_lv, then those of its D1 resources
+                  ARRAY(SELECT jsonb_array_elements_text(
+                                   coalesce(s.config->'processing_lv', '[]')))
+                  || ARRAY(SELECT p->>'report_lv'
+                           FROM allowed_external_resource e,
+                                jsonb_array_elements(coalesce(e.config->'processing', '[]')) p
+                           WHERE e.id = ANY(s.external_resource_ids) AND e.status = 'allowed'
+                                 AND p->>'report_lv' IS NOT NULL
+                           ORDER BY e.id)
            FROM dataset_version v JOIN source s ON s.id = v.source_id
            WHERE v.status = 'live' ORDER BY v.source_id""",
         (run_at,),

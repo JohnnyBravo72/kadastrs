@@ -138,5 +138,8 @@ def test_pinned_sources_carry_coverage_and_processing_notes(conn):
             "SELECT source_id, source FROM work.run_version WHERE run_id = %s", (rid,)
         ).fetchall()
     )
-    assert info["cadastre_text"]["coverage"]
-    assert any("1 cm" in n for n in info["flood_10y"]["processing"])
+    assert info["cadastre_text"]["coverage"].startswith("Pilota pilsētas")  # Latvian
+    assert info["cadastre_text"]["processing"][0] == "Importēti tikai pilota pilsētu ieraksti."
+    flood = info["flood_10y"]["processing"]
+    assert flood[0].startswith("Importēti plūdu zonu objekti")  # own note first, then E7
+    assert any("1 cm" in n for n in flood)

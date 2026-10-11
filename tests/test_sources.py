@@ -24,7 +24,8 @@ EXAMPLE_SOURCE = {
     "type": "check",
     "subject_kinds": ["object"],
     "default_selected": True,
-    "coverage": "Designated flood risk areas only",
+    "coverage_lv": "Tikai noteiktās plūdu riska teritorijas",
+    "processing_lv": ["Testa piezīme."],
     "max_age": "P1M",
     "external_resources": ["E7"],
     "licence": "CC0-1.0",
@@ -115,6 +116,19 @@ def test_external_url_must_be_on_its_host():
     data = _repo_config_dict()
     data["allowed_external_resources"][0]["url"] = "https://example.com/export.csv"
     with pytest.raises(ValidationError, match="is not on host"):
+        SourcesConfig.model_validate(data)
+
+
+def test_every_source_has_a_latvian_coverage_note():
+    """Avoti shows coverage and processing in Latvian (sources.yaml coverage_lv,
+    processing_lv); a source without coverage_lv does not load."""
+    cfg = load_config()
+    for src in cfg.sources:
+        assert src.coverage_lv.strip(), src.id
+        assert all(n.strip() for n in src.processing_lv), src.id
+    data = _with_source()
+    del data["sources"][0]["coverage_lv"]
+    with pytest.raises(ValidationError, match="coverage_lv"):
         SourcesConfig.model_validate(data)
 
 

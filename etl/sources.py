@@ -72,7 +72,12 @@ class Source(BaseModel):
         list[Literal["object", "applicant", "municipality"]], Field(min_length=1)
     ]
     default_selected: bool
-    coverage: str | None = None
+    # Shown to evaluators (report sheet "Avoti"), so in Latvian; the English
+    # wording is kept as a YAML comment for developers. Stored in source.coverage.
+    coverage_lv: Annotated[str, Field(min_length=1)]
+    # What the import changes or leaves out, in Latvian, for the "Avoti" sheet
+    # (next to the processing notes of the source's D1 resources).
+    processing_lv: StrList
     max_age: str
     datagov: Datagov | None = None
     external_resources: StrList  # ids from allowed_external_resources (D1)
@@ -237,7 +242,7 @@ def sync_registry(conn: psycopg.Connection, cfg: SourcesConfig) -> dict[str, int
                     s.type,
                     list(s.subject_kinds),
                     s.default_selected,
-                    s.coverage,
+                    s.coverage_lv,
                     s.max_age,
                     s.datagov.dataset_ids if s.datagov else [],
                     s.datagov.resource_ids if s.datagov else [],

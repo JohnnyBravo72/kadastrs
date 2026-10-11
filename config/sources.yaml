@@ -14,7 +14,10 @@ sources:
     type: reference
     subject_kinds: [object, municipality]
     default_selected: true
-    coverage: "Whole country: VARIS Novadi, Pilsetas, Pagasti"
+    # coverage (en): Whole country: VARIS Novadi, Pilsetas, Pagasti
+    coverage_lv: "Visa valsts: VARIS novadi, valstspilsētas un pagasti"
+    processing_lv:
+      - "Ģeometrija saglabāta LKS-2020 (EPSG:10306), kā publicēta."
     max_age: P2D
     datagov:
       dataset_id: varis-atvertie-dati
@@ -30,7 +33,11 @@ sources:
     type: reference
     subject_kinds: [object]
     default_selected: true
-    coverage: "Pilot cities: building and parcel addresses, EKS and DEL, with earlier texts"
+    # coverage (en): Pilot cities: building and parcel addresses, EKS and DEL, with earlier texts
+    coverage_lv: "Pilota pilsētas: ēku un zemes vienību adreses (eksistējošās un likvidētās) ar agrākajiem nosaukumiem"
+    processing_lv:
+      - "Kļūdainās adreses (statuss ERR) netiek importētas."
+      - "Likvidēta adrese tiek atrasta tikai tad, ja nav eksistējošas, un rādīta ar brīdinājumu „vēsturiska adrese”."
     max_age: P2D
     datagov:
       dataset_id: varis-atvertie-dati
@@ -50,7 +57,11 @@ sources:
     type: reference
     subject_kinds: [object]
     default_selected: true
-    coverage: "Pilot cities (one SHP zip per city)"
+    # coverage (en): Pilot cities (one SHP zip per city)
+    coverage_lv: "Pilota pilsētas (viens SHP arhīvs katrai pilsētai)"
+    processing_lv:
+      - "Ģeometrija saglabāta LKS-2020 (EPSG:10306), kā publicēta."
+      - "Objekts bez ģeometrijas nekad netiek uzskatīts par „nav atrasts”: būvi pārbauda pēc tās zemes vienības, citādi statuss „Nav datu”."
     max_age: P14D
     datagov:
       dataset_id: kadastra-informacijas-sistemas-atverti-telpiskie-dati
@@ -69,7 +80,11 @@ sources:
     type: reference
     subject_kinds: [object]
     default_selected: true
-    coverage: "Pilot cities: parcels, parcel parts, buildings, properties"
+    # coverage (en): Pilot cities: parcels, parcel parts, buildings, properties
+    coverage_lv: "Pilota pilsētas: zemes vienības, zemes vienību daļas, būves un īpašumi"
+    processing_lv:
+      - "Importēti tikai pilota pilsētu ieraksti."
+      - "Teksta laukos rindu pārnesumi un tabulācijas aizstātas ar atstarpēm; apzīmējumi saglabāti kā teksts ar sākuma nullēm."
     max_age: P14D
     datagov:
       dataset_id: kadastra-informacijas-sistemas-atvertie-dati
@@ -91,7 +106,10 @@ sources:
     type: check
     subject_kinds: [object]
     default_selected: true
-    coverage: "Areas shown on the 3rd-cycle flood maps (200-year extent as mask); pilot extent + 1 km"
+    # coverage (en): Areas shown on the 3rd-cycle flood maps (200-year extent as mask); pilot extent + 1 km
+    coverage_lv: "Kartēs attēlotā teritorija (3. cikla plūdu kartes; 200 gadu applūšanas robeža kā pārklājuma maska); pilota pilsētas + 1 km"
+    processing_lv:
+      - "Importēti plūdu zonu objekti, kas skar pilota pilsētas teritoriju + 1 km."
     max_age: P1Y
     datagov:
       dataset_id: 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1   # licence and version date
@@ -107,7 +125,11 @@ sources:
     type: check
     subject_kinds: [object]
     default_selected: true
-    coverage: "Whole country"
+    # coverage (en): Whole country
+    coverage_lv: "Visa valsts"
+    processing_lv:
+      - "Nederīgas ģeometrijas labotas automātiski (saglabātas tikai laukumu daļas)."
+      - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
     max_age: P13M
     datagov:
       dataset_id: ipasi-aizsargajamas-dabas-teritorijas
@@ -123,7 +145,11 @@ sources:
     type: check
     subject_kinds: [object]
     default_selected: true
-    coverage: "Whole country"
+    # coverage (en): Whole country
+    coverage_lv: "Visa valsts"
+    processing_lv:
+      - "Nederīgas ģeometrijas labotas automātiski (saglabātas tikai laukumu daļas)."
+      - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
     max_age: P13M
     datagov:
       dataset_id: mikroliegumi
@@ -139,7 +165,11 @@ sources:
     type: check
     subject_kinds: [object]
     default_selected: true
-    coverage: "Whole country"
+    # coverage (en): Whole country
+    coverage_lv: "Visa valsts"
+    processing_lv:
+      - "Nederīgas ģeometrijas labotas automātiski (saglabātas tikai laukumu daļas)."
+      - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
     max_age: P13M
     datagov:
       dataset_id: dabas-pieminekli
@@ -155,7 +185,11 @@ sources:
     type: check
     subject_kinds: [object]
     default_selected: true
-    coverage: "Whole country (mapped habitats only)"
+    # coverage (en): Whole country (mapped habitats only)
+    coverage_lv: "Visa valsts (tikai kartētie biotopi)"
+    processing_lv:
+      - "Nederīgas ģeometrijas labotas automātiski (saglabātas tikai laukumu daļas)."
+      - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
     max_age: P13M
     datagov:
       dataset_id: aizsargajamas-dzivotnes-biotopi
@@ -173,7 +207,11 @@ sources:
     type: check
     subject_kinds: [object]
     default_selected: true
-    coverage: "Pilot cities: case objects by ATVK or designation prefix, and their cases (excl. stage Ideja and restricted cases)"
+    # coverage (en): Pilot cities: case objects by ATVK or designation prefix, and their cases (excl. stage Ideja and restricted cases)
+    coverage_lv: "Pilota pilsētas: būvniecības lietu objekti pēc ATVK vai apzīmējuma sākuma un to lietas (bez stadijas „Ideja” un ierobežotas pieejas lietām)"
+    processing_lv:
+      - "Publicētās dublētās rindas saglabātas, bet katra lieta skaitīta vienreiz."
+      - "Telpu grupas apzīmējums saīsināts līdz būvei (14 cipari); apzīmējumi saglabāti kā teksts ar sākuma nullēm."
     max_age: P2D
     datagov:
       dataset_id: [bis_jlyakg7hgslonjnwyrwc6w, bis_tln9s3hrpjlnucmjip9r3g]
@@ -191,7 +229,10 @@ sources:
     type: check
     subject_kinds: [object]
     default_selected: true
-    coverage: "Pilot cities: encumbrances registered on parcels and parcel parts (text and area, no geometry)"
+    # coverage (en): Pilot cities: encumbrances registered on parcels and parcel parts (text and area, no geometry)
+    coverage_lv: "Pilota pilsētas: zemes vienībām un to daļām reģistrētie apgrūtinājumi (teksts un platība, bez ģeometrijas)"
+    processing_lv:
+      - "Apgrūtinājumu robežas atvērtajos datos nav pieejamas: pārbaudīts tikai objektam reģistrētais saraksts, ne telpiskais pārklājums."
     max_age: P14D
     datagov:
       dataset_id: kadastra-informacijas-sistemas-atvertie-dati
@@ -207,7 +248,10 @@ sources:
     type: reference
     subject_kinds: [object]
     default_selected: true
-    coverage: "Whole classifier"
+    # coverage (en): Whole classifier
+    coverage_lv: "Viss klasifikators"
+    processing_lv:
+      - "Izmantots apgrūtinājumu kodu aprakstiem."
     max_age: P13M
     datagov:
       dataset_id: atis-datu-un-kadastra-objektu-apgrutinajumu-klasifikators
@@ -226,7 +270,11 @@ sources:
     type: check
     subject_kinds: [object]
     default_selected: true
-    coverage: "Pilot cities: parcels and parcel parts (regional files Latgale, Rīga, Zemgale); frozen on 2025-01-31, never updated"
+    # coverage (en): Pilot cities: parcels and parcel parts (regional files Latgale, Rīga, Zemgale); frozen on 2025-01-31, never updated
+    coverage_lv: "Pilota pilsētas: zemes vienības un to daļas (reģionālie faili Latgalei, Rīgai, Zemgalei); saraksts iesaldēts 2025-01-31 un netiek atjaunots"
+    processing_lv:
+      - "Apgrūtinājumi, kuru nav pašreizējā sarakstā, rādīti atsevišķi ar brīdinājumu „pārbaudīt manuāli”, nekad kā pašreizēji."
+      - "Svaigums neattiecas: saraksts iesaldēts."
     max_age: P100Y      # frozen on 2025-01-31 by VZD (frequency NEVER): freshness does not apply
     datagov:
       dataset_id: apgrutinajumi-kas-kadastra-registreti-lidz-2025-gada-31-janvarim
@@ -252,7 +300,9 @@ sources:
 #     type: check                        # layer | check
 #     subject_kinds: [object]            # object | applicant | municipality
 #     default_selected: true
-#     coverage: "Designated flood risk areas only"
+#     # coverage (en): "Designated flood risk areas only"
+#     coverage_lv: "Tikai noteiktās plūdu riska teritorijas"   # shown on the report
+#     processing_lv: ["<what the import changes, in Latvian>"]
 #     max_age: P1M                       # ISO 8601 duration
 #     datagov:
 #       dataset_id: "<CKAN package name>"

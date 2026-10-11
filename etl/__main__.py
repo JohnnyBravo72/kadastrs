@@ -53,7 +53,9 @@ def cmd_status() -> int:
         rows = c.execute(
             """
             SELECT s.id, v.id, v.version_date, v.row_count, v.imported_at,
-                   l.status, l.started_at, l.message
+                   l.status, l.started_at, l.message,
+                   -- same rule as a check run (engine/checks/context.py pin_live)
+                   (v.version_date + s.max_age) < current_date, s.max_age::text
             FROM source s
             LEFT JOIN dataset_version v ON v.source_id = s.id AND v.status = 'live'
             LEFT JOIN LATERAL (SELECT * FROM import_log WHERE source_id = s.id
@@ -63,14 +65,20 @@ def cmd_status() -> int:
             """,
             (list(IMPORTERS),),
         ).fetchall()
-    for sid, vid, vdate, n, imported, lstatus, lstarted, msg in rows:
+    stale_sources = []
+    for sid, vid, vdate, n, imported, lstatus, lstarted, msg, stale, max_age in rows:
+        fresh = f"STALE (older than {max_age})" if stale else "fresh"
+        if stale:
+            stale_sources.append(sid)
         live = (
-            f"live v{vid} data {vdate} rows {n} imported {imported:%Y-%m-%d %H:%M}"
+            f"live v{vid} data {vdate} {fresh} rows {n} imported {imported:%Y-%m-%d %H:%M}"
             if vid
             else "no live version"
         )
         last = f"last run {lstatus} {lstarted:%Y-%m-%d %H:%M}" if lstatus else "never run"
         print(f"{sid:18} {live} | {last}" + (f" | {msg}" if msg else ""))
+    if stale_sources:
+        print(f"stale: {', '.join(stale_sources)} (import again before a pilot session)")
     return 0
 
 
