@@ -12,7 +12,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from etl.textio import clean_text
-from tests.checks.conftest import V, seed_checks
+from tests.checks.conftest import (
+    V,
+    no_network_freshness,  # noqa: F401  (autouse fixture)
+    seed_checks,
+)
 from tests.etl.conftest import ETL_DB
 
 RAW_NAME = "Noliktava\r\nNr.\t2 \\ korpuss\tA"

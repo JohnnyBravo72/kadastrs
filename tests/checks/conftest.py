@@ -248,3 +248,23 @@ def client(engine_db):
     with TestClient(app) as c:
         yield c
     mp.undo()
+
+
+def all_current(*_a, **_k):
+    """Every source answers "nothing newer than what you have" (no dates)."""
+    from etl import freshness
+
+    return {s.id: freshness.Remote(True) for s in freshness.load_config().sources}
+
+
+@pytest.fixture(scope="package", autouse=True)
+def no_network_freshness():
+    """Runs look at data.gov.lv for each source's latest release (etl/freshness.py).
+    Engine tests never use the network. Package scope: active before the
+    module-scoped run fixtures, undone after this package."""
+    from etl import freshness
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(freshness, "fetch_remote", all_current)
+    yield
+    mp.undo()

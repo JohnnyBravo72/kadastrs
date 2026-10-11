@@ -13,6 +13,7 @@ from functools import partial
 
 import psycopg
 
+from etl import freshness
 from etl.ckan import http_client
 from etl.importers import IMPORTERS
 from etl.run import run_import
@@ -53,9 +54,7 @@ def cmd_status() -> int:
         rows = c.execute(
             """
             SELECT s.id, v.id, v.version_date, v.row_count, v.imported_at,
-                   l.status, l.started_at, l.message,
-                   -- same rule as a check run (engine/checks/context.py pin_live)
-                   (v.version_date + s.max_age) < current_date, s.max_age::text
+                   l.status, l.started_at, l.message
             FROM source s
             LEFT JOIN dataset_version v ON v.source_id = s.id AND v.status = 'live'
             LEFT JOIN LATERAL (SELECT * FROM import_log WHERE source_id = s.id
@@ -65,20 +64,25 @@ def cmd_status() -> int:
             """,
             (list(IMPORTERS),),
         ).fetchall()
+        # freshness against the source, same check as a run (etl/freshness.py), recorded
+        at = c.execute("SELECT now()").fetchone()[0]
+        fresh = freshness.check(c, at, "status")
+        c.commit()
     stale_sources = []
-    for sid, vid, vdate, n, imported, lstatus, lstarted, msg, stale, max_age in rows:
-        fresh = f"STALE (older than {max_age})" if stale else "fresh"
-        if stale:
+    for sid, vid, vdate, n, imported, lstatus, lstarted, msg in rows:
+        f = fresh.get(sid)
+        state = f"{f['label_lv']}: {f['text_lv']}" if f else ""
+        if f and f["warn"]:
             stale_sources.append(sid)
         live = (
-            f"live v{vid} data {vdate} {fresh} rows {n} imported {imported:%Y-%m-%d %H:%M}"
+            f"live v{vid} data {vdate} rows {n} imported {imported:%Y-%m-%d %H:%M} | {state}"
             if vid
             else "no live version"
         )
         last = f"last run {lstatus} {lstarted:%Y-%m-%d %H:%M}" if lstatus else "never run"
         print(f"{sid:18} {live} | {last}" + (f" | {msg}" if msg else ""))
     if stale_sources:
-        print(f"stale: {', '.join(stale_sources)} (import again before a pilot session)")
+        print(f"check freshness: {', '.join(stale_sources)} (see the texts above)")
     return 0
 
 

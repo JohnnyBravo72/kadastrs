@@ -20,6 +20,7 @@ from engine.checks.modules import BY_ID, MODULES, PER_TARGET
 from engine.checks.modules.base import ModuleSpec, make
 from engine.checks.rules import RuleSet
 from engine.checks.units import Target, Unit, build_geometry, expand
+from etl import freshness
 
 AGGREGATE_GAPS = ["error", "source_unavailable", "no_data", "not_covered"]  # worst first
 NO_UNITS = "īpašumam nav pārbaudāmu vienību"
@@ -242,13 +243,15 @@ def start_run(
     """Check the targets now and store the run; returns the run id. Commits.
     `inputs`: the cleaned batch input rows (work.run_input), stored with the run."""
     rules = rules or rules_mod.load()
+    # Look at the sources' latest releases before the transaction (network, no DB).
+    remotes = freshness.fetch_remote()
     with conn.transaction():
         run_at = conn.execute("SELECT now()").fetchone()[0]
         selected_list = sources if sources is not None else default_sources(conn)
         check_sources(conn, selected_list)
         selected = set(selected_list)
         modules = modules_for(selected)
-        pinned = pin_live(conn, run_at)
+        pinned = pin_live(conn, run_at, remotes)
         run_id = conn.execute(
             """INSERT INTO work.run (created_at, origin, sources, modules, engine_version,
                    rule_set_version, rule_set_status, rule_set_sha256, rule_set)

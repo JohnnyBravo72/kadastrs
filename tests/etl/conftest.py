@@ -27,7 +27,8 @@ TRUNCATE work.check_result, work.run_input, work.run_target, work.run_version, w
          ref.building_parcel, ref.property, ref.property_object,
          ref.bis_case, ref.bis_object, ref.encumbrance, ref.atis_classifier,
          ref.encumbrance_frozen,
-         import_log, dataset_version, source, allowed_external_resource RESTART IDENTITY CASCADE
+         source_check, import_log, dataset_version, source, allowed_external_resource
+         RESTART IDENTITY CASCADE
 """
 
 

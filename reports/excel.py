@@ -268,8 +268,10 @@ def _warnings(target: dict[str, Any], results: dict[str, CheckResult]) -> str:
             if w.code == "units_partial":  # engine text lists raw status codes
                 for code, lv in STATUS_LV.items():
                     msg = msg.replace(f"{code}: ", f"{lv}: ")
-            if w.code == "stale_data":  # about a source, not a unit; age in Latvian
-                msg = re.sub(r"\(([^()]*)\)$", lambda m: f"({_age(m.group(1))})", msg)
+            if w.code == "stale_data":  # about a source, not a unit; old runs: age in Latvian
+                msg = re.sub(
+                    r"\((\d+ [a-z]+(?: \d+ [a-z]+)*)\)$", lambda m: f"({_age(m.group(1))})", msg
+                )
                 add(msg)
                 continue
             unit = getattr(w, "unit", None)
@@ -522,6 +524,31 @@ def _age(text: str | None) -> str | None:
     return " ".join(out) or text
 
 
+FRESHNESS_FILL = {
+    "current": RISK_FILL["none"],
+    "newer_available": RISK_FILL["high"],
+    "source_stale": RISK_FILL["medium"],
+    "unknown": RISK_FILL["unknown"],
+}
+
+
+def _freshness(v: dict[str, Any]) -> tuple[str, str | None, str | None, str | None, str]:
+    """(label, reason, source updated, stale-after limit, fill) of one pinned source.
+    Runs before 2026-10-11 stored a max_age verdict instead; shown as it was."""
+    f = v.get("freshness")
+    if f is not None:
+        limit = _age(f.get("source_stale_after")) or "netiek pārbaudīts"
+        fill = FRESHNESS_FILL[f["status"]]
+        return f["label_lv"], f["text_lv"], f.get("source_updated"), limit, fill
+    if "stale" not in v:
+        return "nezināms", None, None, None, RISK_FILL["unknown"]
+    stale = v["stale"]
+    reason = f"dati {'vecāki' if stale else 'jaunāki'} par pieļaujamo vecumu"
+    reason += f" ({_age(v.get('max_age'))})"
+    fill = RISK_FILL["high"] if stale else RISK_FILL["none"]
+    return ("novecojuši" if stale else "aktuāli"), reason, None, None, fill
+
+
 def _sources_sheet(wb: Workbook, data: ReportData) -> None:
     columns = [
         ("Avots", 34),
@@ -529,7 +556,9 @@ def _sources_sheet(wb: Workbook, data: ReportData) -> None:
         ("Datu kopas versija", 10),
         ("Datu datums", 12),
         ("Svaigums", 14),
-        ("Pieļaujamais vecums", 12),
+        ("Svaiguma pamatojums", 40),
+        ("Avots atjaunots", 12),
+        ("Brīdināt, ja avots nav atjaunots ilgāk par", 14),
         ("Pārklājums", 40),
         ("Apstrādes piezīmes", 60),
         ("data.gov.lv saite", 40),
@@ -538,23 +567,25 @@ def _sources_sheet(wb: Workbook, data: ReportData) -> None:
     row = 1
     for v in data.head["dataset_versions"]:
         row += 1
-        stale = v.get("stale")
+        label, reason, updated, limit, color = _freshness(v)
         values = [
             v.get("name"),
             v.get("id"),
             v.get("dataset_version_id"),
             v.get("dataset_date"),
-            "novecojuši" if stale else "aktuāli",
-            _age(v.get("max_age")),
+            label,
+            reason,
+            updated,
+            limit,
             v.get("coverage"),
             "\n".join(v.get("processing") or []) or None,
             v.get("datagov_url"),
         ]
         for c, value in enumerate(values, 1):
-            cell = _put(ws, row, c, value, text=c in (2, 4))
+            cell = _put(ws, row, c, value, text=c in (2, 4, 7))
             if c == 5:
-                _fill(cell, RISK_FILL["high"] if stale else RISK_FILL["none"])
-            if c == 9 and value:
+                _fill(cell, color)
+            if c == len(values) and value:
                 cell.hyperlink = value
                 cell.font = Font(color="0563C1", underline="single")
     _finish(ws, len(columns), row)

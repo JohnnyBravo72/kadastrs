@@ -1,5 +1,9 @@
 # Source registry (PLAN.md §4, table `source`).
 # Add an entry only after the dataset is verified in docs/data-sources.md.
+# Freshness (docs/decisions.md "Freshness"): a source is fresh when we hold the
+# newest file it has published (package_show last_modified at run time); it is
+# flagged when a newer file exists, or when the publisher itself has released
+# nothing for longer than `source_stale_after`.
 # Never guess dataset ids or resource ids.
 
 sources:
@@ -18,7 +22,7 @@ sources:
     coverage_lv: "Visa valsts: VARIS novadi, valstspilsētas un pagasti"
     processing_lv:
       - "Ģeometrija saglabāta LKS-2020 (EPSG:10306), kā publicēta."
-    max_age: P2D
+    source_stale_after: P14D
     datagov:
       dataset_id: varis-atvertie-dati
       resource_ids: ["b643b1b3-223f-4394-9beb-18524f8b0b82"]   # aw_shp.zip
@@ -38,7 +42,7 @@ sources:
     processing_lv:
       - "Kļūdainās adreses (statuss ERR) netiek importētas."
       - "Likvidēta adrese tiek atrasta tikai tad, ja nav eksistējošas, un rādīta ar brīdinājumu „vēsturiska adrese”."
-    max_age: P2D
+    source_stale_after: P14D
     datagov:
       dataset_id: varis-atvertie-dati
       resource_ids:
@@ -62,7 +66,7 @@ sources:
     processing_lv:
       - "Ģeometrija saglabāta LKS-2020 (EPSG:10306), kā publicēta."
       - "Objekts bez ģeometrijas nekad netiek uzskatīts par „nav atrasts”: būvi pārbauda pēc tās zemes vienības, citādi statuss „Nav datu”."
-    max_age: P14D
+    source_stale_after: P60D
     datagov:
       dataset_id: kadastra-informacijas-sistemas-atverti-telpiskie-dati
       resource_ids:
@@ -85,7 +89,7 @@ sources:
     processing_lv:
       - "Importēti tikai pilota pilsētu ieraksti."
       - "Teksta laukos rindu pārnesumi un tabulācijas aizstātas ar atstarpēm; apzīmējumi saglabāti kā teksts ar sākuma nullēm."
-    max_age: P14D
+    source_stale_after: P60D
     datagov:
       dataset_id: kadastra-informacijas-sistemas-atvertie-dati
       resource_ids:
@@ -110,7 +114,7 @@ sources:
     coverage_lv: "Kartēs attēlotā teritorija (3. cikla plūdu kartes; 200 gadu applūšanas robeža kā pārklājuma maska); pilota pilsētas + 1 km"
     processing_lv:
       - "Importēti plūdu zonu objekti, kas skar pilota pilsētas teritoriju + 1 km."
-    max_age: P1Y
+    source_stale_after: P2Y
     datagov:
       dataset_id: 3-cikla-latvijas-pldu-postjumu-vietu-un-pldu-riska-kartes1   # licence and version date
     external_resources: [E7]
@@ -130,7 +134,7 @@ sources:
     processing_lv:
       - "Nederīgas ģeometrijas labotas automātiski (saglabātas tikai laukumu daļas)."
       - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
-    max_age: P13M
+    source_stale_after: P2Y
     datagov:
       dataset_id: ipasi-aizsargajamas-dabas-teritorijas
       resource_ids: ["aa165932-8835-41a0-baa2-3336d2e8e6ef"]   # SHP zip
@@ -150,7 +154,7 @@ sources:
     processing_lv:
       - "Nederīgas ģeometrijas labotas automātiski (saglabātas tikai laukumu daļas)."
       - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
-    max_age: P13M
+    source_stale_after: P2Y
     datagov:
       dataset_id: mikroliegumi
       resource_ids: ["4770cc11-02eb-42e1-98c9-e640e3d8b7ff"]   # SHP zip
@@ -170,7 +174,7 @@ sources:
     processing_lv:
       - "Nederīgas ģeometrijas labotas automātiski (saglabātas tikai laukumu daļas)."
       - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
-    max_age: P13M
+    source_stale_after: P2Y
     datagov:
       dataset_id: dabas-pieminekli
       resource_ids: ["18139898-7119-4ff8-b769-5ab956209bd3"]   # SHP zip
@@ -190,7 +194,7 @@ sources:
     processing_lv:
       - "Nederīgas ģeometrijas labotas automātiski (saglabātas tikai laukumu daļas)."
       - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
-    max_age: P13M
+    source_stale_after: P2Y
     datagov:
       dataset_id: aizsargajamas-dzivotnes-biotopi
       resource_ids: ["e52b8094-f563-4706-b59f-401f7113a133"]   # SHP zip
@@ -212,7 +216,7 @@ sources:
     processing_lv:
       - "Publicētās dublētās rindas saglabātas, bet katra lieta skaitīta vienreiz."
       - "Telpu grupas apzīmējums saīsināts līdz būvei (14 cipari); apzīmējumi saglabāti kā teksts ar sākuma nullēm."
-    max_age: P2D
+    source_stale_after: P30D
     datagov:
       dataset_id: [bis_jlyakg7hgslonjnwyrwc6w, bis_tln9s3hrpjlnucmjip9r3g]
       resource_ids:
@@ -233,7 +237,7 @@ sources:
     coverage_lv: "Pilota pilsētas: zemes vienībām un to daļām reģistrētie apgrūtinājumi (teksts un platība, bez ģeometrijas)"
     processing_lv:
       - "Apgrūtinājumu robežas atvērtajos datos nav pieejamas: pārbaudīts tikai objektam reģistrētais saraksts, ne telpiskais pārklājums."
-    max_age: P14D
+    source_stale_after: P60D
     datagov:
       dataset_id: kadastra-informacijas-sistemas-atvertie-dati
       resource_ids: ["ca8a415c-a894-427f-b14d-d1e44c582620"]   # encumbrance.zip
@@ -252,7 +256,7 @@ sources:
     coverage_lv: "Viss klasifikators"
     processing_lv:
       - "Izmantots apgrūtinājumu kodu aprakstiem."
-    max_age: P13M
+    source_stale_after: P2Y
     datagov:
       dataset_id: atis-datu-un-kadastra-objektu-apgrutinajumu-klasifikators
       resource_ids: ["072603f8-243f-4910-8994-8e8de8665bd7"]   # classifier CSV
@@ -275,7 +279,7 @@ sources:
     processing_lv:
       - "Apgrūtinājumi, kuru nav pašreizējā sarakstā, rādīti atsevišķi ar brīdinājumu „pārbaudīt manuāli”, nekad kā pašreizēji."
       - "Svaigums neattiecas: saraksts iesaldēts."
-    max_age: P100Y      # frozen on 2025-01-31 by VZD (frequency NEVER): freshness does not apply
+    # no source_stale_after: frozen by VZD on 2025-01-31 (frequency NEVER), never republished
     datagov:
       dataset_id: apgrutinajumi-kas-kadastra-registreti-lidz-2025-gada-31-janvarim
       resource_ids:
@@ -303,7 +307,8 @@ sources:
 #     # coverage (en): "Designated flood risk areas only"
 #     coverage_lv: "Tikai noteiktās plūdu riska teritorijas"   # shown on the report
 #     processing_lv: ["<what the import changes, in Latvian>"]
-#     max_age: P1M                       # ISO 8601 duration
+#     source_stale_after: P2Y            # ISO 8601; warn when the publisher has released
+#                                        # nothing newer for this long (omit = never)
 #     datagov:
 #       dataset_id: "<CKAN package name>"
 #       resource_ids: ["<CKAN resource id>"]

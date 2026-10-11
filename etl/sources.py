@@ -78,16 +78,20 @@ class Source(BaseModel):
     # What the import changes or leaves out, in Latvian, for the "Avoti" sheet
     # (next to the processing notes of the source's D1 resources).
     processing_lv: StrList
-    max_age: str
+    # Freshness (docs/decisions.md "Freshness"): warn when the publisher has
+    # released nothing newer for this long. None = never (a frozen list).
+    source_stale_after: str | None = None
     datagov: Datagov | None = None
     external_resources: StrList  # ids from allowed_external_resources (D1)
     licence: str | None = None
 
-    @field_validator("max_age")
+    @field_validator("source_stale_after")
     @classmethod
-    def _iso_duration(cls, v: str) -> str:
-        if not _ISO_DURATION.match(v):
-            raise ValueError(f"max_age must be an ISO 8601 duration such as P2D or P1M, got {v!r}")
+    def _iso_duration(cls, v: str | None) -> str | None:
+        if v is not None and not _ISO_DURATION.match(v):
+            raise ValueError(
+                f"source_stale_after must be an ISO 8601 duration such as P30D or P2Y, got {v!r}"
+            )
         return v
 
     @model_validator(mode="after")
@@ -192,7 +196,7 @@ ON CONFLICT (id) DO UPDATE SET
 _UPSERT_SOURCE = """
 INSERT INTO source
     (id, name_lv, name_en, owner, source_group, display_order, type, subject_kinds,
-     default_selected, coverage, max_age, datagov_dataset_ids, datagov_resource_ids,
+     default_selected, coverage, source_stale_after, datagov_dataset_ids, datagov_resource_ids,
      external_resource_ids, licence, config, active, loaded_at)
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::interval, %s, %s, %s, %s, %s, true, now())
 ON CONFLICT (id) DO UPDATE SET
@@ -200,7 +204,8 @@ ON CONFLICT (id) DO UPDATE SET
     source_group = EXCLUDED.source_group, display_order = EXCLUDED.display_order,
     type = EXCLUDED.type, subject_kinds = EXCLUDED.subject_kinds,
     default_selected = EXCLUDED.default_selected, coverage = EXCLUDED.coverage,
-    max_age = EXCLUDED.max_age, datagov_dataset_ids = EXCLUDED.datagov_dataset_ids,
+    source_stale_after = EXCLUDED.source_stale_after,
+    datagov_dataset_ids = EXCLUDED.datagov_dataset_ids,
     datagov_resource_ids = EXCLUDED.datagov_resource_ids,
     external_resource_ids = EXCLUDED.external_resource_ids, licence = EXCLUDED.licence,
     config = EXCLUDED.config, active = true, loaded_at = now()
@@ -243,7 +248,7 @@ def sync_registry(conn: psycopg.Connection, cfg: SourcesConfig) -> dict[str, int
                     list(s.subject_kinds),
                     s.default_selected,
                     s.coverage_lv,
-                    s.max_age,
+                    s.source_stale_after,
                     s.datagov.dataset_ids if s.datagov else [],
                     s.datagov.resource_ids if s.datagov else [],
                     s.external_resources,

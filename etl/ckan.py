@@ -11,12 +11,8 @@ USER_AGENT = "kadastrs-etl/0.1 (+https://github.com/JohnnyBravo72/kadastrs)"
 
 def http_client(**kwargs) -> httpx.Client:
     """TLS verification stays on (CLAUDE.md rule 9)."""
-    return httpx.Client(
-        headers={"User-Agent": USER_AGENT},
-        timeout=httpx.Timeout(60.0, read=600.0),
-        follow_redirects=True,
-        **kwargs,
-    )
+    kwargs.setdefault("timeout", httpx.Timeout(60.0, read=600.0))
+    return httpx.Client(headers={"User-Agent": USER_AGENT}, follow_redirects=True, **kwargs)
 
 
 @dataclass(frozen=True)

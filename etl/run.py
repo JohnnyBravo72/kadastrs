@@ -281,7 +281,8 @@ def _finish(
         conn_factory,
         "UPDATE import_log SET status = %s, finished_at = now(), dataset_version_id = %s,"
         " checksum = coalesce(%s, checksum), files = coalesce(%s, files),"
-        " row_counts = coalesce(%s, row_counts), message = %s WHERE id = %s",
+        " row_counts = coalesce(%s, row_counts), message = %s,"
+        " source_last_modified = coalesce(%s, source_last_modified) WHERE id = %s",
         (
             status,
             version_id,
@@ -289,9 +290,19 @@ def _finish(
             Jsonb(files) if files is not None else None,
             Jsonb(row_counts) if row_counts is not None else None,
             text,
+            ctx.source_last_modified if ctx else None,  # e.g. flood: dataset metadata date
             log_id,
         ),
     )
+    if status in ("succeeded", "unchanged"):
+        # an import is also a look at the source's latest release (etl/freshness.py)
+        _log(
+            conn_factory,
+            "INSERT INTO source_check (source_id, origin, ok, remote_last_modified)"
+            " SELECT source_id, 'import', true, source_last_modified FROM import_log"
+            " WHERE id = %s",
+            (log_id,),
+        )
     return Outcome(sid, status, version_id, text or "", row_counts or {})
 
 

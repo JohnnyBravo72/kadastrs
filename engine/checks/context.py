@@ -12,6 +12,7 @@ from typing import Any
 from engine.checks.contract import SourceRef, Warning_
 from engine.checks.rules import RuleSet
 from engine.resolve.context import SourceUnavailable, Versions
+from etl import freshness
 
 DATASET_URL = "https://data.gov.lv/dati/lv/dataset/{}"
 REFERENCE = ("cadastre_text", "cadastre_spatial", "varis_addresses", "admin_boundaries")
@@ -23,7 +24,8 @@ class Pinned:
 
     source_id: str
     version_id: int
-    # {id, name, dataset_date, datagov_url, max_age, stale, coverage, processing}
+    # {id, name, dataset_date, datagov_url, freshness, coverage, processing}
+    # (runs before the freshness change hold max_age and stale instead of freshness)
     info: dict[str, Any]
 
     def ref(self) -> SourceRef:
@@ -36,11 +38,14 @@ class Pinned:
         )
 
 
-def pin_live(conn, run_at: datetime) -> dict[str, Pinned]:
-    """The live version of every source, with what the report shows about it."""
+def pin_live(conn, run_at: datetime, remotes: dict | None = None) -> dict[str, Pinned]:
+    """The live version of every source, with what the report shows about it:
+    its freshness against the source (etl/freshness.py; `remotes` = this run's
+    look at data.gov.lv, None = use the last known checks), coverage and notes."""
+    fresh = freshness.check(conn, run_at, "run", remotes if remotes is not None else {})
     rows = conn.execute(
         """SELECT v.source_id, v.id, v.version_date, s.name_lv, s.datagov_dataset_ids,
-                  s.max_age::text, (v.version_date + s.max_age) < %s::date, s.coverage,
+                  s.coverage,
                   -- Latvian processing notes (sources.yaml): the source's own
                   -- processing_lv, then those of its D1 resources
                   ARRAY(SELECT jsonb_array_elements_text(
@@ -52,11 +57,10 @@ def pin_live(conn, run_at: datetime) -> dict[str, Pinned]:
                                  AND p->>'report_lv' IS NOT NULL
                            ORDER BY e.id)
            FROM dataset_version v JOIN source s ON s.id = v.source_id
-           WHERE v.status = 'live' ORDER BY v.source_id""",
-        (run_at,),
+           WHERE v.status = 'live' ORDER BY v.source_id"""
     ).fetchall()
     out = {}
-    for source_id, vid, vdate, name, datasets, max_age, stale, coverage, processing in rows:
+    for source_id, vid, vdate, name, datasets, coverage, processing in rows:
         out[source_id] = Pinned(
             source_id,
             vid,
@@ -65,8 +69,8 @@ def pin_live(conn, run_at: datetime) -> dict[str, Pinned]:
                 "name": name,
                 "dataset_date": vdate.isoformat(),
                 "datagov_url": DATASET_URL.format(datasets[0]) if datasets else None,
-                "max_age": max_age,
-                "stale": bool(stale),
+                # freshness against the source as of the run (warning if not current)
+                "freshness": fresh.get(source_id),
                 # shown on the report's "Avoti" sheet; stored with the run
                 "coverage": coverage,
                 "processing": list(processing),
@@ -117,7 +121,15 @@ class RunContext:
         out = []
         for s in source_ids:
             p = self.pinned.get(s)
-            if p and p.info.get("stale"):
+            f = p.info.get("freshness") if p else None
+            if f is not None:  # runs since 2026-10-11: against the source
+                if f["warn"]:
+                    out.append(
+                        Warning_(
+                            code="stale_data", message=f"{p.info['name']}: {f['text_lv']}", source=s
+                        )
+                    )
+            elif p and p.info.get("stale"):  # older runs (max_age), kept for replay
                 out.append(
                     Warning_(
                         code="stale_data",

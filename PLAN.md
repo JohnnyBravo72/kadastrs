@@ -9,6 +9,7 @@
 **Status (2026-10-11):** Phases 1–3 are done; Phase 4 (check engine v1) is built and tested, risk rules v1 are agreed (D4, 2026-10-11; to be revised after the test-set comparison), and the comparison with the colleagues' manual answers waits for the filled test-set files. Phase 5 (batch + Excel) is built and tested; its "done when" (pilot with 2–3 colleagues, time per object vs the baseline) is open. Earlier: Phase 0 steps 1 and 3 were done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
 
 **Change log**
+- 2026-10-11 (freshness): freshness is checked against the source (§2.2, `docs/decisions.md` "Freshness"): "aktuāli" when we hold the latest release on data.gov.lv, a warning when a newer release is not imported or the publisher has been silent longer than `source_stale_after` (replaces `max_age`). Runs read `package_show` at start (the only live call), record it in `source_check`, and store the verdict with the run. Avoti and the source notes are in Latvian (`coverage_lv`, `processing_lv`).
 - 2026-10-11 (Phase 5): batch input and the Excel report (§7.1).
   - Input: pasted list, CSV or XLSX (`vertiba`, optional `projekta_nr`, `pieteicejs_reg_nr`, `adrese`, new optional `veids`), at most 1,000 rows; via `POST /api/batch`, `check batch` and a plain page at `/` (upload or paste → Excel). The upload is not stored; the cleaned rows are (`work.run_input`, insert-only).
   - Rows (decided 2026-10-11, Janis; `docs/decisions.md` "Phase 5"): property-or-parcel numbers checked both ways ("divdomīgs: …") unless `veids` decides; precision-lost values and unclear addresses not checked and listed on "Neatrasts"; an address checked on every linked object; duplicates checked with a warning; `adrese` = module 2's given address (unresolved: object still checked, "adrese nav atrasta"); applicant reg. no. only with the legal-entity pattern.
@@ -82,10 +83,15 @@
 
 ### 2.2 How data gets in
 - **Find:** datasets are found through the data.gov.lv CKAN API (`package_search`, `package_show`).
-- **Import, never call live:** resources are downloaded and imported into PostGIS on a schedule. The app never calls agency services at request time.
+- **Import, never call live:** resources are downloaded and imported into PostGIS on a schedule. The app never reads data from agency services at request time. The one live call is to the **data.gov.lv catalogue** (`package_show`) at the start of a check run, to read each source's latest release date for the freshness check below; if it fails, the run goes on with the last known check.
 - **Track every import:** `import_log` records the dataset id, resource id, licence, last-modified date, row counts and a file checksum. Each import becomes a **dataset version**.
 - **Schema check on every import:** expected columns, types and CRS. If a source changes, the import stops and alerts; the last good version stays live.
-- **Freshness:** each source has a `max_age` that matches its real update cycle: 2 days for UR, BIS and EU projects (daily); 120 days for the VID rating (updated at least 4× a year); 14 days for the cadastre (weekly). A report built on older data gets a warning.
+- **Freshness against the source (decided 2026-10-11, `docs/decisions.md` "Freshness"; replaces the fixed `max_age`):** fresh means *we hold the newest file the publisher has released*, not *our copy is younger than N days*. At the start of every check run, and in `etl status`, each source's latest release is read from `package_show` (newest resource `last_modified`, or the dataset's `metadata_modified` for a source without CKAN files, as the importer does, E1/E7) and compared with the release our live version was imported from (`import_log.source_last_modified`, also counting `unchanged` imports of a re-uploaded file). Each look is recorded in `source_check`; the run stores the verdict with its pinned versions, so its report shows freshness as of the run and a replay gives the same report.
+  - **We hold the latest release:** "aktuāli", text "jaunākie pieejamie dati (avots atjaunots <date>)", no warning.
+  - **A newer release exists that we have not imported:** "novecojuši – pieejama jaunāka versija", warning.
+  - **The publisher has released nothing for longer than the source's `source_stale_after`:** "avots nav atjaunots kopš <date>", warning. Values: cadastre text, cadastre map and encumbrances P60D; VARIS addresses and boundaries P14D; BIS P30D; flood, nature and the ATIS classifier P2Y; the frozen 2025-01-31 list none.
+  - **data.gov.lv cannot be reached:** the last good check is used and the text adds "pēdējā pārbaude <date>"; with no earlier check the status is "nezināms", with a warning.
+  - Later sources set their own `source_stale_after` (e.g. the VID rating, released at least 4× a year: about 120 days).
 
 ### 2.3 Availability (single source of truth)
 
@@ -190,7 +196,7 @@ The **check engine is the core**. The UI and the reports only display its stored
 - `run`: who, when, selected sources, rule set version, dataset versions used
 - `check_result`: run_id, subject_id, module, module_version, status, risk, rule_ids, items (jsonb), match_type, warnings, dataset_version_id, computed_at. **Never updated:** re-checking creates a new run.
 - `risk_rule`: id, module, condition, level, text, version
-- `source` (registry, also in `sources.yaml`): id, names, owner, group, order, type (layer / check), subject kinds, default_selected, coverage, max_age, datagov ids, licence
+- `source` (registry, also in `sources.yaml`): id, names, owner, group, order, type (layer / check), subject kinds, default_selected, coverage (Latvian), source_stale_after, datagov ids, licence
 
 **Indexes:** GIST on geometries, GIN trigram on `normalized_text`, btree on codes.
 
@@ -253,7 +259,7 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 | 7 | Ownership status | object | Cadastre (owner type only) | 8 | Owner type only (`PersonStatus`: natural / legal person, state, municipality, other). Never names of natural persons |
 | 8 | Zoning | object | TAPIS | 6 | Common legend mapping; partial coverage |
 | 9 | Applicant registry | applicant | UR | 8 | Status, form, legal address, dates |
-| 10 | Applicant tax (VID rating) | applicant | VID | 8 | Rating A/B/C/J/N with its date. Freshness `max_age` 120 days (the source is updated irregularly, at least 4× a year). **No tax-debt data on data.gov.lv**, so the module does not claim to check debts |
+| 10 | Applicant tax (VID rating) | applicant | VID | 8 | Rating A/B/C/J/N with its date. Freshness: `source_stale_after` about 120 days (the source is updated irregularly, at least 4× a year). **No tax-debt data on data.gov.lv**, so the module does not claim to check debts |
 | 11 | De minimis | applicant | FM | 8 | Aid in the relevant period. Legal-entity rows only |
 | 12 | EU double funding | object + applicant | EU projects | 8 | Other EU-funded projects on the same object or for the same applicant |
 | 13 | Procurement | applicant | IUB / EIS | 8 | |

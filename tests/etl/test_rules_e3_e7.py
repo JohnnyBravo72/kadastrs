@@ -186,9 +186,8 @@ def test_e5_lks92_source_is_transformed_with_the_grid(etl_db):
     with etl_db() as c, c.transaction(force_rollback=True):
         c.execute(
             "INSERT INTO source (id, name_lv, name_en, owner, source_group, display_order,"
-            " type, subject_kinds, default_selected, max_age, datagov_dataset_ids, config)"
-            " VALUES ('t3059', 't', 't', 't', 't', 1, 'check', '{object}', true, '1 day',"
-            " '{x}', '{}')"
+            " type, subject_kinds, default_selected, datagov_dataset_ids, config)"
+            " VALUES ('t3059', 't', 't', 't', 't', 1, 'check', '{object}', true, '{x}', '{}')"
         )
         vid = c.execute(
             "INSERT INTO dataset_version (source_id, version_date, checksum)"

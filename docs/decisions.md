@@ -23,6 +23,27 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 - **No names of natural persons are stored** (nor personal codes or birth dates).
 - Data that is not open (e.g. ATIS geometries, land book) is not used, and the affected check shows as *unavailable*.
 
+## Freshness against the source (decided 2026-10-11, Janis)
+
+**Problem:** a fixed `max_age` per source flagged data as stale when the publisher simply had not released anything newer (2026-10-11: VZD's cadastre files dated 2026-09-26, last modified on data.gov.lv 2026-09-28, dataset frequency WEEKLY). Raising `max_age` would have hidden real staleness, so the model changed instead.
+
+**Decision:** fresh = we hold the newest release the publisher has made (`etl/freshness.py`).
+- At the start of every check run and in `etl status`, read each source's latest release from data.gov.lv `package_show`: the newest `last_modified` of its resources, or the dataset `metadata_modified` for a source without CKAN files (flood, D1 E7). Same dates as the importer (E1, E7). This is catalogue metadata only; data is never read live (PLAN §2.2).
+- Compare it with the release our live version came from: `import_log.source_last_modified` of the imports that produced or confirmed the live version (an `unchanged` import of a re-uploaded file counts).
+- Outcomes and texts (Latvian, on the report's Avoti sheet and, if not current, as a `stale_data` warning on every result of that source):
+
+| Case | Svaigums | Text | Warning |
+|---|---|---|---|
+| we hold the latest release | aktuāli | jaunākie pieejamie dati (avots atjaunots <date>) | no |
+| a newer release is not imported | novecojuši | novecojuši – pieejama jaunāka versija (avots atjaunots <date>) | yes |
+| no release for longer than `source_stale_after` | avots nav atjaunots | avots nav atjaunots kopš <date> | yes |
+| data.gov.lv unreachable | (from the last good check) | … ; pēdējā pārbaude <date> | as that check |
+| unreachable, never checked | nezināms | nav zināms, vai šī ir jaunākā versija … | yes |
+
+- `source_stale_after` per source in `config/sources.yaml` (replaces `max_age`): cadastre text, cadastre map and encumbrances P60D; VARIS addresses and boundaries P14D; BIS P30D; flood, nature and the ATIS classifier P2Y; the frozen 2025-01-31 list none (never republished).
+- Every look is recorded in `source_check` (origin `run`, `status` or `import`; an import is also a look). A run stores the verdict with its pinned versions (`work.run_version.source`), so its report always shows freshness as of the run and a replay gives the same report; a report downloaded later does not re-check. Runs made before this change keep their `max_age` verdict.
+- Offline or tests: `KADASTRS_FRESHNESS_CHECK=off` skips the network and uses the last known checks.
+
 ## Phase 5: batch input rules (decided 2026-10-11, Janis)
 
 How a batch list becomes checked objects (`engine/batch/plan.py`; runbook "Batch and Excel report"):

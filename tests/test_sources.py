@@ -26,7 +26,7 @@ EXAMPLE_SOURCE = {
     "default_selected": True,
     "coverage_lv": "Tikai noteiktās plūdu riska teritorijas",
     "processing_lv": ["Testa piezīme."],
-    "max_age": "P1M",
+    "source_stale_after": "P1M",
     "external_resources": ["E7"],
     "licence": "CC0-1.0",
 }
@@ -79,8 +79,8 @@ def test_example_source_validates():
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
-        ({"max_age": "1 month"}, "ISO 8601"),
-        ({"max_age": "P"}, "ISO 8601"),
+        ({"source_stale_after": "1 month"}, "ISO 8601"),
+        ({"source_stale_after": "P"}, "ISO 8601"),
         ({"type": "map"}, "type"),
         ({"type": "reference", "default_selected": False}, "must be default_selected"),
         ({"subject_kinds": []}, "subject_kinds"),
@@ -119,6 +119,13 @@ def test_external_url_must_be_on_its_host():
         SourcesConfig.model_validate(data)
 
 
+def test_source_stale_after_is_optional_only_for_the_frozen_list():
+    """Freshness against the source (docs/decisions.md "Freshness"): every source
+    that is still published has a source_stale_after; the frozen list has none."""
+    without = sorted(s.id for s in load_config().sources if s.source_stale_after is None)
+    assert without == ["encumbrances_frozen"]
+
+
 def test_every_source_has_a_latvian_coverage_note():
     """Avoti shows coverage and processing in Latvian (sources.yaml coverage_lv,
     processing_lv); a source without coverage_lv does not load."""
@@ -134,7 +141,7 @@ def test_every_source_has_a_latvian_coverage_note():
 
 def test_cli_validate_reports_invalid_file(tmp_path, capsys):
     bad = tmp_path / "sources.yaml"
-    bad.write_text(yaml.safe_dump(_with_source(max_age="monthly")), encoding="utf-8")
+    bad.write_text(yaml.safe_dump(_with_source(source_stale_after="monthly")), encoding="utf-8")
     assert main(["validate", "--config", str(bad)]) == 1
     assert "ISO 8601" in capsys.readouterr().err
 
@@ -145,7 +152,8 @@ def test_cli_validate_reports_invalid_file(tmp_path, capsys):
 def _registry_rows(conn) -> list[tuple]:
     sources = conn.execute(
         "SELECT id, name_lv, name_en, owner, source_group, display_order, type, subject_kinds,"
-        " default_selected, coverage, max_age::text, datagov_dataset_ids, datagov_resource_ids,"
+        " default_selected, coverage, source_stale_after::text, datagov_dataset_ids,"
+        " datagov_resource_ids,"
         " external_resource_ids, licence, config, active FROM source ORDER BY id"
     ).fetchall()
     external = conn.execute(
@@ -172,13 +180,14 @@ def test_load_stores_source_fields(db_conn):
     with db_conn.transaction(force_rollback=True):
         sync_registry(db_conn, cfg)
         row = db_conn.execute(
-            "SELECT name_lv, source_group, max_age::text, subject_kinds, external_resource_ids,"
+            "SELECT name_lv, source_group, source_stale_after::text, subject_kinds,"
+            " external_resource_ids,"
             " config->>'id', active FROM source WHERE id = 'test_flood_10y'"
         ).fetchone()
         ext = db_conn.execute(
             "SELECT urls, status, config->>'licence' FROM allowed_external_resource WHERE id = 'E7'"
         ).fetchone()
-    name_lv, group, max_age, kinds, ext_ids, cfg_id, active = row
+    name_lv, group, stale_after, kinds, ext_ids, cfg_id, active = row
     assert (name_lv, group, kinds, ext_ids, cfg_id, active) == (
         "Plūdi (10 gadu)",
         "Plūdi",
@@ -187,7 +196,7 @@ def test_load_stores_source_fields(db_conn):
         "test_flood_10y",
         True,
     )
-    assert max_age == "1 mon"  # ISO 8601 P1M stored as a PostgreSQL interval
+    assert stale_after == "1 mon"  # ISO 8601 P1M stored as a PostgreSQL interval
     assert ext[1] == "allowed"
     assert ext[2] == "CC0-1.0"
     assert ext[0][0].startswith("https://geodata.lvgmc.lv/")
