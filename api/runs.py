@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from engine.checks import rules as rules_mod
 from engine.checks import runner, summary
 from engine.checks.contract import TargetIn
 from engine.resolve.context import SourceUnavailable, resolve_config
@@ -73,6 +74,10 @@ def get_target_results(request: Request, run_id: int, target_no: int) -> dict[st
         )
         if target is None:
             raise HTTPException(status_code=404, detail=f"objekts {target_no} nav šajā pārbaudē")
+        rule_set = conn.execute(
+            "SELECT rule_set FROM work.run WHERE id = %s", (run_id,)
+        ).fetchone()[0]
+        by_id = {r.id: r for r in rules_mod.from_json(rule_set).rules}
         modules: dict[str, dict[str, Any]] = {}
         for row in runner.stored(conn, run_id):
             if row.target_no != target_no:
@@ -83,7 +88,13 @@ def get_target_results(request: Request, run_id: int, target_no: int) -> dict[st
                 {"module": r.module, "module_no": r.module_no, "result": None, "units": []},
             )
             data = r.model_dump(mode="json") | {
-                "summary_status": summary.bucket(r.module, r.status, r.reason)
+                "summary_status": summary.bucket(r.module, r.status, r.reason),
+                # the fired rules with their report text (the run's stored rule set)
+                "rules": [
+                    {"id": i, "level": by_id[i].level, "text_lv": by_id[i].text_lv}
+                    for i in r.rule_ids
+                    if i in by_id
+                ],
             }
             if row.scope == "target":
                 entry["result"] = data

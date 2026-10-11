@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from api.batch import router as batch_router
 from api.db import create_pool
+from api.map import router as map_router
 from api.resolve import router as resolve_router
 from api.runs import router as runs_router
 
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Kadastra pārbaude", version="0.1.0", lifespan=lifespan)
 app.include_router(resolve_router)
 app.include_router(runs_router)
+app.include_router(map_router)
 app.include_router(batch_router)
 
 

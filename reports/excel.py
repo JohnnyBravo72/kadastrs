@@ -17,7 +17,6 @@ Codes are written as text (leading zeros kept, CLAUDE.md rule 8).
 """
 
 import io
-import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -31,6 +30,7 @@ from openpyxl.utils import get_column_letter
 from engine.checks import rules as rules_mod
 from engine.checks import runner, summary
 from engine.checks.contract import CheckResult
+from engine.checks.describe import describe
 from engine.checks.modules import BY_ID
 from engine.checks.rules import RuleSet
 
@@ -341,55 +341,6 @@ def _summary_sheet(wb: Workbook, data: ReportData) -> None:
 # --- Detaļas --------------------------------------------------------------------------------
 
 
-def _purposes(item: dict[str, Any]) -> str:
-    names = [p.get("name") for p in item.get("land_purposes") or [] if isinstance(p, dict)]
-    return ", ".join(n for n in names if n)
-
-
-def _describe(module: str, item: dict[str, Any]) -> str:
-    """One item as a line of text."""
-    if module == "cadastre_facts":
-        parts = [f"{item.get('type') or ''} {item.get('designation') or ''}".strip()]
-        if item.get("area_m2") is not None:
-            parts.append(f"platība {item['area_m2']} m²")
-        if item.get("name") or item.get("use_kind"):
-            parts.append(" / ".join(x for x in (item.get("name"), item.get("use_kind")) if x))
-        if purposes := _purposes(item):
-            parts.append(f"lietošanas mērķis: {purposes}")
-        on_parcel = item.get("buildings_on_parcel") or []
-        if on_parcel:
-            parts.append(f"būves uz zemes vienības: {len(on_parcel)}")
-        if item.get("property_numbers"):
-            parts.append(f"īpašums {', '.join(item['property_numbers'])}")
-        return "; ".join(p for p in parts if p)
-    if module == "nature":
-        name = item.get("name") or ""
-        extra = ", ".join(x for x in (item.get("category"), item.get("zone_type")) if x)
-        return f"{item.get('kind_lv') or item.get('kind')}: {name}" + (
-            f" ({extra})" if extra else ""
-        )
-    if module == "flood_10y":
-        return f"10 gadu plūdu zona ({item.get('layer_name') or item.get('layer')})"
-    if module == "bis":
-        bits = [
-            item.get("object_name"),
-            item.get("stage"),
-            item.get("construction_kind"),
-            item.get("created_date"),
-        ]
-        return f"{item.get('case_number')}: " + ", ".join(str(b) for b in bits if b)
-    if module == "encumbrances":
-        text = f"{item.get('code')} {item.get('description') or ''}".strip()
-        if item.get("area") is not None:
-            text += f"; platība {item['area']} {item.get('measure') or ''}".rstrip()
-        if item.get("establish_date"):
-            text += f"; reģistrēts {item['establish_date']}"
-        if item.get("frozen"):
-            text += "; tikai 2025-01-31 sarakstā – pārbaudīt manuāli"
-        return text
-    return json.dumps(item, ensure_ascii=False, sort_keys=True)
-
-
 def _address_line(r: CheckResult) -> str:
     given = next((i for i in r.items if "given_address" in i), {})
     linked = [i.get("address") or i.get("varis_code") for i in r.items if "given_address" not in i]
@@ -416,7 +367,7 @@ def _detail_lines(r: CheckResult, designation: str) -> list[dict[str, Any]]:
             frozen_items.add((item.get("object_code"), item.get("code")))
         lines.append(
             {
-                "text": _describe(r.module, item),
+                "text": describe(r.module, item),
                 "unit": item.get("unit") or item.get("designation") or designation,
                 "overlap_m2": _num(item.get("overlap_m2")),
                 "share": _num(item.get("share")),
