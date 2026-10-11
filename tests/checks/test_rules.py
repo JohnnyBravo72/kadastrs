@@ -28,9 +28,9 @@ def result(module="flood_10y", status="found", items=(), warnings=(), reason=Non
     )
 
 
-def test_rule_set_v1_is_a_draft_with_a_reason_per_rule():
+def test_rule_set_v1_is_agreed_with_a_reason_per_rule():
     rs = rules_mod.load()
-    assert (rs.version, rs.status) == ("1", "draft")
+    assert (rs.version, rs.status) == ("1", "agreed")
     assert all(r.reason.strip() and r.text_lv.strip() for r in rs.rules)
     assert rs.modules() <= set(BY_ID)
     assert rs.modules() == set(BY_ID)  # every module has rules

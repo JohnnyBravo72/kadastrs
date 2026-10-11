@@ -1,11 +1,12 @@
 # Risk rules (PLAN.md §6.4). The only place risk levels come from (CLAUDE.md rule 4).
-# Rule set v1 is decision D4: to be agreed with the team leads. Until then it is a
-# DRAFT, and every run and report shows "status: draft" next to the version.
+# Rule set v1 is decision D4: agreed by Janis Bardavskis 2026-10-11, to be revised
+# after the test-set comparison. Every run and report shows version and status.
+# A changed rule set gets a new version (back to status: draft until agreed).
 # The engine stores this whole file with each run, so an old run is replayed with
 # the rules it was made with.
 
 version: "1"
-status: draft          # draft | agreed
+status: agreed         # draft | agreed
 
 # Spatial thresholds (PLAN.md §6.3), listed on the report's "Avoti" sheet.
 thresholds:
@@ -272,10 +273,11 @@ rules:
       item:
         frozen: false
         code:
-          # water bodies: Baltic coast (dunes, beach, limited-activity belt), watercourses, lakes, artificial water bodies
+          # water bodies: Baltic coast dunes and beach, watercourses, lakes, artificial water bodies.
+          # Not the Baltic limited-activity belt 7311010300: it covers most of Jūrmala, so it
+          # gives no parcel-level signal and stays low (decided 2026-10-11).
           - "7311010100"
           - "7311010200"
-          - "7311010300"
           - "7311020101"
           - "7311020105"
           - "7311020206"
