@@ -20,7 +20,9 @@ ETL_DB = os.environ.get(
     "postgresql://kadastrs:kadastrs-dev@127.0.0.1:5432/kadastrs_test",
 )
 RESET = """
-TRUNCATE ref.admin_area, ref.address, ref.address_history, ref.kk_parcel, ref.kk_parcel_part,
+SET kadastrs.allow_truncate = on;
+TRUNCATE work.check_result, work.run_target, work.run_version, work.run,
+         ref.admin_area, ref.address, ref.address_history, ref.kk_parcel, ref.kk_parcel_part,
          ref.kk_building, ref.kk_servitude, ref.parcel, ref.parcel_part, ref.building,
          ref.building_parcel, ref.property, ref.property_object,
          ref.bis_case, ref.bis_object, ref.encumbrance, ref.atis_classifier,
