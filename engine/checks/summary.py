@@ -120,8 +120,9 @@ def summarize(conn, run_id: int) -> dict[str, Any] | None:
 def targets(conn, run_id: int) -> list[dict[str, Any]]:
     """One line per target: input, designation and per module status and risk."""
     out: dict[int, dict[str, Any]] = {}
-    for tno, inp, typ, des, addr, pno, warns, units in conn.execute(
-        """SELECT target_no, input, type, designation, given_address, project_no, warnings, units
+    for tno, inp, typ, des, addr, pno, warns, units, label, ino in conn.execute(
+        """SELECT target_no, input, type, designation, given_address, project_no, warnings, units,
+                  label, input_no
            FROM work.run_target WHERE run_id = %s ORDER BY target_no""",
         (run_id,),
     ):
@@ -134,6 +135,8 @@ def targets(conn, run_id: int) -> list[dict[str, Any]]:
             "project_no": pno,
             "warnings": warns,
             "units": units,
+            "label": label,  # e.g. "divdomīgs: zemes vienība" (batch input)
+            "input_no": ino,
             "modules": {},
         }
     for tno, module, status, reason, risk in conn.execute(

@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 from engine.checks import rules as rules_mod
 from engine.checks import runner, summary
 from engine.checks.contract import TargetIn
+from engine.checks.describe import describe
+from engine.checks.modules import BY_ID
 from engine.resolve.context import SourceUnavailable, resolve_config
 
 router = APIRouter(prefix="/api", tags=["runs"])
@@ -29,7 +31,8 @@ def _summary(conn, run_id: int) -> dict[str, Any]:
     s = summary.summarize(conn, run_id)
     if s is None:
         raise HTTPException(status_code=404, detail=f"pārbaude {run_id} nav atrasta")
-    return s
+    names = {m: BY_ID[m].name_lv for m in s["modules"] if m in BY_ID}
+    return s | {"module_names": names}
 
 
 @router.post("/runs", status_code=201)
@@ -63,6 +66,15 @@ def get_run_targets(request: Request, run_id: int) -> list[dict[str, Any]]:
         return summary.targets(conn, run_id)
 
 
+@router.get("/runs/{run_id}/inputs")
+def get_run_inputs(request: Request, run_id: int) -> list[dict[str, Any]]:
+    """The batch input rows (cleaned list) with their problems: rows that were not
+    checked, an unresolved address, a dropped applicant number ("Neatrasts")."""
+    with request.app.state.pool.connection() as conn:
+        _summary(conn, run_id)
+        return runner.stored_inputs(conn, run_id)
+
+
 @router.get("/runs/{run_id}/targets/{target_no}")
 def get_target_results(request: Request, run_id: int, target_no: int) -> dict[str, Any]:
     """Every result of one target: per module the target-level result (a
@@ -89,6 +101,8 @@ def get_target_results(request: Request, run_id: int, target_no: int) -> dict[st
             )
             data = r.model_dump(mode="json") | {
                 "summary_status": summary.bucket(r.module, r.status, r.reason),
+                "module_name": BY_ID[r.module].name_lv,
+                "items_text": [describe(r.module, i) for i in r.items],
                 # the fired rules with their report text (the run's stored rule set)
                 "rules": [
                     {"id": i, "level": by_id[i].level, "text_lv": by_id[i].text_lv}

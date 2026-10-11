@@ -4,7 +4,7 @@
                                    format=json (summary + report_url) or xlsx (the report)
   GET  /api/runs/{id}/report.xlsx  the report of a stored run (built from stored results)
   GET  /api/batch/template.xlsx    an empty input template
-  GET  /                           a plain page with one form, for colleagues without the CLI
+(The page at / is the results view, web/, served by api/web.py.)
 
 The uploaded file is read in memory and never written by this code (PLAN.md §1);
 Starlette may spool an upload over 1 MB to a temporary file that it deletes when
@@ -13,7 +13,6 @@ the request ends. Only the cleaned rows and the results are stored.
 
 import io
 from html import escape
-from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -31,7 +30,6 @@ router = APIRouter(tags=["batch"])
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 MAX_UPLOAD = 5 * 1024 * 1024  # 1,000 rows are far below this
-PAGE = Path(__file__).resolve().parent / "static" / "index.html"
 
 
 def _xlsx_response(data: bytes, name: str) -> Response:
@@ -136,8 +134,3 @@ def input_template() -> Response:
     buf = io.BytesIO()
     wb.save(buf)
     return _xlsx_response(buf.getvalue(), "saraksta_veidne.xlsx")
-
-
-@router.get("/", response_class=HTMLResponse, include_in_schema=False)
-def page() -> HTMLResponse:
-    return HTMLResponse(PAGE.read_text(encoding="utf-8"))

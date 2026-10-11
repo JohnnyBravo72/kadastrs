@@ -120,6 +120,27 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # --- web profile: `docker compose --profile web up web` -------------------------
+
+  # Vite dev server for frontend work (hot reload) at http://127.0.0.1:5173,
+  # proxying /api to the api service. Not needed to use the app: the api image
+  # serves the built view at http://127.0.0.1:8000/. Node runs only here.
+  web:
+    profiles: [web]
+    image: node:22.11.0-bookworm-slim
+    working_dir: /web
+    command: ["sh", "-c", "npm ci --ignore-scripts --no-audit --no-fund && npm run dev"]
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ../web:/web
+      - web_node_modules:/web/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+
   # --- test profile: `docker compose --profile test run --rm tests` -------------
 
   # Runs pytest on the api image's Python with the repo mounted at /src.
@@ -192,5 +213,6 @@ services:
 
 volumes:
   dbdata:
+  web_node_modules:
   etl_raw:
   precommit_cache:

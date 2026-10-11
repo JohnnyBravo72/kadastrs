@@ -1,6 +1,7 @@
 """FastAPI app: health check (Phase 1), input resolution (Phase 3, api/resolve.py),
-check runs (Phase 4, api/runs.py) and batch runs with the Excel report and a plain
-input page (Phase 5, api/batch.py)."""
+check runs (Phase 4, api/runs.py), batch runs with the Excel report (Phase 5,
+api/batch.py), map data (Phase 6, api/map.py) and the results
+view at / (api/web.py)."""
 
 import platform
 from contextlib import asynccontextmanager
@@ -13,6 +14,7 @@ from api.db import create_pool
 from api.map import router as map_router
 from api.resolve import router as resolve_router
 from api.runs import router as runs_router
+from api.web import mount as mount_web
 
 # Minimum PROJ for EPSG:10306 and EPSG:10838 (decision D9).
 MIN_PROJ = (9, 8)
@@ -58,6 +60,7 @@ app.include_router(resolve_router)
 app.include_router(runs_router)
 app.include_router(map_router)
 app.include_router(batch_router)
+mount_web(app)
 
 
 def _version_tuple(text: str) -> tuple[int, ...]:

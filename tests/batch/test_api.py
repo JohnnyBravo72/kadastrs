@@ -1,6 +1,7 @@
-"""POST /api/batch, the report download, the input page and the CLI (Phase 5)."""
+"""POST /api/batch, the report download, the web page and the CLI (Phase 5)."""
 
 import io
+import re
 
 import pytest
 from openpyxl import load_workbook
@@ -59,10 +60,10 @@ def test_unknown_run_report_is_404(client):
 
 
 def test_input_page_and_template(client):
-    page = client.get("/")
-    assert page.status_code == 200
-    assert 'action="/api/batch"' in page.text and 'enctype="multipart/form-data"' in page.text
-    assert 'name="file"' in page.text and 'name="text"' in page.text
+    page = client.get("/")  # the results view (web/, built in the image)
+    assert page.status_code == 200 and '<div id="root">' in page.text
+    script = re.search(r'src="(/assets/[^"]+\.js)"', page.text).group(1)
+    assert client.get(script).status_code == 200
     t = client.get("/api/batch/template.xlsx")
     ws = load_workbook(io.BytesIO(t.content)).active
     assert [c.value for c in ws[1]] == [

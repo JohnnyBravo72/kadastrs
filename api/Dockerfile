@@ -1,6 +1,16 @@
 # API image (target `runtime`), ETL runner (`etl`), check CLI (`check`) and test runner (`test`).
+# The results view (web/, Vite + React) is built in the `web` stage: Node runs only
+# in this container, never on the host (CLAUDE.md rule 12).
 # Build context is the repo root (see infra/docker-compose.yml).
 # Python minor must match .python-version (host venv and CI); tests check it.
+FROM node:22.11.0-bookworm-slim AS web
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+# --ignore-scripts: no install scripts from dependencies run in the build
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY web/ ./
+RUN npm test && npm run build
+
 FROM python:3.14-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -25,6 +35,8 @@ RUN pip install -c constraints.txt . \
 # there (cwd comes first on sys.path, so the mounted code is what gets tested).
 FROM base AS test
 RUN pip install -c constraints.txt ".[dev]"
+COPY --from=web /web/dist /app/web/dist
+ENV KADASTRS_WEB_DIST=/app/web/dist
 WORKDIR /src
 CMD ["python", "-m", "pytest", "-p", "no:cacheprovider"]
 
@@ -49,7 +61,8 @@ USER app
 ENTRYPOINT ["python", "-m", "engine.checks"]
 
 FROM base AS runtime
-ENV KADASTRS_CONFIG_DIR=/app/config
+ENV KADASTRS_CONFIG_DIR=/app/config     KADASTRS_WEB_DIST=/app/web/dist
+COPY --from=web /web/dist /app/web/dist
 COPY config/ config/
 USER app
 EXPOSE 8000

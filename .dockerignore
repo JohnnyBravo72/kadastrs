@@ -8,6 +8,7 @@ data
 docs
 etl/discovery
 tests
-web
+web/node_modules
+web/dist
 infra
 api/tests

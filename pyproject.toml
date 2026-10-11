@@ -32,9 +32,6 @@ dev = [
 include = ["api*", "etl*", "engine*", "reports*"]
 exclude = ["etl.discovery*", "*.tests*"]
 
-[tool.setuptools.package-data]
-api = ["static/*.html"]  # the plain input page (GET /)
-
 [tool.ruff]
 line-length = 100
 target-version = "py314"
