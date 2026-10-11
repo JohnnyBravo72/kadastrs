@@ -1,19 +1,199 @@
 # Risk rules (PLAN.md §6.4). The only place risk levels come from (CLAUDE.md rule 4).
-# Rule set v1 is decision D4: agreed with the team leads in Phase 4.
-# The rule-set version is printed on every report.
+# Rule set v1 is decision D4: to be agreed with the team leads. Until then it is a
+# DRAFT, and every run and report shows "status: draft" next to the version.
+# The engine stores this whole file with each run, so an old run is replayed with
+# the rules it was made with.
 
-version: "0.0.0"
+version: "1"
+status: draft          # draft | agreed
 
 # Spatial thresholds (PLAN.md §6.3), listed on the report's "Avoti" sheet.
 thresholds:
   inward_buffer_m: 0.5       # parcel geometry buffered inward before intersecting
   min_overlap_m2: 1.0        # a finding needs >= 1 m2 overlap ...
   min_overlap_share: 0.001   # ... or >= 0.1 % of the parcel
+  bis_nearby_m: 20           # module 5 "nearby": a BIS object point within this distance
 
-# Entries (Phase 4), e.g.:
-#   - id: nature_microreserve_overlap
-#     module: 3
-#     condition: "..."
-#     level: high            # high | medium | low | none | unknown
-#     text_lv: "..."
-rules: []
+# Worst first. A property's aggregate takes the worst risk of its units; "unknown"
+# ranks above "low" so a gap in the data is never hidden by a low finding.
+risk_order: [high, medium, unknown, low, none]
+
+# Level when no rule of the module fires, by status (rule id "default_<status>").
+defaults:
+  found: low
+  clear: none
+  not_covered: unknown
+  no_data: unknown
+  source_unavailable: unknown
+  error: unknown
+
+# Every rule: id, module, level, when (all conditions must hold), reason (why the
+# level, for the reviewers) and text_lv (shown in reports). Several rules may
+# fire; the result gets the worst level and lists every fired id.
+# Conditions:
+#   status / reason / match_type   equal to the value, or one of a list
+#   warning                        a warning with this code (or one of a list) is present
+#   item                           at least one item matches every field test;
+#                                  "<field>_gte" / "<field>_lt" compare numbers
+rules:
+  # --- 1 Kadastra dati ----------------------------------------------------------
+  - id: cadastre_facts_found
+    module: cadastre_facts
+    level: none
+    when: {status: found}
+    reason: "Register facts are context for the evaluator, not a risk in themselves."
+    text_lv: "Kadastra dati atrasti."
+  - id: cadastre_not_exist
+    module: cadastre_facts
+    level: medium
+    when: {warning: not_exist}
+    reason: "The register marks the building as not found on the ground; the object in the application may not exist."
+    text_lv: "Būve reģistrā atzīmēta kā neeksistējoša."
+  - id: cadastre_prereg
+    module: cadastre_facts
+    level: low
+    when: {warning: prereg}
+    reason: "Pre-registered building: registration is not complete, facts may change."
+    text_lv: "Pirmsreģistrēta būve."
+  - id: cadastre_not_in_register
+    module: cadastre_facts
+    level: unknown
+    when: {status: no_data}
+    reason: "Object missing from the cadastre text data: facts cannot be confirmed."
+    text_lv: "Objekts nav kadastra teksta datos."
+
+  # --- 2 Adreses atbilstība -------------------------------------------------------
+  - id: address_mismatch
+    module: address_consistency
+    level: medium
+    when: {status: found}
+    reason: "The address given in the application is not linked to the object (\"Neatbilst\"); the evaluator must clarify which object is meant."
+    text_lv: "Norādītā adrese neatbilst kadastra objektam."
+  - id: address_historical
+    module: address_consistency
+    level: low
+    when: {warning: historical_address}
+    reason: "The given address is deleted in VARIS; the application uses an outdated address."
+    text_lv: "Norādīta vēsturiska adrese."
+  - id: address_not_given
+    module: address_consistency
+    level: none
+    when: {status: no_data, reason: "adrese nav norādīta"}
+    reason: "No address given, nothing to compare. Counted as not applicable, not as a data gap."
+    text_lv: "Adrese nav norādīta."
+
+  # --- 3 Aizsargājamā daba (OZOLS) -----------------------------------------------------
+  - id: nature_protected_area
+    module: nature
+    level: high
+    when: {item: {kind: [protected_area, protected_area_zone]}}
+    reason: "Specially protected nature area (ĪADT) or its functional zone: activities are restricted by the area's regulations."
+    text_lv: "Objekts atrodas īpaši aizsargājamā dabas teritorijā vai tās zonā."
+  - id: nature_microreserve
+    module: nature
+    level: high
+    when: {item: {kind: microreserve}}
+    reason: "Microreserve core: economic activity is largely prohibited."
+    text_lv: "Objekts pārklājas ar mikroliegumu."
+  - id: nature_microreserve_buffer
+    module: nature
+    level: medium
+    when: {item: {kind: microreserve_buffer}}
+    reason: "Microreserve buffer zone: restrictions apply but are milder than in the core."
+    text_lv: "Objekts pārklājas ar mikrolieguma buferzonu."
+  - id: nature_monument
+    module: nature
+    level: medium
+    when: {item: {kind: nature_monument}}
+    reason: "Protected nature monument (e.g. a tree or a boulder) on the object: works near it need permission."
+    text_lv: "Objektā ir dabas piemineklis."
+  - id: nature_habitat
+    module: nature
+    level: medium
+    when: {item: {kind: habitat}}
+    reason: "Protected habitat mapped on the object: may require an expert opinion before works."
+    text_lv: "Objekts pārklājas ar aizsargājamu biotopu."
+  - id: nature_clear
+    module: nature
+    level: none
+    when: {status: clear}
+    reason: "No protected nature mapped on the object (above the overlap thresholds)."
+    text_lv: "Aizsargājamā daba nav konstatēta."
+
+  # --- 4 Plūdi (10 gadu) ----------------------------------------------------------------
+  - id: flood_10y_major
+    module: flood_10y
+    level: high
+    when: {item: {share_gte: 0.10}}
+    reason: "At least 10 % of the parcel lies in the 10-year spring flood zone."
+    text_lv: "Vismaz 10 % objekta atrodas 10 gadu plūdu zonā."
+  - id: flood_10y_minor
+    module: flood_10y
+    level: medium
+    when: {status: found}
+    reason: "Part of the parcel (above the overlap thresholds) lies in the 10-year spring flood zone."
+    text_lv: "Daļa objekta atrodas 10 gadu plūdu zonā."
+  - id: flood_not_covered
+    module: flood_10y
+    level: unknown
+    when: {status: not_covered}
+    reason: "Outside the area shown on the flood maps: either not modelled or dry even at 0.5 % (E7); open data cannot tell which."
+    text_lv: "Ārpus plūdu kartēs attēlotās teritorijas."
+  - id: flood_partly_covered
+    module: flood_10y
+    level: low
+    when: {status: clear, warning: partial_coverage}
+    reason: "Only part of the parcel lies inside the mapped area; the rest is not covered."
+    text_lv: "Plūdu karte aptver tikai daļu objekta."
+  - id: flood_clear
+    module: flood_10y
+    level: none
+    when: {status: clear}
+    reason: "Inside the mapped area and outside the 10-year zone."
+    text_lv: "10 gadu plūdu zonā nav."
+
+  # --- 5 Būvniecības lietas (BIS) --------------------------------------------------------
+  - id: bis_exact
+    module: bis
+    level: medium
+    when: {item: {match_type: [exact_building, building_on_parcel]}}
+    reason: "A construction case on this building, or on a building the cadastre links to this parcel: possible overlap with the project."
+    text_lv: "Būvniecības lieta uz šī objekta."
+  - id: bis_probable
+    module: bis
+    level: low
+    when: {item: {match_type: [probable_parcel, same_address_code]}}
+    reason: "A case matched only by designation prefix or address code; may concern this object."
+    text_lv: "Iespējama būvniecības lieta uz šī objekta (pēc apzīmējuma vai adreses)."
+  - id: bis_weak
+    module: bis
+    level: none
+    when: {status: found}
+    reason: "Cases on another object of the same property or nearby by coordinates: shown for manual review only."
+    text_lv: "Būvniecības lietas tuvumā vai citā tā paša īpašuma objektā."
+  - id: bis_clear
+    module: bis
+    level: none
+    when: {status: clear}
+    reason: "No construction case linked to the object."
+    text_lv: "Būvniecības lietas nav atrastas."
+
+  # --- 6 Apgrūtinājumi -----------------------------------------------------------------------
+  - id: encumbrance_registered
+    module: encumbrances
+    level: low
+    when: {item: {}}
+    reason: "Encumbrances are registered on the object; the evaluator checks whether they limit the planned works."
+    text_lv: "Objektam reģistrēti apgrūtinājumi."
+  - id: encumbrance_frozen_only
+    module: encumbrances
+    level: unknown
+    when: {warning: frozen_only}
+    reason: "An encumbrance is only in the frozen 2025-01-31 list, not in the current data: needs a manual check."
+    text_lv: "Apgrūtinājums tikai 2025-01-31 sarakstā – pārbaudīt manuāli."
+  - id: encumbrance_clear
+    module: encumbrances
+    level: none
+    when: {status: clear}
+    reason: "No encumbrance registered on the object."
+    text_lv: "Apgrūtinājumi nav reģistrēti."
