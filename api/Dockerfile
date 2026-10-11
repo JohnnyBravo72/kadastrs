@@ -14,6 +14,7 @@ COPY pyproject.toml constraints.txt ./
 COPY api/ api/
 COPY etl/ etl/
 COPY engine/ engine/
+COPY reports/ reports/
 RUN pip install -c constraints.txt . \
     && useradd --system --no-create-home app \
     && mkdir -p /data/raw && chown app /data/raw

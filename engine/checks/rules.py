@@ -99,6 +99,31 @@ class RuleSet(BaseModel):
     def modules(self) -> set[str]:
         return {r.module for r in self.rules}
 
+    def explain(
+        self, result: CheckResult, item: dict[str, Any] | None = None, warning: str | None = None
+    ) -> list[Rule]:
+        """The fired rules (result.rule_ids) that concern one item or warning of a
+        stored result, for the report's "Detaļas" lines: rules whose item test
+        matches the item, or whose warning test names the warning; else the
+        fired rules without an item test. Decides nothing (risk is in result.risk)."""
+        by_id = {r.id: r for r in self.rules}
+        fired = [by_id[i] for i in result.rule_ids if i in by_id]
+        if item is not None:
+            hits = [r for r in fired if "item" in r.when and _item_matches(item, r.when["item"])]
+            if hits:
+                return hits
+        if warning is not None:
+            hits = [r for r in fired if warning in _as_list(r.when.get("warning"))]
+            if hits:
+                return hits
+        return [r for r in fired if "item" not in r.when] or fired
+
+
+def _as_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
 
 def _one_of(value: Any, expected: Any) -> bool:
     return value in expected if isinstance(expected, list) else value == expected

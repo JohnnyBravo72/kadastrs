@@ -28,7 +28,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["api*", "etl*", "engine*"]
+include = ["api*", "etl*", "engine*", "reports*"]
 exclude = ["etl.discovery*", "*.tests*"]
 
 [tool.ruff]
