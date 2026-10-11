@@ -203,6 +203,7 @@ def test_bis_distinct_cases_and_match_types(conn):
     near = res[(2, "bis")]["target"]
     assert [(i["case_number"], i["match_type"]) for i in near.items] == [("BIS-C", "nearby")]
     assert near.risk == "none" and near.rule_ids == ["bis_weak"]
+    assert near.items[0]["match_label"] == "tuvumā (≤ 20 m), nav piesaistīts objektam"
 
 
 def test_bis_same_property(conn):
@@ -228,14 +229,21 @@ def test_encumbrances_list_parcel_and_parts(conn):
         ("09000360220", "7312030100", "Ceļa aizsargjosla (klasifikators)"),
         ("090003602200001", "7312050500", "aizsargjosla ap apakšstaciju"),
     ]
-    assert "frozen_only" not in codes(r)  # its frozen row is also current
+    assert all(i["frozen"] is False for i in r.items)
+    # 7312030100 is also current; 7399000000 is frozen-only: a warning line, no risk increase
+    frozen = [w.encumbrance_code for w in r.warnings if w.code == "frozen_only"]
+    assert frozen == ["7399000000"]
     assert r.risk == "low"
+    assert r.rule_ids == ["encumbrance_registered", "encumbrance_frozen_alongside_current"]
 
 
-def test_frozen_only_is_a_warning_never_clear(conn):
+def test_all_frozen_only_is_found_with_frozen_items_never_clear(conn):
     res = check(conn, parcel("13000102702"), sources=["cadastre_encumbrances"])
     r = res[(0, "encumbrances")]["target"]
-    assert (r.status, r.reason, r.items) == ("found", ONLY_FROZEN_REASON, [])
+    assert (r.status, r.reason) == ("found", ONLY_FROZEN_REASON)
+    assert [
+        (i["code"], i["description"], i["establish_date"], i["frozen"], i["flags"]) for i in r.items
+    ] == [("7311010000", "vecs apgrūtinājums", "2010-01-01", True, ["frozen"])]
     w = next(w for w in r.warnings if w.code == "frozen_only")
     assert w.message == FROZEN_ONLY
     assert (w.encumbrance_code, w.establish_date) == ("7311010000", "2010-01-01")

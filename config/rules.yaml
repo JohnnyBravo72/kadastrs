@@ -169,7 +169,7 @@ rules:
     module: bis
     level: none
     when: {status: found}
-    reason: "Cases on another object of the same property or nearby by coordinates: shown for manual review only."
+    reason: "Cases on another object of the same property, or nearby by coordinates (\"tuvumā (≤ 20 m), nav piesaistīts objektam\"): shown for manual review only."
     text_lv: "Būvniecības lietas tuvumā vai citā tā paša īpašuma objektā."
   - id: bis_clear
     module: bis
@@ -179,18 +179,26 @@ rules:
     text_lv: "Būvniecības lietas nav atrastas."
 
   # --- 6 Apgrūtinājumi -----------------------------------------------------------------------
+  # Items are current encumbrances (frozen: false), or, when ALL of an object's
+  # encumbrances are frozen-only, those frozen-only ones (frozen: true).
   - id: encumbrance_registered
     module: encumbrances
     level: low
-    when: {item: {}}
+    when: {item: {frozen: false}}
     reason: "Encumbrances are registered on the object; the evaluator checks whether they limit the planned works."
     text_lv: "Objektam reģistrēti apgrūtinājumi."
+  - id: encumbrance_frozen_alongside_current
+    module: encumbrances
+    level: none
+    when: {warning: frozen_only, item: {frozen: false}}
+    reason: "Frozen-only encumbrances next to current ones: shown as warning lines for a manual look, no risk increase (decided 2026-10-11)."
+    text_lv: "Papildus pašreizējiem – apgrūtinājumi tikai 2025-01-31 sarakstā (pārbaudīt manuāli)."
   - id: encumbrance_frozen_only
     module: encumbrances
     level: unknown
-    when: {warning: frozen_only}
-    reason: "An encumbrance is only in the frozen 2025-01-31 list, not in the current data: needs a manual check."
-    text_lv: "Apgrūtinājums tikai 2025-01-31 sarakstā – pārbaudīt manuāli."
+    when: {status: found, reason: "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli"}
+    reason: "All of the object's encumbrances are only in the frozen 2025-01-31 list, none in the current data: needs a manual check (decided 2026-10-11)."
+    text_lv: "Visi apgrūtinājumi tikai 2025-01-31 sarakstā – pārbaudīt manuāli."
   - id: encumbrance_clear
     module: encumbrances
     level: none

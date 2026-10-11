@@ -14,8 +14,8 @@
   - Risk rules v1 are a **draft** in `config/rules.yaml` (`status: draft`, reason per rule), awaiting review (D4). Each run stores the whole rule set; the aggregate order is `high > medium > unknown > low > none`.
   - §6.3 reading: the 0.5 m inward-buffered overlap decides whether there is a finding (≥ 1 m² or ≥ 0.1 %); the m² and % reported are those of the whole unit (a parcel fully in the zone shows 100 %).
   - Module 2 runs once per target; without a given address it is `no_data` "adrese nav norādīta", **counted as "not applicable", not as a data gap**, in summaries and the Excel report (decided 2026-10-11, Janis).
-  - Module 5 adds "nearby": a BIS object point (WGS84 coordinates as published) within 20 m of the unit (`bis_nearby_m`).
-  - Module 6: an object whose only encumbrances are frozen-only is `found` with reason "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli", never `clear`; the draft rule gives it risk `unknown`.
+  - Module 5 adds "nearby": a BIS object point (WGS84 coordinates as published) within 20 m of the unit (`bis_nearby_m`), labelled **"tuvumā (≤ 20 m), nav piesaistīts objektam"**, risk `none` (agreed 2026-10-11).
+  - Module 6 (decided 2026-10-11, Janis): frozen-only encumbrances are always warning lines. Next to current encumbrances they add **no risk** (rule level `none`). Only an object whose encumbrances are **all** frozen-only gets risk `unknown`; it is `found` with reason "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli" and lists them as items flagged `frozen` (code, description, date), never `clear`. On 100 pilot parcels: 51 had frozen-only lines next to current ones, 1 had only frozen-only ones.
   - API `POST /api/runs`, `GET /api/runs/{id}`, `/targets`, `/targets/{no}`; CLI `docker compose run --rm check run|show|replay|compare`.
   - Comparison tool for the returned test-set templates (`check compare`). Phase 4's "done when" (findings match the colleagues' answers) waits for those files.
 - 2026-10-10 (Phase 3): input resolution built (§5).

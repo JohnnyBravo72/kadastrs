@@ -181,8 +181,8 @@ The check engine (`engine/checks`, PLAN.md §6) runs modules 1–6 on resolved o
 | 2 Adreses atbilstība | `address_consistency` | `clear` (given address linked), `found` "Neatbilst", `no_data` "adrese nav norādīta" (**counted as `not_applicable`** in summaries) |
 | 3 Aizsargājamā daba | `nature` | `found` (one line per feature and kind), `clear`, `no_data` "nav ģeometrijas" |
 | 4 Plūdi (10 gadu) | `flood_10y` | `found`, `clear` (warning `partial_coverage` if part of the unit is outside the mask), `not_covered` (outside the 200-year mask), `no_data` |
-| 5 Būvniecības lietas | `bis` | `found` (one item per distinct case, best match type first), `clear` |
-| 6 Apgrūtinājumi | `encumbrances` | `found`, `found` with reason "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli" (frozen-only, never `clear`), `clear` |
+| 5 Būvniecības lietas | `bis` | `found` (one item per distinct case, best match type first, with `match_label`, e.g. "tuvumā (≤ 20 m), nav piesaistīts objektam"), `clear` |
+| 6 Apgrūtinājumi | `encumbrances` | `found` (current encumbrances; frozen-only ones next to them are warning lines, no risk increase), `found` with reason "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli" (all frozen-only: listed as items with `frozen: true`, risk `unknown`, never `clear`), `clear` |
 
 Any module can also give `source_unavailable` (no live version) or `error` (reason holds the exception). **Risk comes only from `config/rules.yaml`** (mounted; edits apply to the next run). Rule set v1 is a **draft** (`status: draft`); each run stores the whole rule set and its SHA-256, and summaries show version and status. Thresholds (§6.3) are in the same file: 0.5 m inward buffer, overlap ≥ 1 m² or ≥ 0.1 %, BIS "nearby" 20 m. The buffered overlap decides whether there is a finding; the m² and % reported are those of the whole unit.
 

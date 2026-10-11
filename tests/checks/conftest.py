@@ -18,7 +18,8 @@ BIS: case A twice (duplicate rows) on building 09000360220002; case B by the
   address code 101765287; case C a point 5 m from 13000102702 (nearby); case D
   a building 09000360220099 missing from the cadastre (probable parcel).
 Encumbrances: 09000360220 and its part have current ones; 13000102702 has only a
-  frozen-only one; 09000360220's frozen row is also current (not frozen-only).
+  frozen-only one; 09000360220 has one frozen row that is also current and one
+  frozen-only (code 7399000000) next to its current ones.
 Geometry: building 09000360220012 has none (its parcel has: parcel level);
   parcel 05000040099 and its building 05000040099001 have none (no_data).
 Address: 09000050405 has VARIS 101000005, the successor of deleted 101154013.
@@ -201,7 +202,11 @@ def seed_checks(conn) -> None:
         " VALUES (%s, '7312030100', 'ATIS', 'Ceļa aizsargjosla (klasifikators)')",
         (V["atis_classifier"],),
     )
-    for row_no, obj, code in [(1, "13000102702", "7311010000"), (2, "09000360220", "7312030100")]:
+    for row_no, obj, code in [
+        (1, "13000102702", "7311010000"),
+        (2, "09000360220", "7312030100"),
+        (3, "09000360220", "7399000000"),
+    ]:
         conn.execute(
             "INSERT INTO ref.encumbrance_frozen (dataset_version_id, file_role, row_no,"
             " object_code, object_kind, code, description, establish_date, frozen_as_of, flags)"

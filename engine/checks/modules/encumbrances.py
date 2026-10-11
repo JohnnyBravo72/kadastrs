@@ -4,9 +4,14 @@ A list per object from the cadastre text data: a parcel with its parcel parts,
 a parcel part, or a building. No ATIS geometries are open, so there is no
 spatial overlap. Frozen-only encumbrances (in the 2025-01-31 list, object still
 in the cadastre, code not in the current list; ref.encumbrance_frozen_status)
-are never items: each is a warning line "apgrūtinājums no 2025-01-31 saraksta,
-pašreizējos datos nav – pārbaudīt manuāli", and an object whose only
-encumbrances are frozen-only is `found` with that reason, never `clear`.
+are always a warning line each: "apgrūtinājums no 2025-01-31 saraksta,
+pašreizējos datos nav – pārbaudīt manuāli".
+- Object with current encumbrances: items = the current ones (frozen: false);
+  its frozen-only ones stay warning lines only.
+- Object whose encumbrances are ALL frozen-only: `found` with reason
+  "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli", items = the
+  frozen-only ones (frozen: true, flags ["frozen"]), never `clear`.
+Risk for both cases comes from rules.yaml (decided 2026-10-11).
 """
 
 from engine.checks.context import RunContext
@@ -62,9 +67,11 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
                 "area": _num(area),
                 "measure": measure,
                 "row_no": row_no,
+                "frozen": False,
             }
         )
     frozen: dict[str, list[Warning_]] = {}
+    frozen_items: dict[str, list[dict]] = {}
     for obj, code, desc, date, file_role, row_no in c.execute(
         """SELECT s.object_code, s.code, f.description, f.establish_date, s.file_role, s.row_no
            FROM ref.encumbrance_frozen_status(%s, %s, %s) s
@@ -85,6 +92,17 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
                 evidence=f"{file_role}:{row_no}",
             )
         )
+        frozen_items.setdefault(obj, []).append(
+            {
+                "object_code": obj,
+                "code": code,
+                "description": desc,
+                "establish_date": date.isoformat() if date else None,
+                "frozen": True,
+                "flags": ["frozen"],
+                "evidence": f"{file_role}:{row_no}",
+            }
+        )
 
     out: dict[str, CheckResult] = {}
     for u in units:
@@ -99,7 +117,10 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
         if items:
             out[u.key] = make(SPEC, ctx, u, "found", items=items, warnings=warns)
         elif warns:
-            out[u.key] = make(SPEC, ctx, u, "found", reason=ONLY_FROZEN_REASON, warnings=warns)
+            only = [i for o in objects[u.code] for i in frozen_items.get(o, [])]
+            out[u.key] = make(
+                SPEC, ctx, u, "found", reason=ONLY_FROZEN_REASON, items=only, warnings=warns
+            )
         else:
             out[u.key] = make(SPEC, ctx, u, "clear")
     return out
@@ -108,7 +129,7 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
 SPEC = ModuleSpec(
     id="encumbrances",
     no=6,
-    version="1",
+    version="2",
     name_lv="Apgrūtinājumi",
     selectors=("cadastre_encumbrances",),
     reads=("cadastre_encumbrances", "cadastre_text", "encumbrances_frozen", "atis_classifier"),

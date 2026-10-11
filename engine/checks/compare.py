@@ -251,7 +251,7 @@ def _detail(module: str, r) -> str | None:
     if module == "bis":
         return "; ".join(f"{i['case_number']} ({i['match_type']})" for i in r.items) or None
     if module == "encumbrances":
-        codes = [i["code"] for i in r.items]
+        codes = [i["code"] for i in r.items if not i.get("frozen")]
         frozen = [w.encumbrance_code for w in r.warnings if w.code == "frozen_only"]
         parts = [", ".join(codes)] if codes else []
         if frozen:

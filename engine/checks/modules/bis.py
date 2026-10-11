@@ -26,6 +26,14 @@ MATCH_ORDER = [
     "nearby",
 ]
 STRONG = ("exact_building", "building_on_parcel", "probable_parcel")
+MATCH_LABEL = {
+    "exact_building": "šī būve",
+    "building_on_parcel": "būve uz šīs zemes vienības",
+    "probable_parcel": "iespējami šī zemes vienība (pēc apzīmējuma)",
+    "same_address_code": "tā pati adrese",
+    "same_property": "cits tā paša īpašuma objekts",
+    "nearby": "tuvumā (≤ {m:g} m), nav piesaistīts objektam",
+}
 
 
 def _links_table(ctx: RunContext) -> None:
@@ -144,6 +152,7 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
                 {
                     "case_number": case,
                     "match_type": types[0],
+                    "match_label": MATCH_LABEL[types[0]].format(m=ctx.thresholds.bis_nearby_m),
                     "match_types": types,
                     "objects": sorted(o for o in e["objects"] if o),
                     "row_nos": sorted(e["row_nos"]),
@@ -173,7 +182,7 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
 SPEC = ModuleSpec(
     id="bis",
     no=5,
-    version="1",
+    version="2",
     name_lv="Būvniecības lietas (BIS)",
     selectors=("bis_cases",),
     reads=("bis_cases", "cadastre_text", "cadastre_spatial"),
@@ -182,7 +191,7 @@ SPEC = ModuleSpec(
         kind="table",
         columns=[
             "case_number",
-            "match_type",
+            "match_label",
             "object_name",
             "stage",
             "construction_kind",
