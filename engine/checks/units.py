@@ -50,6 +50,18 @@ class Target:
     units: list[Unit]
     property_units: bool  # True: a property checked per unit plus an aggregate
     target_obj: CadastreObject | None = None  # the property itself
+    # notes on the whole target made here, e.g. "pārbaudītas 5 no 12 vienībām"
+    notes: list[Warning_] = field(default_factory=list)
+
+
+def selection_note(selected: int, total: int, missing: list[str]) -> Warning_ | None:
+    """The target warning for a partial unit selection (entry dialog, Phase 7)."""
+    if selected >= total and not missing:
+        return None
+    msg = f"pārbaudītas {selected} no {total} īpašuma vienībām (atzīmētās ievades logā)"
+    if missing:
+        msg += f"; īpašumā nav atrastas: {', '.join(missing)}"
+    return Warning_(code="units_selected", message=msg, selected=selected, total=total)
 
 
 def _w(note) -> Warning_:
@@ -59,17 +71,26 @@ def _w(note) -> Warning_:
 def expand(ctx: RunContext, targets: list[TargetIn]) -> list[Target]:
     v = ctx.cadastre
     out: list[Target] = []
-    plans: list[tuple[TargetIn, list[tuple[str, str, list[Warning_]]], bool]] = []
+    plans: list[tuple[TargetIn, list[tuple[str, str, list[Warning_]]], bool, list[Warning_]]] = []
     for t in targets:
         if t.type == "property":
             pu = cadastre.property_units(ctx.conn, v, t.designation, include_non_existing=False)
             if pu is None:
-                plans.append((t, [("property", t.designation, [])], False))
+                plans.append((t, [("property", t.designation, [])], False, []))
                 continue
             plan: list[tuple[str, str, list[Warning_]]] = []
             seen: set[str] = set()
-            parcels = {u.designation for u in pu.units if u.type == "parcel"}
-            for u in pu.units:
+            chosen = pu.units
+            notes: list[Warning_] = []
+            if t.unit_selection is not None:
+                wanted = {(u.type, u.designation) for u in t.unit_selection}
+                chosen = [u for u in pu.units if (u.type, u.designation) in wanted]
+                have = {(u.type, u.designation) for u in chosen}
+                missing = sorted(d for typ, d in wanted if (typ, d) not in have)
+                note = selection_note(len(chosen), len(pu.units), missing)
+                notes = [note] if note else []
+            parcels = {u.designation for u in chosen if u.type == "parcel"}
+            for u in chosen:
                 code, utype, warns = u.designation, u.type, []
                 if u.type == "premise_group":
                     code, utype = u.building_code or u.designation[:14], "building"
@@ -85,18 +106,18 @@ def expand(ctx: RunContext, targets: list[TargetIn]) -> list[Target]:
                     continue
                 seen.add(code)
                 plan.append((utype, code, warns))
-            plans.append((t, plan, True))
+            plans.append((t, plan, True, notes))
         elif t.type == "premise_group":
             b = t.designation[:14]
             note = Warning_(
                 code="premise_group_to_building",
                 message=f"telpu grupa {t.designation}: pārbauda būvi {b}",
             )
-            plans.append((t, [("building", b, [note])], False))
+            plans.append((t, [("building", b, [note])], False, []))
         else:
-            plans.append((t, [(t.type, t.designation, [])], False))
+            plans.append((t, [(t.type, t.designation, [])], False, []))
 
-    codes = {code for _, plan, _ in plans for _, code, _ in plan}
+    codes = {code for _, plan, _, _ in plans for _, code, _ in plan}
     facts = cadastre.fetch(ctx.conn, v, codes)
     by_type = {
         "parcel": facts.parcels,
@@ -104,9 +125,9 @@ def expand(ctx: RunContext, targets: list[TargetIn]) -> list[Target]:
         "parcel_part": facts.parts,
         "property": facts.properties,
     }
-    for no, (t, plan, per_unit) in enumerate(plans):
+    for no, (t, plan, per_unit, notes) in enumerate(plans):
         units = [Unit(utype, code, by_type[utype].get(code), warns) for utype, code, warns in plan]
-        out.append(Target(no, t, units, per_unit, facts.properties.get(t.designation)))
+        out.append(Target(no, t, units, per_unit, facts.properties.get(t.designation), notes))
     return out
 
 

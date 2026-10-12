@@ -27,8 +27,8 @@ from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from engine.checks import grouping, runner, summary
 from engine.checks import rules as rules_mod
-from engine.checks import runner, summary
 from engine.checks.contract import CheckResult
 from engine.checks.describe import describe
 from engine.checks.modules import BY_ID
@@ -113,11 +113,16 @@ class ReportData:
     rows: list[runner.Row]
     rules: RuleSet
     centres: dict[str, tuple[float, float]] = field(default_factory=dict)  # flood viewer links
+    # the project grouping the report follows (engine/checks/grouping.py); None = input's
+    grouping: dict[str, Any] | None = None
 
 
-def load(conn, run_id: int, rows: list[runner.Row] | None = None) -> ReportData | None:
+def load(
+    conn, run_id: int, rows: list[runner.Row] | None = None, grouping_id: int | None = None
+) -> ReportData | None:
     """Everything the report shows, from the stored run. `rows`: results to show
-    instead of the stored ones (a replay of the same run)."""
+    instead of the stored ones (a replay of the same run). `grouping_id`: the
+    grouping row to follow; None = the run's current grouping."""
     head = summary.run_header(conn, run_id)
     if head is None:
         return None
@@ -150,6 +155,7 @@ def load(conn, run_id: int, rows: list[runner.Row] | None = None) -> ReportData 
         rows=rows,
         rules=rules_mod.from_json(rule_set),
         centres=geo.centres(conn, run_id, [r.unit_code for r in rows]),
+        grouping=grouping.current(conn, run_id, grouping_id),
     )
 
 
@@ -286,6 +292,14 @@ def _warnings(target: dict[str, Any], results: dict[str, CheckResult]) -> str:
     return "\n".join(lines)
 
 
+def _projects(data: ReportData) -> dict[int, str | None]:
+    """Project per target from the grouping ("Bez projekta" = empty, as before)."""
+    if data.grouping is None:
+        return {t["target_no"]: t["project_no"] for t in data.targets}
+    names = grouping.group_names(data.grouping)
+    return {t: None if n == grouping.NONE_NAME else n for t, n in names.items()}
+
+
 def _summary_sheet(wb: Workbook, data: ReportData) -> None:
     modules = _modules(data)
     columns = [
@@ -306,6 +320,7 @@ def _summary_sheet(wb: Workbook, data: ReportData) -> None:
     ws = _sheet(wb, "Kopsavilkums", columns, first=True)
     results = _by_target(data)
     inputs = {i["input_no"]: i for i in data.inputs}
+    project = _projects(data)
     row = 1
     for t in data.targets:
         row += 1
@@ -314,7 +329,7 @@ def _summary_sheet(wb: Workbook, data: ReportData) -> None:
         values = [
             (t["target_no"] + 1, False),
             (inp.get("row_no"), False),
-            (t["project_no"], True),
+            (project.get(t["target_no"]), True),
             (t["input"], True),
             (t["designation"], True),
             (TYPE_LV.get(t["type"], t["type"]), False),
@@ -552,6 +567,12 @@ def _freshness(v: dict[str, Any]) -> tuple[str, str | None, str | None, str | No
     return ("novecojuši" if stale else "aktuāli"), reason, None, None, fill
 
 
+RERUN_LV = {
+    "sources": "(Atjaunot: tās pašas datu versijas, mainīta avotu izvēle)",
+    "latest": "(pārbaudīts ar jaunākajiem datiem)",
+}
+
+
 def _sources_sheet(wb: Workbook, data: ReportData) -> None:
     columns = [
         ("Avots", 34),
@@ -612,6 +633,22 @@ def _sources_sheet(wb: Workbook, data: ReportData) -> None:
             created.strftime("%Y-%m-%d %H:%M %Z") if isinstance(created, datetime) else created,
         ),
         ("Izcelsme", data.head["origin"]),
+        *(
+            [
+                (
+                    "Izveidota no pārbaudes",
+                    f"nr. {data.head['parent_run_id']} "
+                    + RERUN_LV.get(data.head["rerun_kind"], data.head["rerun_kind"]),
+                )
+            ]
+            if data.head.get("parent_run_id")
+            else []
+        ),
+        *(
+            [("Projektu grupējums", grouping.label(data.grouping))]
+            if data.grouping is not None
+            else []
+        ),
         ("Moduļi", ", ".join(f"{BY_ID[m].no}. {BY_ID[m].name_lv}" for m in _modules(data))),
         ("Dzinēja versija", data.head["engine_version"]),
         ("", None),

@@ -62,6 +62,7 @@ MAX_SUGGESTIONS = 10
 class Prepared:
     targets: list[TargetIn] = field(default_factory=list)
     inputs: list[dict[str, Any]] = field(default_factory=list)
+    resolved: list[ResolvedRow] = field(default_factory=list)  # per input row (preview)
 
 
 def _problem(column: str, status: str, reason: str | None, matches: list[Match] = ()) -> dict:
@@ -188,6 +189,21 @@ def _objects(rr: ResolvedRow, kind: str | None):
     return [], _problem("vertiba", rr.status, reason, rr.matches)
 
 
+def _select(rr: ResolvedRow, objects: list, selected: list[dict] | None):
+    """Entry dialog: only the ticked objects of an address are checked (a
+    property's ticked units are passed on to the engine as its unit selection)."""
+    if selected is None or not objects or not (rr.status == "resolved" and rr.type == "address"):
+        return objects, None
+    wanted = {(s["type"], s["designation"]) for s in selected}
+    kept = [o for o in objects if (o[0], o[1]) in wanted]
+    if kept:
+        many = len(kept) > 1
+        return [
+            (t, d, f"adresei {len(kept)} objekti" if many else None, a) for t, d, _, a in kept
+        ], None
+    return [], _problem("vertiba", "no_objects", "neviens adreses objekts nav atzīmēts")
+
+
 def prepare(conn, rows: list[InputRow]) -> Prepared:
     """Resolve the rows (nothing is stored here)."""
     v = live_versions(conn)
@@ -235,6 +251,8 @@ def prepare(conn, rows: list[InputRow]) -> Prepared:
             )
         else:
             objects, p_value = _objects(rr, kind)
+            objects, p_sel = _select(rr, objects, row.selected)
+            p_value = p_value or p_sel
         given, given_notes, p_addr = given_address(addr_rows.get(i))
         problems += [x for x in (p_value, p_kind, p_addr, p_reg) if x]
         target_nos = []
@@ -261,8 +279,10 @@ def prepare(conn, rows: list[InputRow]) -> Prepared:
                         input_no=i,
                         label=label,
                         applicant_reg_no=reg,
+                        unit_selection=row.selected if typ == "property" else None,
                     )
                 )
+        out.resolved.append(rr)
         out.inputs.append(
             {
                 "input_no": i,
@@ -287,3 +307,41 @@ def run_batch(
     row is stored, so its report lists every row on "Neatrasts"."""
     prepared = prepare(conn, rows)
     return runner.start_run(conn, prepared.targets, sources, origin=origin, inputs=prepared.inputs)
+
+
+def preview(conn, rows: list[InputRow]) -> list[dict[str, Any]]:
+    """The import preview (entry dialog, §8.1 step 6): per row the detected type,
+    match status, corrections, warnings, duplicates and the objects it would
+    check. Nothing is stored. A value that looks like a personal code is not
+    shown (CLAUDE.md rule 5)."""
+    p = prepare(conn, rows)
+    out = []
+    for inp, rr in zip(p.inputs, p.resolved, strict=True):
+        hidden = inp["status"] == "not_stored"
+        dup = rr.duplicate_of
+        out.append(
+            {
+                "row_no": inp["row_no"],
+                "value": inp["value"],
+                "kind": None if hidden else rr.kind,
+                "type": None if hidden else rr.type,
+                "status": inp["status"],
+                "checked": bool(inp["target_nos"]),
+                "project_no": inp["project_no"],
+                "address": inp["address"],
+                "applicant_reg_no": inp["applicant_reg_no"],
+                "corrections": [] if hidden else [c.message for c in rr.corrections],
+                "warnings": [] if hidden else [w.message for w in rr.warnings],
+                "duplicate_of": None if dup is None else p.inputs[dup]["row_no"],
+                "problems": inp["problems"],
+                "targets": [
+                    {
+                        "type": p.targets[n].type,
+                        "designation": p.targets[n].designation,
+                        "label": p.targets[n].label,
+                    }
+                    for n in inp["target_nos"]
+                ],
+            }
+        )
+    return out

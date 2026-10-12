@@ -51,6 +51,9 @@ class InputRow:
     project_no: str | None = None
     address: str | None = None
     applicant: str | None = None
+    # entry dialog (Phase 7): the ticked units of a property, or the ticked objects
+    # at an address ([{type, designation}]); None = all
+    selected: list[dict[str, str]] | None = None
 
 
 def text_of(value: Any) -> str | None:

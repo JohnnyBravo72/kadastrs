@@ -63,6 +63,13 @@ class CheckResult(BaseModel):
         return self.model_dump(mode="json", exclude={"computed_at"})
 
 
+class UnitRef(BaseModel):
+    """A unit of a property or an object at an address, as ticked in the entry dialog."""
+
+    type: UnitType
+    designation: str = Field(pattern=r"^[0-9]{11}([0-9]{3,4}|[0-9]{6})?$")
+
+
 class TargetIn(BaseModel):
     """One resolved object to check (from POST /api/resolve, chosen by the user)."""
 
@@ -78,3 +85,5 @@ class TargetIn(BaseModel):
     input_no: int | None = None
     label: str | None = None
     applicant_reg_no: str | None = Field(default=None, pattern=r"^[459][0-9]{10}$")
+    # entry dialog (Phase 7): the property's units ticked; None = all units
+    unit_selection: list[UnitRef] | None = None

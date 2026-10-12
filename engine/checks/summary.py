@@ -31,7 +31,7 @@ def run_header(conn, run_id: int) -> dict[str, Any] | None:
     row = conn.execute(
         """SELECT id, created_at, finished_at, status, origin, sources, modules, engine_version,
                   rule_set_version, rule_set_status, rule_set_sha256, rule_set->'risk_order',
-                  rule_set->'thresholds', error
+                  rule_set->'thresholds', error, parent_run_id, rerun_kind, checked_as_of
            FROM work.run WHERE id = %s""",
         (run_id,),
     ).fetchone()
@@ -52,6 +52,9 @@ def run_header(conn, run_id: int) -> dict[str, Any] | None:
         risk_order,
         thresholds,
         error,
+        parent_run_id,
+        rerun_kind,
+        checked_as_of,
     ) = row
     versions = [
         info | {"dataset_version_id": vid}
@@ -79,6 +82,9 @@ def run_header(conn, run_id: int) -> dict[str, Any] | None:
         },
         "dataset_versions": versions,
         "error": error,
+        "parent_run_id": parent_run_id,
+        "rerun_kind": rerun_kind,  # sources ("Atjaunot") | latest
+        "checked_as_of": checked_as_of,  # evaluation time when not created_at
     }
 
 

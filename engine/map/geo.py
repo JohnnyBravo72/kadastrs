@@ -65,7 +65,8 @@ def collection(features: list[dict], **extra) -> dict[str, Any]:
 
 def _run_context(conn, run_id: int) -> RunContext:
     row = conn.execute(
-        "SELECT created_at, sources, rule_set FROM work.run WHERE id = %s", (run_id,)
+        "SELECT coalesce(checked_as_of, created_at), sources, rule_set FROM work.run WHERE id = %s",
+        (run_id,),
     ).fetchone()
     if row is None:
         raise NotFound(f"pārbaude {run_id} nav atrasta")

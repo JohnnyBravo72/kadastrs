@@ -192,7 +192,7 @@ def compute(
                     members=t.units,
                 )
                 r = _run_module(spec, ctx, [u])[u.key]
-                extra = [*t.given.warnings, *(lead.warnings if lead else [])]
+                extra = [*t.given.warnings, *t.notes, *(lead.warnings if lead else [])]
                 r = rules.apply(_with_target_warnings(r, extra))
                 rows.append(Row(t.no, "target", u.type, u.code, r))
             continue
@@ -213,7 +213,7 @@ def compute(
             else:
                 pu = Unit("property", t.given.designation, t.target_obj)
                 agg = rules.apply(make(spec, ctx, pu, "no_data", reason=NO_UNITS))
-            agg = _with_target_warnings(agg, list(t.given.warnings))
+            agg = _with_target_warnings(agg, [*t.given.warnings, *t.notes])
             rows.append(Row(t.no, "target", "property", t.given.designation, agg))
     return targets, rows
 
@@ -232,6 +232,16 @@ def _j(x) -> str:
     return json.dumps(x, ensure_ascii=False)
 
 
+@dataclass
+class Parent:
+    """A new run made from a stored one (Phase 7)."""
+
+    run_id: int
+    kind: str  # sources: "Atjaunot", same pinned versions | latest: live versions
+    pinned: dict[str, Pinned] | None = None  # kind sources: the parent's versions
+    checked_as_of: datetime | None = None  # kind sources: the parent's evaluation time
+
+
 def start_run(
     conn,
     targets_in: list[TargetIn],
@@ -239,23 +249,29 @@ def start_run(
     origin: str = "api",
     rules: RuleSet | None = None,
     inputs: list[dict[str, Any]] | None = None,
+    parent: Parent | None = None,
 ) -> int:
     """Check the targets now and store the run; returns the run id. Commits.
-    `inputs`: the cleaned batch input rows (work.run_input), stored with the run."""
+    `inputs`: the cleaned batch input rows (work.run_input), stored with the run.
+    `parent`: the run this one is made from; with its pinned versions (and
+    evaluation time) the new run reads exactly the same data."""
     rules = rules or rules_mod.load()
+    reuse = parent is not None and parent.pinned is not None
     # Look at the sources' latest releases before the transaction (network, no DB).
-    remotes = freshness.fetch_remote()
+    remotes = None if reuse else freshness.fetch_remote()
     with conn.transaction():
         run_at = conn.execute("SELECT now()").fetchone()[0]
         selected_list = sources if sources is not None else default_sources(conn)
         check_sources(conn, selected_list)
         selected = set(selected_list)
         modules = modules_for(selected)
-        pinned = pin_live(conn, run_at, remotes)
+        pinned = parent.pinned if reuse else pin_live(conn, run_at, remotes)
+        as_of = parent.checked_as_of if reuse else None
         run_id = conn.execute(
             """INSERT INTO work.run (created_at, origin, sources, modules, engine_version,
-                   rule_set_version, rule_set_status, rule_set_sha256, rule_set)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                   rule_set_version, rule_set_status, rule_set_sha256, rule_set,
+                   parent_run_id, rerun_kind, checked_as_of)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
             (
                 run_at,
                 origin,
@@ -266,6 +282,9 @@ def start_run(
                 rules.status,
                 rules.sha256,
                 _j(rules.as_json()),
+                parent.run_id if parent else None,
+                parent.kind if parent else None,
+                as_of,
             ),
         ).fetchone()[0]
         with conn.cursor() as cur:
@@ -273,13 +292,13 @@ def start_run(
                 "INSERT INTO work.run_version VALUES (%s, %s, %s, %s)",
                 [(run_id, p.source_id, p.version_id, _j(p.info)) for p in pinned.values()],
             )
-        targets, rows = compute(conn, rules, run_at, pinned, selected, modules, targets_in)
+        targets, rows = compute(conn, rules, as_of or run_at, pinned, selected, modules, targets_in)
         with conn.cursor() as cur:
             cur.executemany(
                 """INSERT INTO work.run_target (run_id, target_no, input, type, designation,
                        given_address, project_no, input_no, label, applicant_reg_no,
-                       warnings, units)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                       warnings, units, unit_selection)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 [
                     (
                         run_id,
@@ -303,6 +322,9 @@ def start_run(
                                 for u in t.units
                             ]
                         ),
+                        None
+                        if t.given.unit_selection is None
+                        else _j([u.model_dump() for u in t.given.unit_selection]),
                     )
                     for t in targets
                 ],
@@ -457,10 +479,11 @@ def load_targets(conn, run_id: int) -> list[TargetIn]:
             input_no=ino,
             label=label,
             applicant_reg_no=reg,
+            unit_selection=sel,
         )
-        for typ, d, inp, ga, pno, warns, ino, label, reg in conn.execute(
+        for typ, d, inp, ga, pno, warns, ino, label, reg, sel in conn.execute(
             "SELECT type, designation, input, given_address, project_no, warnings,"
-            " input_no, label, applicant_reg_no"
+            " input_no, label, applicant_reg_no, unit_selection"
             " FROM work.run_target WHERE run_id = %s ORDER BY target_no",
             (run_id,),
         )
@@ -471,7 +494,9 @@ def replay(conn, run_id: int) -> list[Row]:
     """Recompute a stored run from its pinned versions and rule-set snapshot.
     Nothing is written."""
     created_at, sources, modules, rule_set = conn.execute(
-        "SELECT created_at, sources, modules, rule_set FROM work.run WHERE id = %s", (run_id,)
+        "SELECT coalesce(checked_as_of, created_at), sources, modules, rule_set"
+        " FROM work.run WHERE id = %s",
+        (run_id,),
     ).fetchone()
     rules = rules_mod.from_json(rule_set)
     pinned = load_pinned(conn, run_id)
@@ -492,3 +517,76 @@ def sort_rows(rows: list[Row]) -> list[Row]:
     return sorted(
         rows, key=lambda r: (r.target_no, r.result.module_no, r.scope != "unit", r.unit_code)
     )
+
+
+# --- new runs from a stored run (Phase 7) ---------------------------------------------------
+
+
+class RunNotFound(LookupError):
+    pass
+
+
+def rerun(conn, run_id: int, sources: list[str] | None, kind: str, origin: str = "api") -> int:
+    """A new run with the same targets (unit selections included), input rows and
+    current grouping as run `run_id`; the stored run is not touched.
+      kind "sources" ("Atjaunot"): the parent's pinned versions, rule set and
+        evaluation time; only the source set changes, so the other modules give
+        the same results.
+      kind "latest" ("Pārbaudīt ar jaunākajiem datiem"): live versions and the
+        current rule set; `sources` None = the parent's source set."""
+    if kind not in ("sources", "latest"):
+        raise ValueError(kind)
+    row = conn.execute(
+        "SELECT sources, rule_set, coalesce(checked_as_of, created_at), status"
+        " FROM work.run WHERE id = %s",
+        (run_id,),
+    ).fetchone()
+    if row is None:
+        raise RunNotFound(f"pārbaude {run_id} nav atrasta")
+    old_sources, rule_set, as_of, status = row
+    if status != "done":
+        raise RunNotFound(f"pārbaude {run_id} nav pabeigta")
+    parent = Parent(run_id, kind)
+    rules = None
+    if kind == "sources":
+        parent.pinned = load_pinned(conn, run_id)
+        parent.checked_as_of = as_of
+        rules = rules_mod.from_json(rule_set)
+    new_id = start_run(
+        conn,
+        load_targets(conn, run_id),
+        sources if sources is not None else list(old_sources),
+        origin=origin,
+        rules=rules,
+        inputs=stored_inputs(conn, run_id),
+        parent=parent,
+    )
+    from engine.checks import grouping  # noqa: PLC0415  (grouping imports runner)
+
+    grouping.carry_over(conn, run_id, new_id)
+    return new_id
+
+
+def version_changes(conn, run_id: int) -> list[dict[str, Any]]:
+    """Sources whose pinned version differs from the parent run's ("Pārbaudīt ar
+    jaunākajiem datiem" shows these)."""
+    parent = conn.execute("SELECT parent_run_id FROM work.run WHERE id = %s", (run_id,)).fetchone()
+    if parent is None or parent[0] is None:
+        return []
+    old = load_pinned(conn, parent[0])
+    new = load_pinned(conn, run_id)
+    out = []
+    for s in sorted(set(old) | set(new)):
+        a, b = old.get(s), new.get(s)
+        if a is None or b is None or a.version_id != b.version_id:
+            out.append(
+                {
+                    "id": s,
+                    "name": (b or a).info.get("name"),
+                    "old_version_id": a.version_id if a else None,
+                    "old_date": a.info.get("dataset_date") if a else None,
+                    "new_version_id": b.version_id if b else None,
+                    "new_date": b.info.get("dataset_date") if b else None,
+                }
+            )
+    return out
