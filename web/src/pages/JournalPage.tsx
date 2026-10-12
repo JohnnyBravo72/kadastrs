@@ -3,6 +3,7 @@ import { api, type JournalRun } from "../api";
 import { RiskPill } from "../components/RiskPill";
 
 const ORIGIN_LV: Record<string, string> = { batch: "saraksts", api: "API", cli: "CLI", compare: "salīdzinājums", test: "tests" };
+const MAX_PROJECTS = 6;
 const RERUN_LV: Record<string, string> = { sources: "Atjaunot (avoti)", latest: "jaunākie dati" };
 
 /** Žurnāls (PLAN.md §8.2): earlier runs, newest first; a click reopens one.
@@ -48,17 +49,28 @@ export function JournalPage({ current, open }: { current: number | null; open: (
                 title="Atvērt pārbaudi"
               >
                 <td className="mono">{r.id}</td>
-                <td>{new Date(r.created_at).toLocaleString("lv-LV")}</td>
+                <td className="nowrap">{new Date(r.created_at).toLocaleString("lv-LV")}</td>
                 <td>{r.targets}</td>
-                <td>{r.projects.length ? r.projects.join(", ") : <span className="hint">bez projekta</span>}</td>
+                <td>
+                  {r.projects.length ? (
+                    <>
+                      {r.projects.slice(0, MAX_PROJECTS).join(", ")}
+                      {r.projects.length > MAX_PROJECTS && <span className="hint"> un vēl {r.projects.length - MAX_PROJECTS}</span>}
+                    </>
+                  ) : (
+                    <span className="hint">bez projekta</span>
+                  )}
+                </td>
                 <td>{r.risk ? <RiskPill risk={r.risk} /> : "–"}</td>
                 <td>{r.modules.length}</td>
                 <td>
-                  {ORIGIN_LV[r.origin] ?? r.origin}
-                  {r.parent_run_id && (
-                    <div className="hint">
-                      no nr. {r.parent_run_id}: {RERUN_LV[r.rerun_kind ?? ""] ?? r.rerun_kind}
-                    </div>
+                  {r.parent_run_id ? (
+                    <>
+                      {RERUN_LV[r.rerun_kind ?? ""] ?? r.rerun_kind}
+                      <div className="hint">no nr. {r.parent_run_id}</div>
+                    </>
+                  ) : (
+                    (ORIGIN_LV[r.origin] ?? r.origin)
                   )}
                 </td>
               </tr>

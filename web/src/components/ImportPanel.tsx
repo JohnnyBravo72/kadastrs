@@ -22,6 +22,7 @@ const STATUS_LV: Record<string, string> = {
   not_stored: "nav saglabāts",
 };
 const KIND_LV: Record<string, string> = { cadastre: "kadastrs", address: "adrese", address_code: "adreses kods" };
+const TYPE_TEXT: Record<string, string> = { ...TYPE_LV, address: "Adrese" };
 
 /** Rows of the import that will be checked: objects per kept row. */
 export function importObjects(s: ImportState): number {
@@ -72,6 +73,7 @@ export function ImportPanel({ state, setState }: { state: ImportState; setState:
   return (
     <div className="import">
       <div className="import-inputs">
+        {!state.file && (
         <div>
           <textarea
             aria-label="Ielīmēt sarakstu"
@@ -85,6 +87,7 @@ export function ImportPanel({ state, setState }: { state: ImportState; setState:
             Pieteicēja reģ. Nr., Adrese pieteikumā, Objekta veids. Ne vairāk kā 1000 rindu.
           </p>
         </div>
+        )}
         <div className="import-actions">
           <input
             ref={fileInput}
@@ -138,6 +141,12 @@ export function ImportPanel({ state, setState }: { state: ImportState; setState:
             <span className="hint">
               {kept.length} no {state.rows.length} rindām; pārbaudīs {importObjects(state)} objektus
             </span>
+            <span className="preview-counts">
+              <span className="st st-ok">atrastas: {kept.filter((r) => r.checked).length}</span>
+              <span className="st st-no">netiks pārbaudītas: {kept.filter((r) => !r.checked).length}</span>
+              <span className="st">atkārtojas: {kept.filter((r) => r.duplicate_of !== null).length}</span>
+              <span className="st">ar labojumiem: {kept.filter((r) => r.corrections.length > 0).length}</span>
+            </span>
           </div>
           <div className="preview-scroll">
             <table className="overview">
@@ -164,8 +173,8 @@ export function ImportPanel({ state, setState }: { state: ImportState; setState:
                   return (
                     <tr key={r.row_no} className={`${out ? "removed" : ""} ${r.checked ? "" : "not-checked"}`} data-row={r.row_no}>
                       <td>{r.row_no}</td>
-                      <td className="mono">{r.value ?? "—"}</td>
-                      <td>{r.type ? (TYPE_LV[r.type] ?? r.type) : r.kind ? (KIND_LV[r.kind] ?? r.kind) : "—"}</td>
+                      <td className={r.kind === "address" ? "" : "mono"}>{r.value ?? "—"}</td>
+                      <td>{r.type ? (TYPE_TEXT[r.type] ?? r.type) : r.kind ? (KIND_LV[r.kind] ?? r.kind) : "—"}</td>
                       <td>
                         <span className={`st st-${r.checked ? "ok" : "no"}`}>{STATUS_LV[r.status] ?? r.status}</span>
                         {r.duplicate_of !== null && <div className="hint">atkārtojas (rinda {r.duplicate_of})</div>}
