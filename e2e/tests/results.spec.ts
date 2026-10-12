@@ -39,7 +39,7 @@ test("search, chips, layer, Excel", async ({ page }) => {
 
   await pickCadastre(page, "090000504", "09000050400", "zemes vienības apzīmējums");
   await expect(dialog.locator(".picked")).toContainText("09000050400");
-  await expect(dialog.getByTestId("totals")).toContainText(/^1 objekts, \d+ avoti$/);
+  await expect(dialog.getByTestId("totals")).toHaveText(/^1 objekts · \d+ avoti$/);
   await dialog.getByRole("button", { name: "Pārbaudīt" }).click();
 
   await expect(page).toHaveURL(/[?&]run=\d+/);
@@ -110,7 +110,8 @@ test("property -> untick one unit -> run -> change sources -> Atjaunot -> Žurn�
   await list.locator("li", { hasText: "09000360220002" }).getByRole("checkbox").uncheck();
   await expect(counter).toHaveText(`${total - 1} no ${total}`);
   await expect(all).toHaveJSProperty("indeterminate", true);
-  await expect(dialog.getByTestId("totals")).toContainText(`${total - 1} objekti`);
+  // a property and its units are counted separately
+  await expect(dialog.getByTestId("totals")).toHaveText(new RegExp(`^1 īpašums · ${total - 1} vienības · \\d+ avoti$`));
   await dialog.getByRole("button", { name: "Pārbaudīt" }).click();
 
   await expect(page).toHaveURL(/[?&]run=\d+/);
@@ -141,10 +142,15 @@ test("property -> untick one unit -> run -> change sources -> Atjaunot -> Žurn�
   // its layer is gone from the map panel
   await expect(page.getByTestId("layer-panel")).not.toContainText("Būvniecības lietas (BIS)");
 
-  // Žurnāls lists both runs; the old one reopens unchanged
+  // Žurnāls: this server's runs are test runs (origin e2e), hidden by default;
+  // with "Rādīt testa pārbaudes" both runs are listed and the old one reopens unchanged
   await page.getByRole("button", { name: "Žurnāls" }).click();
   const journal = page.getByTestId("journal");
+  await expect(page.locator(".journal-filters")).toBeVisible();
+  await expect(journal.locator(`tr[data-run="${second}"]`)).toHaveCount(0);
+  await page.getByLabel("Rādīt testa pārbaudes").check();
   await expect(journal.locator(`tr[data-run="${second}"]`)).toContainText(`no nr. ${first}`);
+  await expect(page.getByTestId("journal-range")).toContainText(/^1–\d+ no \d+$/);
   await journal.locator(`tr[data-run="${first}"]`).click();
   await expect.poll(() => runId(page)).toBe(first);
   await expect(page.getByTestId("status-strip").locator('[data-module="bis"]')).toHaveCount(1);
@@ -171,12 +177,12 @@ test("import: preview, remove a row, check", async ({ page }) => {
   await expect(preview.locator('tr[data-row="2"]')).toContainText("atjaunota nulle sākumā");
   await expect(preview.locator('tr[data-row="3"]')).toContainText("atkārtojas (rinda 2)");
   await expect(preview.locator('tr[data-row="5"]')).toContainText("nederīgs");
-  await expect(dialog.getByTestId("totals")).toContainText("3 objekti");
+  await expect(dialog.getByTestId("totals")).toHaveText(/^3 objekti · \d+ avoti$/);
 
   // remove the duplicate and the invalid row
   await preview.getByRole("button", { name: "Noņemt rindu 3" }).click();
   await preview.getByRole("button", { name: "Noņemt rindu 5" }).click();
-  await expect(dialog.getByTestId("totals")).toContainText("2 objekti");
+  await expect(dialog.getByTestId("totals")).toHaveText(/^2 objekti · \d+ avoti$/);
   await dialog.getByRole("button", { name: "Pārbaudīt" }).click();
 
   await expect(page.getByTestId("switcher")).toContainText("1 / 2");
@@ -199,8 +205,26 @@ test("import: preview, remove a row, check", async ({ page }) => {
   await expect(projects.locator('[data-group="P-2"]')).toContainText("Nav objektu");
   await expect(projects).toContainText(/grupējums nr\. \d+/);
   // the grouping is kept with the run
+  // a project group zooms the map to its objects; "Visi projekti" fits all
+  const map = page.locator(".overview-map");
+  await projects.getByRole("button", { name: "Projekts Kopējais" }).click();
+  await expect(map).toHaveAttribute("data-fit", "1");
+  await projects.getByRole("button", { name: "Visi projekti" }).click();
+  await expect(map).toHaveAttribute("data-fit", "0,1");
+  const runNo = runId(page);
+  // the grouping is kept with the run
   await page.reload();
   await expect(page.getByTestId("projects").locator('[data-group="Kopējais"] tr.obj')).toHaveCount(1);
   await page.getByTestId("projects").locator('[data-group="Kopējais"] tr.obj').click();
   await expect(page.getByTestId("designation")).toHaveText("13000102702");
+
+  // Žurnāls finds the run by its (new) project name
+  await page.getByRole("button", { name: "Žurnāls" }).click();
+  await page.getByLabel("Rādīt testa pārbaudes").check();
+  await page.getByLabel("Meklēt pēc projekta Nr.").fill("kopēj");
+  const journal = page.getByTestId("journal");
+  await expect(journal.locator(`tr[data-run="${runNo}"]`)).toBeVisible();
+  await expect(journal.locator("tr[data-run]")).toHaveCount(1);
+  await page.getByLabel("Meklēt pēc projekta Nr.").fill("nav-tāda-projekta");
+  await expect(page.getByText("Atlasei neatbilst neviena pārbaude.")).toBeVisible();
 });

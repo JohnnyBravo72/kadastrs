@@ -223,6 +223,7 @@ services:
     environment:
       DATABASE_URL: postgresql://kadastrs:${KADASTRS_DB_PASSWORD:-kadastrs-dev}@db:5432/kadastrs_test
       KADASTRS_FRESHNESS_CHECK: "off"
+      KADASTRS_RUN_ORIGIN: e2e  # runs hidden from Žurnāls by default
     volumes:
       - ../config:/app/config:ro
     healthcheck:
@@ -234,6 +235,28 @@ services:
     depends_on:
       api:
         condition: service_healthy  # same image, built by the api service
+
+  # The api image on the dev database (real pilot data) for review screenshots
+  # (e2e/tests/screens.spec.ts). Its runs get origin "e2e", so they stay out of
+  # the visible Žurnāls history.
+  api-screens:
+    profiles: [screens]
+    image: kadastrs-api:dev
+    environment:
+      DATABASE_URL: *db-url
+      KADASTRS_FRESHNESS_CHECK: "off"
+      KADASTRS_RUN_ORIGIN: e2e
+    volumes:
+      - ../config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 3s
+      timeout: 6s
+      retries: 20
+      start_period: 3s
+    depends_on:
+      api:
+        condition: service_healthy
 
   # Playwright in its official container (no Node on the host); OSM tiles are
   # answered with a blank image inside the test.

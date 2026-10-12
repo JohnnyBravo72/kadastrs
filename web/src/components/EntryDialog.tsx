@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type CadastreObject, type Entry, type RegistrySource, type Suggestion } from "../api";
-import { selection, unitKey } from "../selection";
-import { EMPTY_IMPORT, hasImport, ImportPanel, importObjects, type ImportState } from "./ImportPanel";
+import { selection, totalsText, unitKey, type Totals } from "../selection";
+import { EMPTY_IMPORT, hasImport, ImportPanel, importTotals, type ImportState } from "./ImportPanel";
 import { SourcesChecklist } from "./SourcesChecklist";
 import { BADGE_LV, SuggestField } from "./SuggestField";
 import { UnitChecklist } from "./UnitChecklist";
@@ -47,13 +47,30 @@ const EMPTY_DRAFT: Draft = {
   loading: false,
 };
 
+type Counts = Omit<Totals, "sources">;
+
 interface Added {
   entry: Entry;
   title: string;
-  objects: number;
+  counts: Counts;
 }
 
-const draftObjects = (d: Draft) => (d.unitsOf ? (d.units ?? []).filter((u) => d.ticked.has(unitKey(u))).length : d.cad || d.addr ? 1 : 0);
+const tickedCount = (d: Draft) => (d.units ?? []).filter((u) => d.ticked.has(unitKey(u))).length;
+
+/** What the draft object checks: a property is one object with its ticked
+ *  units; each ticked object at an address is one object. */
+function draftCounts(d: Draft): Counts {
+  if (d.unitsOf === "property") return { objects: 1, properties: 1, units: tickedCount(d) };
+  if (d.unitsOf === "address") return { objects: tickedCount(d), properties: 0, units: tickedCount(d) };
+  return d.cad || d.addr ? { objects: 1, properties: 0, units: 1 } : { objects: 0, properties: 0, units: 0 };
+}
+
+const sum = (list: Counts[]): Counts =>
+  list.reduce((a, c) => ({ objects: a.objects + c.objects, properties: a.properties + c.properties, units: a.units + c.units }), {
+    objects: 0,
+    properties: 0,
+    units: 0,
+  });
 
 function toEntry(d: Draft, project: string, applicant: string): Entry | null {
   const common = { project_no: project.trim() || null, applicant: applicant.trim() || null };
@@ -102,7 +119,7 @@ export function EntryDialog({
   const [applicant, setApplicant] = useState("");
   const [imp, setImp] = useState<ImportState>(EMPTY_IMPORT);
   const [sources, setSources] = useState<RegistrySource[] | null>(null);
-  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [sourcesTicked, setSourcesTicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,7 +127,7 @@ export function EntryDialog({
     api.sources().then(
       (s) => {
         setSources(s);
-        setTicked(new Set(s.filter((x) => x.selectable && x.default_selected).map((x) => x.id)));
+        setSourcesTicked(new Set(s.filter((x) => x.selectable && x.default_selected).map((x) => x.id)));
       },
       (e) => setError(`Avotu saraksts nav pieejams: ${e instanceof Error ? e.message : e}`),
     );
@@ -223,9 +240,11 @@ export function EntryDialog({
 
   const applicantBad = applicant.trim() !== "" && !LEGAL_REG_NO.test(applicant.replace(/\s+/g, ""));
   const draftEntry = useMemo(() => toEntry(draft, project, applicant), [draft, project, applicant]);
-  const nDraft = draftObjects(draft);
-  const nObjects = added.reduce((n, a) => n + a.objects, 0) + nDraft + importObjects(imp);
-  const nSources = ticked.size;
+  const draftC = draftCounts(draft);
+  const nDraft = draftC.units;
+  const totals = sum([...added.map((a) => a.counts), draftC, importTotals(imp)]);
+  const nObjects = totals.objects;
+  const nSources = sourcesTicked.size;
   const importPending = hasImport(imp) && imp.rows === null;
   const canRun =
     !busy && !draft.loading && !applicantBad && nSources > 0 && (nObjects > 0 || importPending) && !(draftEntry && nDraft === 0);
@@ -233,7 +252,7 @@ export function EntryDialog({
   const addDraft = () => {
     if (!draftEntry || nDraft === 0) return;
     const title = draft.cad ? draft.cad.designation : (draft.addr?.text ?? "");
-    setAdded([...added, { entry: draftEntry, title, objects: nDraft }]);
+    setAdded([...added, { entry: draftEntry, title, counts: draftC }]);
     setDraft(EMPTY_DRAFT);
   };
 
@@ -246,7 +265,7 @@ export function EntryDialog({
     if (imp.removed.size) form.set("skip_rows", [...imp.removed].join(","));
     const entries = [...added.map((a) => a.entry), ...(draftEntry && nDraft > 0 ? [draftEntry] : [])];
     if (entries.length) form.set("entries", JSON.stringify(entries));
-    form.set("sources", [...ticked].join(","));
+    form.set("sources", [...sourcesTicked].join(","));
     try {
       const run = await api.batch(form);
       onRun(run.id);
@@ -389,7 +408,7 @@ export function EntryDialog({
                     <span className="tag" key={`${a.title}-${i}`}>
                       <span className={/^\d+$/.test(a.title) ? "mono" : ""}>{a.title}</span>
                       <span className="hint">
-                        {a.objects} {a.objects === 1 ? "objekts" : "objekti"}
+                        {totalsText({ ...a.counts, sources: 0 }).replace(/ · 0 avoti$/, "")}
                         {a.entry.project_no ? ` · ${a.entry.project_no}` : ""}
                       </span>
                       <button aria-label="Noņemt" onClick={() => setAdded(added.filter((_, j) => j !== i))}>
@@ -406,7 +425,7 @@ export function EntryDialog({
 
           <aside className="modal-side">
             <h3>Avoti</h3>
-            {sources ? <SourcesChecklist sources={sources} ticked={ticked} setTicked={setTicked} /> : <span className="spinner" />}
+            {sources ? <SourcesChecklist sources={sources} ticked={sourcesTicked} setTicked={setSourcesTicked} /> : <span className="spinner" />}
           </aside>
         </div>
 
@@ -415,7 +434,7 @@ export function EntryDialog({
           <span className="spacer" />
           <span className="totals" data-testid="totals">
             {importPending ? "fails vēl nav nolasīts · " : ""}
-            {nObjects} {nObjects === 1 ? "objekts" : "objekti"}, {nSources} {nSources === 1 ? "avots" : "avoti"}
+            {totalsText({ ...totals, sources: nSources })}
           </span>
           {closable && (
             <button className="btn" onClick={onClose}>

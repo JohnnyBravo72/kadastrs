@@ -4,11 +4,13 @@ Runs are synchronous: the pilot checks 100 objects in a few seconds. Results
 are stored and never changed; checking again creates a new run.
 """
 
+from datetime import date
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from api.db import TEST_ORIGINS, run_origin
 from engine import links
 from engine.checks import grouping, runner, summary
 from engine.checks import rules as rules_mod
@@ -44,7 +46,7 @@ def create_run(request: Request, body: RunRequest) -> dict[str, Any]:
         raise HTTPException(status_code=413, detail=f"ne vairāk kā {limit} objekti vienā pārbaudē")
     with request.app.state.pool.connection() as conn:
         try:
-            run_id = runner.start_run(conn, body.targets, body.sources, origin="api")
+            run_id = runner.start_run(conn, body.targets, body.sources, origin=run_origin("api"))
         except runner.UnknownSources as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except SourceUnavailable as exc:
@@ -74,13 +76,63 @@ class GroupingRequest(BaseModel):
     assignment: dict[str, str]
 
 
-def _journal(conn, limit: int, offset: int) -> list[dict[str, Any]]:
+# Žurnāls filters. A run's projects are the names of its current grouping (the
+# newest work.run_grouping row), else its targets' project numbers.
+_JOURNAL_WHERE = """
+WHERE (%(tests)s OR r.origin <> ALL(%(test_origins)s))
+  AND (%(date_from)s::date IS NULL
+       OR (r.created_at AT TIME ZONE 'Europe/Riga')::date >= %(date_from)s::date)
+  AND (%(date_to)s::date IS NULL
+       OR (r.created_at AT TIME ZONE 'Europe/Riga')::date <= %(date_to)s::date)
+  AND (%(project)s::text IS NULL OR
+       CASE WHEN EXISTS (SELECT 1 FROM work.run_grouping g WHERE g.run_id = r.id)
+       THEN EXISTS (
+           SELECT 1 FROM jsonb_array_elements(
+               (SELECT g.groups FROM work.run_grouping g WHERE g.run_id = r.id
+                ORDER BY g.id DESC LIMIT 1)) e
+           WHERE e->>'id' <> 'none' AND e->>'name' ILIKE %(project)s ESCAPE '\\')
+       ELSE EXISTS (SELECT 1 FROM work.run_target t
+                    WHERE t.run_id = r.id AND t.project_no ILIKE %(project)s ESCAPE '\\')
+       END)
+"""
+
+
+def _like(text: str | None) -> str | None:
+    if not text or not text.strip():
+        return None
+    escaped = text.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _journal(
+    conn,
+    limit: int,
+    offset: int,
+    tests: bool = False,
+    project: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> dict[str, Any]:
+    params = {
+        "tests": tests,
+        "test_origins": list(TEST_ORIGINS),
+        "project": _like(project),
+        "date_from": date_from,
+        "date_to": date_to,
+        "limit": limit,
+        "offset": offset,
+    }
+    total = conn.execute(
+        f"SELECT count(*) FROM work.run r {_JOURNAL_WHERE}",  # noqa: S608  (fixed text)
+        params,
+    ).fetchone()[0]
     runs = conn.execute(
-        """SELECT r.id, r.created_at, r.origin, r.status, r.sources, r.modules,
+        f"""SELECT r.id, r.created_at, r.origin, r.status, r.sources, r.modules,
                   r.parent_run_id, r.rerun_kind, r.rule_set->'risk_order',
                   (SELECT count(*) FROM work.run_target t WHERE t.run_id = r.id)
-           FROM work.run r ORDER BY r.id DESC LIMIT %s OFFSET %s""",
-        (limit, offset),
+           FROM work.run r {_JOURNAL_WHERE}
+           ORDER BY r.id DESC LIMIT %(limit)s OFFSET %(offset)s""",  # noqa: S608  (fixed text)
+        params,
     ).fetchall()
     ids = [r[0] for r in runs]
     risks: dict[int, set[str]] = {}
@@ -112,9 +164,10 @@ def _journal(conn, limit: int, offset: int) -> list[dict[str, Any]]:
                 "modules": modules,
                 "parent_run_id": parent,
                 "rerun_kind": kind,
+                "test": origin in TEST_ORIGINS,
             }
         )
-    return out
+    return {"runs": out, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/runs")
@@ -122,12 +175,18 @@ def list_runs(
     request: Request,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-) -> list[dict[str, Any]]:
-    """Žurnāls: earlier runs, newest first, with objects, projects (current
-    grouping) and the overall risk. All runs on this server until sign-in exists
-    (Phase 10)."""
+    tests: bool = False,
+    project: str | None = Query(None, max_length=100),
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> dict[str, Any]:
+    """Žurnāls: earlier runs, newest first, a page at a time, with objects,
+    projects (current grouping) and the overall risk. Runs of test servers
+    (origin test / e2e) only with `tests=true`; `project` matches a project
+    name; `date_from` / `date_to` are days in Latvian time. All runs on this
+    server until sign-in exists (Phase 10)."""
     with request.app.state.pool.connection() as conn:
-        return _journal(conn, limit, offset)
+        return _journal(conn, limit, offset, tests, project, date_from, date_to)
 
 
 @router.post("/runs/{run_id}/rerun", status_code=201)
@@ -137,7 +196,7 @@ def rerun_run(request: Request, run_id: int, body: RerunRequest) -> dict[str, An
     with request.app.state.pool.connection() as conn:
         _summary(conn, run_id)
         try:
-            new_id = runner.rerun(conn, run_id, body.sources, body.kind, origin="api")
+            new_id = runner.rerun(conn, run_id, body.sources, body.kind, origin=run_origin("api"))
         except runner.UnknownSources as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except runner.RunNotFound as exc:

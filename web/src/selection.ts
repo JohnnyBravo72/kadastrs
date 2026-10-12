@@ -60,3 +60,27 @@ export function typeCounts(units: UnitItem[]): [string, number][] {
   for (const u of units) counts.set(u.type, (counts.get(u.type) ?? 0) + 1);
   return [...counts.entries()].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
 }
+
+/** Latvian noun after a number: 1, 21, 31 … take the singular, 11 the plural. */
+export function lvCount(n: number, one: string, many: string): string {
+  return `${n} ${n % 10 === 1 && n % 100 !== 11 ? one : many}`;
+}
+
+export interface Totals {
+  objects: number; // targets: a property counts once
+  properties: number; // of them, properties
+  units: number; // units checked (a property's ticked units; any other object is one)
+  sources: number;
+}
+
+/** The dialog footer: "1 īpašums · 12 vienības · 9 avoti" when every object is
+ *  a property, else "N objekti (M vienības) · K avoti" (units only when they
+ *  differ from the objects). */
+export function totalsText(t: Totals): string {
+  const sources = lvCount(t.sources, "avots", "avoti");
+  if (t.objects > 0 && t.properties === t.objects) {
+    return `${lvCount(t.properties, "īpašums", "īpašumi")} · ${lvCount(t.units, "vienība", "vienības")} · ${sources}`;
+  }
+  const units = t.units !== t.objects ? ` (${lvCount(t.units, "vienība", "vienības")})` : "";
+  return `${lvCount(t.objects, "objekts", "objekti")}${units} · ${sources}`;
+}

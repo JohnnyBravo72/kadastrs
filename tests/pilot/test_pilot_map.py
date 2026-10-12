@@ -50,7 +50,7 @@ def flood_items(conn, run_id, target_no):
 
 
 def test_flood_regression_parcels_on_the_map(conn):
-    rid = run_batch(conn, read_text("\n".join(c["parcel"] for c in CASES), 1000))
+    rid = run_batch(conn, read_text("\n".join(c["parcel"] for c in CASES), 1000), origin="test")
     outlines = geo.targets(conn, rid)
     targets = {t.designation: no for no, t in enumerate(runner.load_targets(conn, rid))}
     for case in CASES:
@@ -89,7 +89,7 @@ def test_twenty_objects_have_outlines_and_layers(conn, live):
             (live["cadastre_text"],),
         )
     ]
-    rid = run_batch(conn, read_text("\n".join(codes), 1000))
+    rid = run_batch(conn, read_text("\n".join(codes), 1000), origin="test")
     outlines = geo.targets(conn, rid)
     with_geom = {f["properties"]["target_no"] for f in outlines["features"]}
     n = len(runner.load_targets(conn, rid))

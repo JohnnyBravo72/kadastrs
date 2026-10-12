@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TargetLine } from "./api";
 import { addGroup, deleteGroup, grouped, moveTargets, nameTaken, NONE_ID, renameGroup } from "./groups";
-import { counter, selection, toggleAll, toggleOne, triState, typeCounts, unitKey, visible } from "./selection";
+import { counter, lvCount, selection, toggleAll, toggleOne, totalsText, triState, typeCounts, unitKey, visible } from "./selection";
 
 const UNITS = [
   { type: "parcel", designation: "09000360220" },
@@ -70,5 +70,23 @@ describe("project groups", () => {
     const d = deleteGroup(m, "p1");
     expect(d.groups.map((g) => g.id)).toEqual([NONE_ID]);
     expect(d.assignment).toEqual({ "0": NONE_ID, "1": NONE_ID });
+  });
+});
+
+describe("dialog footer", () => {
+  it("counts properties and units separately", () => {
+    expect(totalsText({ objects: 1, properties: 1, units: 12, sources: 9 })).toBe("1 īpašums · 12 vienības · 9 avoti");
+    expect(totalsText({ objects: 2, properties: 2, units: 21, sources: 1 })).toBe("2 īpašumi · 21 vienība · 1 avots");
+  });
+
+  it("mixed lists give objects with their units", () => {
+    expect(totalsText({ objects: 3, properties: 1, units: 14, sources: 9 })).toBe("3 objekti (14 vienības) · 9 avoti");
+    expect(totalsText({ objects: 1, properties: 0, units: 1, sources: 9 })).toBe("1 objekts · 9 avoti");
+    expect(totalsText({ objects: 0, properties: 0, units: 0, sources: 0 })).toBe("0 objekti · 0 avoti");
+  });
+
+  it("uses the Latvian singular after 1, 21, 31 but not 11", () => {
+    expect(lvCount(11, "vienība", "vienības")).toBe("11 vienības");
+    expect(lvCount(31, "vienība", "vienības")).toBe("31 vienība");
   });
 });

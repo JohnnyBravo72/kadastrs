@@ -411,6 +411,10 @@ function AllView({
   setGrouping: (g: Grouping) => void;
   open: (t: number) => void;
 }) {
+  // a project group picked in the projects panel: the map zooms to its objects
+  const [zoomGroup, setZoomGroup] = useState<string | null>(null);
+  const groupTargets = zoomGroup ? grouped(grouping, targets).find((g) => g.id === zoomGroup)?.targets : null;
+  const fit = (groupTargets && groupTargets.length > 0 ? groupTargets : targets).map((t) => t.target_no);
   const byRisk = new Map<string, number>();
   for (const t of targets) {
     const w = targetWorst(t) ?? "none";
@@ -449,9 +453,19 @@ function AllView({
         setLayers={setLayers}
         hidden={hidden}
         onSelect={open}
+        fit={fit}
         compact
       />
-      <ProjectsPanel run={run} targets={targets} grouping={grouping} setGrouping={setGrouping} names={MODULE_SHORT} open={open} />
+      <ProjectsPanel
+        run={run}
+        targets={targets}
+        grouping={grouping}
+        setGrouping={setGrouping}
+        names={MODULE_SHORT}
+        open={open}
+        zoomGroup={zoomGroup}
+        setZoomGroup={setZoomGroup}
+      />
     </div>
   );
 }

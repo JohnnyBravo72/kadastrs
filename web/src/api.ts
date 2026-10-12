@@ -245,7 +245,7 @@ export interface PreviewRow {
   warnings: string[];
   duplicate_of: number | null;
   problems: InputRow["problems"];
-  targets: { type: string; designation: string; label: string | null }[];
+  targets: { type: string; designation: string; label: string | null; units: number }[];
 }
 
 export interface JournalRun {
@@ -260,6 +260,23 @@ export interface JournalRun {
   modules: string[];
   parent_run_id: number | null;
   rerun_kind: "sources" | "latest" | null;
+  test: boolean; // made by a test server (origin test / e2e)
+}
+
+export interface JournalPage {
+  runs: JournalRun[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface JournalQuery {
+  limit: number;
+  offset: number;
+  tests: boolean;
+  project: string;
+  date_from: string; // yyyy-mm-dd or ""
+  date_to: string;
 }
 
 export interface VersionChange {
@@ -325,7 +342,14 @@ export const api = {
     get<AddressObjects>(`/api/address/${encodeURIComponent(code)}/objects`, signal),
   sources: () => get<RegistrySource[]>("/api/sources"),
   preview: (form: FormData) => fetch("/api/batch/preview", { method: "POST", body: form }).then((r) => json<{ rows: PreviewRow[]; limit: number }>(r)),
-  journal: (limit = 100) => get<JournalRun[]>(`/api/runs?limit=${limit}`),
+  journal: (q: JournalQuery, signal?: AbortSignal) => {
+    const p = new URLSearchParams({ limit: String(q.limit), offset: String(q.offset) });
+    if (q.tests) p.set("tests", "true");
+    if (q.project.trim()) p.set("project", q.project.trim());
+    if (q.date_from) p.set("date_from", q.date_from);
+    if (q.date_to) p.set("date_to", q.date_to);
+    return get<JournalPage>(`/api/runs?${p}`, signal);
+  },
   rerun: (id: number, kind: "sources" | "latest", sources: string[] | null) =>
     fetch(`/api/runs/${id}/rerun`, {
       method: "POST",

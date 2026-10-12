@@ -61,7 +61,7 @@ def test_thousand_real_rows_within_the_time_limit(conn, live):
 
     t0 = time.perf_counter()
     rows = read_text(text, 1000)
-    run_id = run_batch(conn, rows, origin="batch")
+    run_id = run_batch(conn, rows, origin="test")  # hidden from Žurnāls by default
     report = excel.to_bytes(excel.load(conn, run_id))
     elapsed = time.perf_counter() - t0
 

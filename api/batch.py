@@ -19,6 +19,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
+from api.db import run_origin
 from engine.batch import reader, template
 from engine.batch.plan import preview, run_batch
 from engine.checks import runner, summary
@@ -147,7 +148,7 @@ def create_batch(
     try:
         rows = _rows(file, text, entries, skip_rows)
         with request.app.state.pool.connection() as conn:
-            run_id = run_batch(conn, rows, selected)
+            run_id = run_batch(conn, rows, selected, origin=run_origin("batch"))
             if format == "xlsx":
                 data = excel.to_bytes(excel.load(conn, run_id))
                 return _xlsx_response(data, excel.filename(run_id))

@@ -47,12 +47,13 @@ interface Props {
   onSelect?: (targetNo: number) => void;
   compact?: boolean;
   hidden?: LayerKey[]; // layers of modules the run did not check (source unticked)
+  fit?: number[] | null; // all objects view: zoom to these targets (a project group)
 }
 
 /** Leaflet map: OSM basemap, the checked objects coloured by worst risk, the
  *  attention areas (hatched, risk of the fired rule) and the data layers of the
  *  run's pinned versions, loaded for the current view. */
-export function MapView({ runId, outlines, focus, attention, layers: given, setLayers, onSelect, compact, hidden = [] }: Props) {
+export function MapView({ runId, outlines, focus, attention, layers: given, setLayers, onSelect, compact, hidden = [], fit = null }: Props) {
   // a layer whose source was unticked is neither listed nor drawn (§8.2 step 5)
   const layers = hideLayers(given, hidden);
   const div = useRef<HTMLDivElement>(null);
@@ -164,6 +165,16 @@ export function MapView({ runId, outlines, focus, attention, layers: given, setL
     if (bounds) map.current.fitBounds(bounds.pad(0.3), { maxZoom: 18 });
   }, [outlines, focus]);
 
+  // --- zoom to a project group (all objects view) ------------------------------------
+  const fitKey = fit ? fit.join(",") : "";
+  useEffect(() => {
+    if (!map.current || !outlines?.bbox_by_target || focus !== null || !fit) return;
+    const boxes = fit.map((t) => outlines.bbox_by_target![String(t)]).filter(Boolean);
+    if (boxes.length === 0) return;
+    const bounds = L.latLngBounds(boxes.flatMap((b) => [L.latLng(b[1], b[0]), L.latLng(b[3], b[2])]));
+    map.current.fitBounds(bounds.pad(0.3), { maxZoom: 18 });
+  }, [fitKey, outlines, focus]);
+
   // --- attention areas --------------------------------------------------------------
   useEffect(() => {
     if (!map.current) return;
@@ -251,7 +262,7 @@ export function MapView({ runId, outlines, focus, attention, layers: given, setL
   }, [layers]);
 
   return (
-    <div className={compact ? "overview-map" : "map-wrap"}>
+    <div className={compact ? "overview-map" : "map-wrap"} data-fit={fitKey || undefined}>
       <Patterns />
       <div ref={div} className="map" data-testid="map" />
       {tooLarge && !compact && <div className="map-msg">Pietuviniet karti, lai redzētu slāņus</div>}

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { api, type PreviewRow } from "../api";
 import { TYPE_LV } from "../format";
+import type { Totals } from "../selection";
 
 export interface ImportState {
   file: File | null;
@@ -27,6 +28,19 @@ const TYPE_TEXT: Record<string, string> = { ...TYPE_LV, address: "Adrese" };
 /** Rows of the import that will be checked: objects per kept row. */
 export function importObjects(s: ImportState): number {
   return (s.rows ?? []).filter((r) => !s.removed.has(r.row_no)).reduce((n, r) => n + r.targets.length, 0);
+}
+
+/** Objects, properties and units the kept rows will check (dialog footer). */
+export function importTotals(s: ImportState): Omit<Totals, "sources"> {
+  const t = { objects: 0, properties: 0, units: 0 };
+  for (const r of (s.rows ?? []).filter((x) => !s.removed.has(x.row_no))) {
+    for (const target of r.targets) {
+      t.objects += 1;
+      t.properties += target.type === "property" ? 1 : 0;
+      t.units += target.units;
+    }
+  }
+  return t;
 }
 
 export function hasImport(s: ImportState): boolean {

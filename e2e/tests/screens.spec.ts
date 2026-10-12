@@ -1,6 +1,8 @@
 // Review screenshots of the entry dialog and results view on the dev database
-// (real pilot data). Skipped unless SCREENSHOTS is set:
-//   docker compose --profile e2e run --rm --no-deps -e SCREENSHOTS=1 -e E2E_BASE_URL=http://api:8000 e2e \
+// (real pilot data), through the api-screens service: its runs get origin "e2e"
+// and stay out of the visible Žurnāls history. Skipped unless SCREENSHOTS is set:
+//   docker compose --profile screens up -d --wait api-screens
+//   docker compose --profile e2e run --rm --no-deps -e SCREENSHOTS=1 -e E2E_BASE_URL=http://api-screens:8000 e2e \
 //     npx playwright test screens
 // Files land in e2e/test-results/screens/ (not committed).
 import { expect, test } from "@playwright/test";
@@ -70,6 +72,7 @@ test("review screenshots", async ({ page }) => {
   await page.getByRole("button", { name: "Atjaunot" }).click();
   await expect(page.getByTestId("parent-note")).toBeVisible({ timeout: 120_000 });
   await page.getByRole("button", { name: "Žurnāls" }).click();
-  await expect(page.getByTestId("journal")).toBeVisible();
+  await page.getByLabel("Rādīt testa pārbaudes").check(); // this server's runs are test runs
+  await expect(page.getByTestId("journal").locator("tr.test-run").first()).toBeVisible();
   await page.screenshot({ path: `${OUT}/4-zurnals.png` });
 });

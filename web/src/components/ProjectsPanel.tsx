@@ -16,6 +16,8 @@ export function ProjectsPanel({
   setGrouping,
   names,
   open,
+  zoomGroup,
+  setZoomGroup,
 }: {
   run: RunSummary;
   targets: TargetLine[];
@@ -23,6 +25,8 @@ export function ProjectsPanel({
   setGrouping: (g: Grouping) => void;
   names: Record<string, string>;
   open: (t: number) => void;
+  zoomGroup: string | null; // the group the map is zoomed to; null = all
+  setZoomGroup: (id: string | null) => void;
 }) {
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [newName, setNewName] = useState("");
@@ -63,6 +67,14 @@ export function ProjectsPanel({
     <section className="projects" data-testid="projects">
       <div className="projects-bar">
         <h2>Projekti</h2>
+        <button
+          className={`btn small ${zoomGroup === null ? "on" : ""}`}
+          aria-pressed={zoomGroup === null}
+          onClick={() => setZoomGroup(null)}
+          title="Kartē rādīt visus objektus"
+        >
+          Visi projekti
+        </button>
         <span className="hint">
           {grouping.id === null
             ? "pēc ievadītajiem projekta numuriem"
@@ -100,7 +112,7 @@ export function ProjectsPanel({
       </div>
       {error && <p className="error">{error}</p>}
       {groups.map((g) => (
-        <div className="project" key={g.id} data-group={g.name}>
+        <div className={`project ${zoomGroup === g.id ? "zoomed" : ""}`} key={g.id} data-group={g.name}>
           <div className="project-head">
             {renaming?.id === g.id ? (
               <>
@@ -126,7 +138,17 @@ export function ProjectsPanel({
               </>
             ) : (
               <>
-                <h3>{g.id === NONE_ID ? "Bez projekta" : `Projekts ${g.name}`}</h3>
+                <h3>
+                  <button
+                    className="group-zoom"
+                    onClick={() => setZoomGroup(g.id)}
+                    disabled={g.targets.length === 0}
+                    aria-pressed={zoomGroup === g.id}
+                    title="Tuvināt karti šī projekta objektiem"
+                  >
+                    {g.id === NONE_ID ? "Bez projekta" : `Projekts ${g.name}`}
+                  </button>
+                </h3>
                 <span className="hint">
                   {g.targets.length} {g.targets.length === 1 ? "objekts" : "objekti"}
                 </span>
@@ -136,7 +158,14 @@ export function ProjectsPanel({
                     <button className="btn small" onClick={() => setRenaming({ id: g.id, name: g.name })} disabled={busy}>
                       Pārdēvēt
                     </button>
-                    <button className="btn small" onClick={() => void save(deleteGroup(grouping, g.id))} disabled={busy} title="Objekti pāries uz „Bez projekta”">
+                    <button
+                      className="btn small"
+                      onClick={async () => {
+                        if ((await save(deleteGroup(grouping, g.id))) && zoomGroup === g.id) setZoomGroup(null);
+                      }}
+                      disabled={busy}
+                      title="Objekti pāries uz „Bez projekta”"
+                    >
                       Dzēst
                     </button>
                   </>

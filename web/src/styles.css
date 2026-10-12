@@ -307,3 +307,15 @@ table.overview tr.obj:focus-visible td { outline: 2px solid #9cc3ec; }
   .field-row { grid-template-columns: 1fr; }
   .app-header .sub { display: none; }
 }
+
+/* --- Žurnāls filters, pager; project zoom ------------------------------------- */
+.journal-filters { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; margin: 6px 0 12px; }
+.journal-filters label { display: grid; gap: 3px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.journal-filters label.check { display: flex; gap: 6px; align-items: center; font-weight: 500; padding-bottom: 7px; }
+.journal-filters input[type="text"], .journal-filters input:not([type]), .journal-filters input[type="date"] { padding: 6px 9px; border: 1px solid #c6d0da; border-radius: 6px; background: #fff; font-weight: 400; }
+.pager { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 12px; color: var(--ink-2); }
+table.overview tr.test-run td { color: var(--ink-3); }
+.btn.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.group-zoom { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.group-zoom:disabled { cursor: default; text-decoration: none; }
+.project.zoomed .project-head h3 { background: #eef4fb; border-radius: 4px; padding: 1px 6px; }

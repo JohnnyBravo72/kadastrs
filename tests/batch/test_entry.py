@@ -4,6 +4,7 @@ registry, Žurnāls, new runs from a stored run and project groups (PLAN.md §8.
 
 import io
 import json
+from datetime import timedelta
 
 import pytest
 from openpyxl import load_workbook
@@ -14,6 +15,12 @@ pytestmark = pytest.mark.stack
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 TAUTAS_11A = "Tautas iela 11A, Daugavpils"  # parcel 05000040013 and building 05000041006001
+
+
+def journal_ids(client, **params) -> list[int]:
+    """Run ids on one Žurnāls page (GET /api/runs)."""
+    page = client.get("/api/runs", params={"limit": 200, **params}).json()
+    return [x["id"] for x in page["runs"]]
 
 
 def run_count(conn) -> int:
@@ -153,7 +160,9 @@ def first(client):
 
 
 def test_journal_lists_runs_and_reopens_them(client, first):
-    runs = client.get("/api/runs", params={"limit": 200}).json()
+    page = client.get("/api/runs", params={"limit": 200}).json()
+    runs = page["runs"]
+    assert page["total"] >= len(runs) and page["limit"] == 200 and page["offset"] == 0
     row = next(x for x in runs if x["id"] == first)
     assert row["targets"] == 2 and row["projects"] == ["P-1", "P-2"]
     assert row["risk"] == "high"  # 09000050400 is in the flood finding
@@ -171,7 +180,7 @@ def test_api_rerun_both_kinds(client, first):
     r = client.post(f"/api/runs/{first}/rerun", json={"kind": "latest"})
     assert r.status_code == 201 and r.json()["rerun_kind"] == "latest"
     assert client.get(f"/api/runs/{r.json()['id']}/changes").json() == []  # nothing new
-    journal = {x["id"]: x for x in client.get("/api/runs").json()}
+    journal = {x["id"]: x for x in client.get("/api/runs").json()["runs"]}
     assert journal[child["id"]]["parent_run_id"] == first
     bad = client.post(f"/api/runs/{first}/rerun", json={"kind": "sources", "sources": ["nope"]})
     assert bad.status_code == 422
@@ -185,9 +194,13 @@ def test_api_groups(client, first):
     r = client.post(f"/api/runs/{first}/groups", json=body)
     assert r.status_code == 201 and r.json()["id"] is not None
     assert client.get(f"/api/runs/{first}/groups").json()["assignment"] == {"0": "x", "1": "x"}
-    assert client.get("/api/runs").json()  # Žurnāls follows the grouping
-    journal = {x["id"]: x for x in client.get("/api/runs", params={"limit": 200}).json()}
+    # Žurnāls follows the grouping, also in its project search
+    journal = {x["id"]: x for x in client.get("/api/runs", params={"limit": 200}).json()["runs"]}
     assert journal[first]["projects"] == ["Kopā"]
+    found = client.get("/api/runs", params={"project": "kop", "limit": 200}).json()["runs"]
+    assert first in [x["id"] for x in found]
+    gone = client.get("/api/runs", params={"project": "P-2", "limit": 200}).json()["runs"]
+    assert first not in [x["id"] for x in gone]
     bad = client.post(f"/api/runs/{first}/groups", json={"groups": [], "assignment": {"0": "none"}})
     assert bad.status_code == 422
     report = client.get(f"/api/runs/{first}/report.xlsx")
@@ -195,3 +208,57 @@ def test_api_groups(client, first):
     assert ws.cell(2, 3).value == "Kopā"
     old = client.get(f"/api/runs/{first}/report.xlsx", params={"grouping": 999999})
     assert old.status_code == 404
+
+
+# --- Žurnāls filters and test origins ----------------------------------------------------------
+
+
+def test_journal_hides_test_runs_and_pages(client, conn, monkeypatch):
+    monkeypatch.setenv("KADASTRS_RUN_ORIGIN", "e2e")  # what api-e2e / api-screens set
+    hidden = client.post("/api/batch", data={"text": "09000050400"}).json()["id"]
+    monkeypatch.delenv("KADASTRS_RUN_ORIGIN")
+    shown = client.post("/api/batch", data={"text": "09000050400"}).json()["id"]
+    assert (
+        conn.execute("SELECT origin FROM work.run WHERE id = %s", (hidden,)).fetchone()[0] == "e2e"
+    )
+
+    assert shown in journal_ids(client) and hidden not in journal_ids(client)
+    with_tests = client.get("/api/runs", params={"tests": True, "limit": 200}).json()
+    assert hidden in [x["id"] for x in with_tests["runs"]]
+    assert next(x for x in with_tests["runs"] if x["id"] == hidden)["test"] is True
+    # paging: 1 per page, newest first, no overlap
+    total = client.get("/api/runs", params={"tests": True, "limit": 1}).json()["total"]
+    first_page = journal_ids(client, tests=True, limit=1)
+    second_page = journal_ids(client, tests=True, limit=1, offset=1)
+    assert total == with_tests["total"] and first_page[0] > second_page[0]
+
+
+def test_journal_date_range(client, conn):
+    rid = client.post("/api/batch", data={"text": "09000050400"}).json()["id"]
+    day = conn.execute(
+        "SELECT (created_at AT TIME ZONE 'Europe/Riga')::date FROM work.run WHERE id = %s", (rid,)
+    ).fetchone()[0]
+
+    assert rid in journal_ids(client, date_from=day.isoformat(), date_to=day.isoformat())
+    assert rid not in journal_ids(client, date_to=(day - timedelta(days=1)).isoformat())
+    assert rid not in journal_ids(client, date_from=(day + timedelta(days=1)).isoformat())
+    assert client.get("/api/runs", params={"date_from": "nav datums"}).status_code == 422
+
+
+def test_project_search_takes_like_characters_literally(client):
+    rid = client.post("/api/batch", data={"text": "vertiba;projekta_nr\n09000050400;A_1%"}).json()[
+        "id"
+    ]
+    hits = client.get("/api/runs", params={"project": "A_1%", "limit": 200}).json()["runs"]
+    assert rid in [x["id"] for x in hits]
+    miss = client.get("/api/runs", params={"project": "AX1", "limit": 200}).json()["runs"]
+    assert rid not in [x["id"] for x in miss]
+
+
+def test_preview_counts_property_units(client):
+    units = client.get("/api/property/09000360220/units").json()["units"]
+    rows = client.post("/api/batch/preview", data={"text": "09000360220\n09000050400"}).json()[
+        "rows"
+    ]
+    by = {t["type"]: t["units"] for r in rows for t in r["targets"]}
+    assert by["property"] == len(units) and by["parcel"] == 1

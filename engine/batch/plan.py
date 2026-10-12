@@ -28,7 +28,7 @@ from engine.batch.headers import fold
 from engine.batch.reader import InputRow
 from engine.checks import runner
 from engine.checks.contract import TargetIn, Warning_
-from engine.resolve import service
+from engine.resolve import cadastre, service
 from engine.resolve.classify import PRECISION_LOST
 from engine.resolve.context import live_versions, pilot, resolve_config
 from engine.resolve.models import Match, ResolvedRow
@@ -315,6 +315,12 @@ def preview(conn, rows: list[InputRow]) -> list[dict[str, Any]]:
     check. Nothing is stored. A value that looks like a personal code is not
     shown (CLAUDE.md rule 5)."""
     p = prepare(conn, rows)
+    v = live_versions(conn)
+    unit_counts: dict[str, int] = {}
+    for t in p.targets:  # a property is checked on its units (engine/checks/units.py)
+        if t.type == "property" and t.designation not in unit_counts:
+            pu = cadastre.property_units(conn, v, t.designation, include_non_existing=False)
+            unit_counts[t.designation] = len(pu.units) if pu else 0
     out = []
     for inp, rr in zip(p.inputs, p.resolved, strict=True):
         hidden = inp["status"] == "not_stored"
@@ -339,6 +345,9 @@ def preview(conn, rows: list[InputRow]) -> list[dict[str, Any]]:
                         "type": p.targets[n].type,
                         "designation": p.targets[n].designation,
                         "label": p.targets[n].label,
+                        "units": unit_counts.get(p.targets[n].designation, 0)
+                        if p.targets[n].type == "property"
+                        else 1,
                     }
                     for n in inp["target_nos"]
                 ],
