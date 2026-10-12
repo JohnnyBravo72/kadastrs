@@ -112,6 +112,7 @@ sources:
     default_selected: true
     # coverage (en): Areas shown on the 3rd-cycle flood maps (200-year extent as mask); pilot extent + 1 km
     coverage_lv: "Kartēs attēlotā teritorija (3. cikla plūdu kartes; 200 gadu applūšanas robeža kā pārklājuma maska); pilota pilsētas + 1 km"
+    partial_coverage: true
     processing_lv:
       - "Importēti plūdu zonu objekti, kas skar pilota pilsētas teritoriju + 1 km."
     source_stale_after: P2Y
@@ -191,6 +192,7 @@ sources:
     default_selected: true
     # coverage (en): Whole country (mapped habitats only)
     coverage_lv: "Visa valsts (tikai kartētie biotopi)"
+    partial_coverage: true
     processing_lv:
       - "Nederīgas ģeometrijas labotas automātiski (saglabātas tikai laukumu daļas)."
       - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."

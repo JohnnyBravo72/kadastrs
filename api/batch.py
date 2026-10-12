@@ -17,10 +17,12 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from engine.batch import reader, template
-from engine.batch.plan import run_batch
+from engine.batch.plan import preview, run_batch
 from engine.checks import runner, summary
+from engine.checks.contract import UnitRef
 from engine.resolve.context import SourceUnavailable, resolve_config
 from reports import excel
 
@@ -48,18 +50,81 @@ def _error_page(status: int, message: str) -> HTMLResponse:
     return HTMLResponse(body, status_code=status)
 
 
-def _rows(file: UploadFile | None, text: str | None) -> list[reader.InputRow]:
+class Entry(BaseModel):
+    """One object chosen in the entry dialog (§8.1): the value as picked, its type
+    (decides a property / parcel number), the given address, project, applicant
+    and the ticked units or address objects (None = all)."""
+
+    value: str = Field(min_length=1, max_length=300)
+    kind: Literal["property", "parcel", "building"] | None = None
+    project_no: str | None = Field(default=None, max_length=100)
+    address: str | None = Field(default=None, max_length=300)
+    applicant: str | None = Field(default=None, max_length=40)
+    selected: list[UnitRef] | None = None
+
+
+KIND_TEXT = {"property": "īpašums", "parcel": "zemes vienība", "building": "būve"}
+
+
+def _entries(raw: str | None, first_row: int) -> list[reader.InputRow]:
+    if not raw:
+        return []
+    try:
+        entries = TypeAdapter(list[Entry]).validate_json(raw)
+    except ValidationError as exc:
+        raise reader.InputError(
+            f"ievades loga dati nav derīgi: {exc.error_count()} kļūdas"
+        ) from exc
+    return [
+        reader.InputRow(
+            row_no=first_row + n,
+            value=e.value.strip(),
+            kind=KIND_TEXT[e.kind] if e.kind else None,
+            project_no=(e.project_no or "").strip() or None,
+            address=(e.address or "").strip() or None,
+            applicant=(e.applicant or "").strip() or None,
+            selected=None if e.selected is None else [u.model_dump() for u in e.selected],
+        )
+        for n, e in enumerate(entries)
+    ]
+
+
+def _skip(raw: str | None) -> set[int]:
+    try:
+        return {int(x) for x in (raw or "").split(",") if x.strip()}
+    except ValueError as exc:
+        raise reader.InputError("skip_rows: rindu numuri, atdalīti ar komatu") from exc
+
+
+def _rows(
+    file: UploadFile | None,
+    text: str | None,
+    entries: str | None = None,
+    skip_rows: str | None = None,
+) -> list[reader.InputRow]:
+    """The file or pasted list (rows removed in the preview left out), then the
+    objects chosen in the entry dialog."""
     limit = resolve_config().max_rows
+    rows: list[reader.InputRow] = []
     has_file = file is not None and bool(file.filename)
     if has_file:
         data = file.file.read(MAX_UPLOAD + 1)
         if len(data) > MAX_UPLOAD:
             raise HTTPException(status_code=413, detail="fails ir pārāk liels (vairāk par 5 MB)")
         if data:
-            return reader.read_upload(file.filename, data, limit)
-    if text and text.strip():
-        return reader.read_text(text, limit)
-    raise reader.InputError("nav ievadīts saraksts: pievienojiet failu vai ielīmējiet vērtības")
+            rows = reader.read_upload(file.filename, data, limit)
+    elif text and text.strip():
+        rows = reader.read_text(text, limit)
+    skip = _skip(skip_rows)
+    rows = [r for r in rows if r.row_no not in skip]
+    rows += _entries(entries, max((r.row_no for r in rows), default=0) + 1)
+    if not rows:
+        raise reader.InputError(
+            "nav ievadīts saraksts: izvēlieties objektu, pievienojiet failu vai ielīmējiet vērtības"
+        )
+    if len(rows) > limit:
+        raise reader.InputError(f"ne vairāk kā {limit} rindas vienā pārbaudē (ir {len(rows)})")
+    return rows
 
 
 @router.post("/api/batch", status_code=201, response_model=None)
@@ -69,14 +134,18 @@ def create_batch(
     text: Annotated[str | None, Form()] = None,
     sources: Annotated[str | None, Form()] = None,
     format: Annotated[Literal["json", "xlsx"], Form()] = "json",  # noqa: A002
+    entries: Annotated[str | None, Form()] = None,
+    skip_rows: Annotated[str | None, Form()] = None,
 ) -> Any:
     """A pasted list (`text`) or a CSV / XLSX file (`file`) with the columns
     vertiba, projekta_nr, pieteicejs_reg_nr, adrese, veids; at most 1,000 rows.
+    `skip_rows`: row numbers removed in the import preview; `entries`: JSON list
+    of objects chosen in the entry dialog (Entry), checked after the file's rows.
     Every row is resolved like POST /api/resolve; rows that are not checked are
     listed on the report's "Neatrasts" sheet."""
     selected = [s.strip() for s in sources.split(",") if s.strip()] if sources else None
     try:
-        rows = _rows(file, text)
+        rows = _rows(file, text, entries, skip_rows)
         with request.app.state.pool.connection() as conn:
             run_id = run_batch(conn, rows, selected)
             if format == "xlsx":
@@ -102,10 +171,34 @@ def create_batch(
     raise HTTPException(status_code=status, detail=message)
 
 
+@router.post("/api/batch/preview")
+def batch_preview(
+    request: Request,
+    file: Annotated[UploadFile | None, File()] = None,
+    text: Annotated[str | None, Form()] = None,
+) -> dict[str, Any]:
+    """The import preview (§8.1 step 6): the file is read like POST /api/batch and
+    every row resolved, but nothing is stored. Run it by posting the same file to
+    POST /api/batch with `skip_rows` for the rows removed in the preview."""
+    try:
+        rows = _rows(file, text)
+        with request.app.state.pool.connection() as conn:
+            return {"rows": preview(conn, rows), "limit": resolve_config().max_rows}
+    except reader.InputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SourceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @router.get("/api/runs/{run_id}/report.xlsx")
-def run_report(request: Request, run_id: int) -> Response:
+def run_report(request: Request, run_id: int, grouping: int | None = None) -> Response:
+    """The report of a stored run, following its current project grouping (or the
+    grouping row `grouping`); the Avoti sheet names the row used."""
     with request.app.state.pool.connection() as conn:
-        data = excel.load(conn, run_id)
+        try:
+            data = excel.load(conn, run_id, grouping_id=grouping)
+        except runner.RunNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         if data is None:
             raise HTTPException(status_code=404, detail=f"pārbaude {run_id} nav atrasta")
         return _xlsx_response(excel.to_bytes(data), excel.filename(run_id))

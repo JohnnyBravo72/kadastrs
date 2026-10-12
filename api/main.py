@@ -14,6 +14,7 @@ from api.db import create_pool
 from api.map import router as map_router
 from api.resolve import router as resolve_router
 from api.runs import router as runs_router
+from api.sources import router as sources_router
 from api.web import mount as mount_web
 
 # Minimum PROJ for EPSG:10306 and EPSG:10838 (decision D9).
@@ -60,6 +61,7 @@ app.include_router(resolve_router)
 app.include_router(runs_router)
 app.include_router(map_router)
 app.include_router(batch_router)
+app.include_router(sources_router)
 mount_web(app)
 
 

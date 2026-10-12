@@ -75,6 +75,9 @@ class Source(BaseModel):
     # Shown to evaluators (report sheet "Avoti"), so in Latvian; the English
     # wording is kept as a YAML comment for developers. Stored in source.coverage.
     coverage_lv: Annotated[str, Field(min_length=1)]
+    # The source covers only part of the pilot area or of the objects (e.g. flood
+    # maps, mapped habitats): the entry dialog's sources checklist shows a note.
+    partial_coverage: bool = False
     # What the import changes or leaves out, in Latvian, for the "Avoti" sheet
     # (next to the processing notes of the source's D1 resources).
     processing_lv: StrList

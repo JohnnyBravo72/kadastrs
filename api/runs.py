@@ -4,14 +4,14 @@ Runs are synchronous: the pilot checks 100 objects in a few seconds. Results
 are stored and never changed; checking again creates a new run.
 """
 
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from engine import links
+from engine.checks import grouping, runner, summary
 from engine.checks import rules as rules_mod
-from engine.checks import runner, summary
 from engine.checks.contract import TargetIn
 from engine.checks.describe import describe
 from engine.checks.modules import BY_ID
@@ -50,6 +50,131 @@ def create_run(request: Request, body: RunRequest) -> dict[str, Any]:
         except SourceUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         return _summary(conn, run_id)
+
+
+class RerunRequest(BaseModel):
+    """kind "sources" (Atjaunot): the run's pinned versions, only the source set
+    changes. kind "latest" (Pārbaudīt ar jaunākajiem datiem): live versions.
+    `sources` null = the run's own source set."""
+
+    kind: Literal["sources", "latest"]
+    sources: list[str] | None = None
+
+
+class Group(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=200)
+
+
+class GroupingRequest(BaseModel):
+    """The whole grouping: groups in display order and {target_no: group id}.
+    "Bez projekta" (id "none") always exists."""
+
+    groups: list[Group]
+    assignment: dict[str, str]
+
+
+def _journal(conn, limit: int, offset: int) -> list[dict[str, Any]]:
+    runs = conn.execute(
+        """SELECT r.id, r.created_at, r.origin, r.status, r.sources, r.modules,
+                  r.parent_run_id, r.rerun_kind, r.rule_set->'risk_order',
+                  (SELECT count(*) FROM work.run_target t WHERE t.run_id = r.id)
+           FROM work.run r ORDER BY r.id DESC LIMIT %s OFFSET %s""",
+        (limit, offset),
+    ).fetchall()
+    ids = [r[0] for r in runs]
+    risks: dict[int, set[str]] = {}
+    for run_id, risk in conn.execute(
+        """SELECT DISTINCT run_id, risk FROM work.check_result
+           WHERE run_id = ANY(%s) AND scope = 'target'
+             AND NOT (module = 'address_consistency' AND reason IS NOT DISTINCT FROM %s)""",
+        (ids, summary.NOT_GIVEN),
+    ):
+        risks.setdefault(run_id, set()).add(risk)
+    out = []
+    for rid, created, origin, status, sources, modules, parent, kind, order, n in runs:
+        worst = next((r for r in order or summary.RISKS if r in risks.get(rid, ())), None)
+        g = grouping.current(conn, rid)
+        used = set(g["assignment"].values())
+        projects = [
+            x["name"] for x in g["groups"] if x["id"] != grouping.NONE_ID and x["id"] in used
+        ]
+        out.append(
+            {
+                "id": rid,
+                "created_at": created,
+                "origin": origin,
+                "status": status,
+                "targets": n,
+                "projects": projects,
+                "risk": worst,
+                "sources": sources,
+                "modules": modules,
+                "parent_run_id": parent,
+                "rerun_kind": kind,
+            }
+        )
+    return out
+
+
+@router.get("/runs")
+def list_runs(
+    request: Request,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> list[dict[str, Any]]:
+    """Žurnāls: earlier runs, newest first, with objects, projects (current
+    grouping) and the overall risk. All runs on this server until sign-in exists
+    (Phase 10)."""
+    with request.app.state.pool.connection() as conn:
+        return _journal(conn, limit, offset)
+
+
+@router.post("/runs/{run_id}/rerun", status_code=201)
+def rerun_run(request: Request, run_id: int, body: RerunRequest) -> dict[str, Any]:
+    """A new run with the same targets, linked by parent_run_id; the stored run is
+    not changed. The answer lists the sources whose version changed."""
+    with request.app.state.pool.connection() as conn:
+        _summary(conn, run_id)
+        try:
+            new_id = runner.rerun(conn, run_id, body.sources, body.kind, origin="api")
+        except runner.UnknownSources as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except runner.RunNotFound as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except SourceUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return _summary(conn, new_id) | {"version_changes": runner.version_changes(conn, new_id)}
+
+
+@router.get("/runs/{run_id}/changes")
+def run_changes(request: Request, run_id: int) -> list[dict[str, Any]]:
+    """Sources whose pinned version differs from the parent run's."""
+    with request.app.state.pool.connection() as conn:
+        _summary(conn, run_id)
+        return runner.version_changes(conn, run_id)
+
+
+@router.get("/runs/{run_id}/groups")
+def get_groups(request: Request, run_id: int) -> dict[str, Any]:
+    """The current project grouping (newest stored row, else from the input's
+    project numbers)."""
+    with request.app.state.pool.connection() as conn:
+        _summary(conn, run_id)
+        return grouping.current(conn, run_id)
+
+
+@router.post("/runs/{run_id}/groups", status_code=201)
+def save_groups(request: Request, run_id: int, body: GroupingRequest) -> dict[str, Any]:
+    """Store a new grouping row (insert-only); check results are not touched."""
+    with request.app.state.pool.connection() as conn:
+        _summary(conn, run_id)
+        try:
+            return grouping.save(
+                conn, run_id, [g.model_dump() for g in body.groups], body.assignment
+            )
+        except grouping.GroupingError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/runs/{run_id}")
