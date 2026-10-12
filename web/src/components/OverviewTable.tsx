@@ -7,36 +7,31 @@ export function targetWorst(t: TargetLine) {
   return worst(Object.values(t.modules).filter((m) => m.summary_status !== "not_applicable").map((m) => m.risk));
 }
 
-/** Projects in input order, objects grouped under them ("bez projekta" last). */
-export function groupByProject(targets: TargetLine[]): [string, TargetLine[]][] {
-  const groups = new Map<string, TargetLine[]>();
-  for (const t of targets) {
-    const key = t.project_no ?? "";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(t);
-  }
-  const keys = [...groups.keys()].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : 0));
-  return keys.map((k) => [k, groups.get(k)!]);
-}
-
-/** One row per object, one column per module (status + risk), overall risk. */
+/** One row per object, one column per module (status + risk), overall risk
+ *  (same as the Excel "Kopsavilkums"). With `picked`, a checkbox per row for
+ *  moving objects between project groups. */
 export function OverviewTable({
   targets,
   modules,
   names,
   onOpen,
+  picked,
+  onPick,
+  testId = "overview",
 }: {
   targets: TargetLine[];
   modules: string[];
   names: Record<string, string>;
   onOpen: (targetNo: number) => void;
+  picked?: Set<number>;
+  onPick?: (targetNo: number) => void;
+  testId?: string;
 }) {
-  const grouped = groupByProject(targets);
-  const showGroups = grouped.length > 1 || grouped[0]?.[0] !== "";
   return (
-    <table className="overview" data-testid="overview">
+    <table className="overview" data-testid={testId}>
       <thead>
         <tr>
+          {picked && <th aria-label="Atzīmēt" />}
           <th>Nr.</th>
           <th>Ievadīts</th>
           <th>Objekts</th>
@@ -50,54 +45,34 @@ export function OverviewTable({
         </tr>
       </thead>
       <tbody>
-        {grouped.map(([project, rows]) => (
-          <GroupRows key={project || "-"} project={project} rows={rows} modules={modules} onOpen={onOpen} showGroup={showGroups} />
+        {targets.map((t) => (
+          <tr key={t.target_no} className="obj" onClick={() => onOpen(t.target_no)} title="Atvērt objektu">
+            {picked && (
+              <td onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={picked.has(t.target_no)}
+                  onChange={() => onPick?.(t.target_no)}
+                  aria-label={`Atzīmēt ${t.designation}`}
+                />
+              </td>
+            )}
+            <td>{t.target_no + 1}</td>
+            <td>{t.input}</td>
+            <td className="mono">{t.designation}</td>
+            <td>
+              {TYPE_LV[t.type] ?? t.type}
+              {t.label && <div className="hint">{t.label}</div>}
+            </td>
+            {modules.map((m) => (
+              <td key={m}>{t.modules[m] ? <StatusCell bucket={t.modules[m].summary_status} risk={t.modules[m].risk} /> : "–"}</td>
+            ))}
+            <td>
+              <RiskPill risk={targetWorst(t)} />
+            </td>
+          </tr>
         ))}
       </tbody>
     </table>
-  );
-}
-
-function GroupRows({
-  project,
-  rows,
-  modules,
-  onOpen,
-  showGroup,
-}: {
-  project: string;
-  rows: TargetLine[];
-  modules: string[];
-  onOpen: (n: number) => void;
-  showGroup: boolean;
-}) {
-  return (
-    <>
-      {showGroup && (
-        <tr className="group">
-          <td colSpan={modules.length + 5}>
-            {project ? `Projekts ${project}` : "Bez projekta numura"} · {rows.length}{" "}
-            {rows.length === 1 ? "objekts" : "objekti"}
-          </td>
-        </tr>
-      )}
-      {rows.map((t) => (
-        <tr key={t.target_no} className="obj" onClick={() => onOpen(t.target_no)} title="Atvērt objektu">
-          <td>{t.target_no + 1}</td>
-          <td>{t.input}</td>
-          <td className="mono">{t.designation}</td>
-          <td>
-            {TYPE_LV[t.type] ?? t.type}
-            {t.label && <div className="hint">{t.label}</div>}
-          </td>
-          {modules.map((m) => (
-            <td key={m}>{t.modules[m] ? <StatusCell bucket={t.modules[m].summary_status} risk={t.modules[m].risk} /> : "–"}</td>
-          ))}
-          <td>
-            <RiskPill risk={targetWorst(t)} />
-          </td>
-        </tr>
-      ))}
-    </>
   );
 }

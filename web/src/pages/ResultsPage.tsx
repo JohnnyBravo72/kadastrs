@@ -3,6 +3,7 @@ import {
   api,
   type AttentionProps,
   type FeatureCollection,
+  type Grouping,
   type InputRow,
   type OutlineProps,
   type RunSummary,
@@ -10,13 +11,16 @@ import {
   type TargetLine,
 } from "../api";
 import { FOOTER } from "../App";
+import { FilterBar, ParentNote } from "../components/FilterBar";
 import { DEFAULT_LAYERS, MapView, type LayerKey, type Layers } from "../components/MapView";
 import { isOpenCard, ModuleCard } from "../components/ModuleCard";
-import { groupByProject, OverviewTable, targetWorst } from "../components/OverviewTable";
+import { targetWorst } from "../components/OverviewTable";
+import { ProjectsPanel } from "../components/ProjectsPanel";
 import { RiskPill } from "../components/RiskPill";
 import { SourceLinks } from "../components/SourceLinks";
 import { TYPE_LV } from "../format";
 import { cellStyle, FINDING_RISKS, riskText, STATUS_LV, type Risk } from "../risk";
+import { grouped } from "../groups";
 import type { UrlState } from "../url";
 
 export const MODULE_SHORT: Record<string, string> = {
@@ -46,6 +50,16 @@ const INPUT_STATUS_LV: Record<string, string> = {
   no_objects: "nav kadastra objektu",
   not_stored: "nav saglabāts",
 };
+/** Layers whose module the run did not check (its source was unticked). */
+export function hiddenLayers(modules: string[]): LayerKey[] {
+  const need: [LayerKey, string][] = [
+    ["pludi", "flood_10y"],
+    ["daba", "nature"],
+    ["bis", "bis"],
+  ];
+  return need.filter(([, m]) => !modules.includes(m)).map(([k]) => k);
+}
+
 const COLUMN_LV: Record<string, string> = { vertiba: "vērtība", adrese: "adrese", veids: "veids", pieteicejs_reg_nr: "pieteicēja reģ. nr." };
 
 /** Layers of the modules with a finding (risk low or higher) on, the others off
@@ -79,15 +93,18 @@ export function ResultsPage({ state, navigate }: Props) {
   const [detail, setDetail] = useState<TargetDetail | null>(null);
   const [attention, setAttention] = useState<FeatureCollection<AttentionProps> | null>(null);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
+  const [grouping, setGrouping] = useState<Grouping | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setError(null);
-    Promise.all([api.run(runId), api.targets(runId), api.inputs(runId)])
-      .then(([r, t, i]) => {
+    setRun(null);
+    Promise.all([api.run(runId), api.targets(runId), api.inputs(runId), api.groups(runId)])
+      .then(([r, t, i, g]) => {
         setRun(r);
         setTargets(t);
         setInputs(i);
+        setGrouping(g);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     api.outlines(runId).then(setOutlines, () => setOutlines(null));
@@ -111,14 +128,23 @@ export function ResultsPage({ state, navigate }: Props) {
     api.attention(runId, target).then(setAttention, () => setAttention(null));
   }, [runId, target, targets, count, view]);
 
-  const go = (t: number, v = view) => navigate({ run: runId, target: t, view: v });
+  const go = (t: number, v = view) => navigate({ run: runId, target: t, view: v, tab: "atlase" });
+  const openRun = (id: number) => navigate({ run: id, target, view, tab: "atlase" });
   const notChecked = inputs.filter((i) => i.problems.length > 0);
 
   if (error) return <p className="center-msg error">{error}</p>;
-  if (!run || !targets) return <p className="center-msg"><span className="spinner" /> Ielādē pārbaudes rezultātus…</p>;
+  if (!run || !targets || !grouping)
+    return (
+      <p className="center-msg">
+        <span className="spinner" /> Ielādē pārbaudes rezultātus…
+      </p>
+    );
+  const hidden = hiddenLayers(run.modules);
 
   return (
     <main className="results">
+      <FilterBar run={run} onNewRun={openRun} />
+      <ParentNote run={run} open={openRun} />
       {count === 0 ? (
         <p className="notice">Neviens ievadītais objekts netika atrasts. Iemesli ir zemāk un Excel lapā „Neatrasts”.</p>
       ) : view === "object" ? (
@@ -131,11 +157,23 @@ export function ResultsPage({ state, navigate }: Props) {
           attention={attention}
           layers={layers}
           setLayers={setLayers}
+          hidden={hidden}
+          grouping={grouping}
           go={go}
           onAll={() => go(target, "all")}
         />
       ) : (
-        <AllView run={run} targets={targets} outlines={outlines} layers={layers} setLayers={setLayers} open={(t) => go(t, "object")} />
+        <AllView
+          run={run}
+          targets={targets}
+          outlines={outlines}
+          layers={layers}
+          setLayers={setLayers}
+          hidden={hidden}
+          grouping={grouping}
+          setGrouping={setGrouping}
+          open={(t) => go(t, "object")}
+        />
       )}
       {notChecked.length > 0 && <NotChecked rows={notChecked} />}
       <p className="footer-note">
@@ -158,6 +196,8 @@ function ObjectView({
   attention,
   layers,
   setLayers,
+  hidden,
+  grouping,
   go,
   onAll,
 }: {
@@ -169,6 +209,8 @@ function ObjectView({
   attention: FeatureCollection<AttentionProps> | null;
   layers: Layers;
   setLayers: (l: Layers) => void;
+  hidden: LayerKey[];
+  grouping: Grouping;
   go: (t: number) => void;
   onAll: () => void;
 }) {
@@ -182,7 +224,7 @@ function ObjectView({
 
   const chipClick = (module: string) => {
     const layer = MODULE_LAYER[module];
-    if (layer && !layers[layer].on) setLayers({ ...layers, [layer]: { ...layers[layer], on: true } });
+    if (layer && !hidden.includes(layer) && !layers[layer].on) setLayers({ ...layers, [layer]: { ...layers[layer], on: true } });
     document.getElementById(`card-${module}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     const card = document.getElementById(`card-${module}`) as HTMLDetailsElement | null;
     if (card) card.open = true;
@@ -199,14 +241,14 @@ function ObjectView({
           <div className="meta">
             <span>{TYPE_LV[line.type] ?? line.type}</span>
             {line.label && <span className="badge">{line.label}</span>}
-            {line.project_no && <span>Projekts {line.project_no}</span>}
+            {projectOf(grouping, line.target_no) && <span>Projekts {projectOf(grouping, line.target_no)}</span>}
             {line.input && line.input !== line.designation && <span>ievadīts: {line.input}</span>}
             <RiskPill risk={targetWorst(line)} prefix="Kopējais risks:" />
             <SourceLinks links={detail?.links} />
           </div>
         </div>
         <div className="head-actions">
-          {targets.length > 1 && <Switcher targets={targets} target={target} go={go} />}
+          {targets.length > 1 && <Switcher targets={targets} target={target} go={go} grouping={grouping} />}
           {targets.length > 1 && (
             <button className="btn" onClick={onAll}>
               Visi objekti ({targets.length})
@@ -248,6 +290,7 @@ function ObjectView({
         attention={attention}
         layers={layers}
         setLayers={setLayers}
+        hidden={hidden}
         onSelect={(t) => go(t)}
       />
 
@@ -277,9 +320,25 @@ function Cards({ detail, run }: { detail: TargetDetail; run: RunSummary }) {
   );
 }
 
-function Switcher({ targets, target, go }: { targets: TargetLine[]; target: number; go: (t: number) => void }) {
+function projectOf(grouping: Grouping, targetNo: number): string | null {
+  const id = grouping.assignment[String(targetNo)];
+  if (!id || id === "none") return null;
+  return grouping.groups.find((g) => g.id === id)?.name ?? null;
+}
+
+function Switcher({
+  targets,
+  target,
+  go,
+  grouping,
+}: {
+  targets: TargetLine[];
+  target: number;
+  go: (t: number) => void;
+  grouping: Grouping;
+}) {
   const [q, setQ] = useState("");
-  const grouped = groupByProject(targets);
+  const groups = grouped(grouping, targets).filter((g) => g.targets.length > 0);
   const label = (t: TargetLine) => `${t.designation}${t.label ? ` (${t.label.replace("divdomīgs: ", "")})` : ""}`;
   return (
     <div className="switcher" data-testid="switcher">
@@ -293,9 +352,9 @@ function Switcher({ targets, target, go }: { targets: TargetLine[]; target: numb
         ▶
       </button>
       <select value={target} onChange={(e) => go(Number(e.target.value))} aria-label="Objekts">
-        {grouped.map(([project, rows]) => (
-          <optgroup key={project || "-"} label={project ? `Projekts ${project}` : "Bez projekta"}>
-            {rows.map((t) => (
+        {groups.map((g) => (
+          <optgroup key={g.id} label={g.id === "none" ? "Bez projekta" : `Projekts ${g.name}`}>
+            {g.targets.map((t) => (
               <option key={t.target_no} value={t.target_no}>
                 {t.target_no + 1}. {label(t)}
               </option>
@@ -337,6 +396,9 @@ function AllView({
   outlines,
   layers,
   setLayers,
+  hidden,
+  grouping,
+  setGrouping,
   open,
 }: {
   run: RunSummary;
@@ -344,6 +406,9 @@ function AllView({
   outlines: FeatureCollection<OutlineProps> | null;
   layers: Layers;
   setLayers: (l: Layers) => void;
+  hidden: LayerKey[];
+  grouping: Grouping;
+  setGrouping: (g: Grouping) => void;
   open: (t: number) => void;
 }) {
   const byRisk = new Map<string, number>();
@@ -375,8 +440,18 @@ function AllView({
           </a>
         </div>
       </div>
-      <MapView runId={run.id} outlines={outlines} focus={null} attention={null} layers={layers} setLayers={setLayers} onSelect={open} compact />
-      <OverviewTable targets={targets} modules={run.modules} names={MODULE_SHORT} onOpen={open} />
+      <MapView
+        runId={run.id}
+        outlines={outlines}
+        focus={null}
+        attention={null}
+        layers={layers}
+        setLayers={setLayers}
+        hidden={hidden}
+        onSelect={open}
+        compact
+      />
+      <ProjectsPanel run={run} targets={targets} grouping={grouping} setGrouping={setGrouping} names={MODULE_SHORT} open={open} />
     </div>
   );
 }

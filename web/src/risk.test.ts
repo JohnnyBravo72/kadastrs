@@ -27,9 +27,12 @@ describe("risk", () => {
 
 describe("url", () => {
   it("round-trips the view state", () => {
-    const s = { run: 48, target: 3, view: "all" as const };
+    const s = { run: 48, target: 3, view: "all" as const, tab: "atlase" as const };
     expect(parseUrl(toSearch(s))).toEqual(s);
-    expect(parseUrl("?run=x&target=-1")).toEqual({ run: null, target: 0, view: "object" });
-    expect(toSearch({ run: null, target: 0, view: "object" })).toBe("");
+    expect(parseUrl("?run=x&target=-1&tab=nope")).toEqual({ run: null, target: 0, view: "object", tab: "atlase" });
+    expect(toSearch({ run: null, target: 0, view: "object", tab: "atlase" })).toBe("");
+    const journal = { run: null, target: 0, view: "object" as const, tab: "zurnals" as const };
+    expect(toSearch(journal)).toBe("?tab=zurnals");
+    expect(parseUrl(toSearch({ ...s, tab: "avoti" })).tab).toBe("avoti");
   });
 });

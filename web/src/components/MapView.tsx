@@ -46,12 +46,15 @@ interface Props {
   setLayers: (l: Layers) => void;
   onSelect?: (targetNo: number) => void;
   compact?: boolean;
+  hidden?: LayerKey[]; // layers of modules the run did not check (source unticked)
 }
 
 /** Leaflet map: OSM basemap, the checked objects coloured by worst risk, the
  *  attention areas (hatched, risk of the fired rule) and the data layers of the
  *  run's pinned versions, loaded for the current view. */
-export function MapView({ runId, outlines, focus, attention, layers, setLayers, onSelect, compact }: Props) {
+export function MapView({ runId, outlines, focus, attention, layers: given, setLayers, onSelect, compact, hidden = [] }: Props) {
+  // a layer whose source was unticked is neither listed nor drawn (§8.2 step 5)
+  const layers = hideLayers(given, hidden);
   const div = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const groups = useRef<Partial<Record<string, L.Layer>>>({});
@@ -254,7 +257,7 @@ export function MapView({ runId, outlines, focus, attention, layers, setLayers, 
       {tooLarge && !compact && <div className="map-msg">Pietuviniet karti, lai redzētu slāņus</div>}
       {!tooLarge && loading > 0 && <div className="map-msg">Ielādē slāņus…</div>}
       {!tooLarge && loading === 0 && truncated && <div className="map-msg">Parādīta daļa objektu: pietuviniet karti</div>}
-      <LayerPanel layers={layers} setLayers={setLayers} dates={dates} open={panelOpen} setOpen={setPanelOpen} />
+      <LayerPanel layers={layers} setLayers={setLayers} dates={dates} open={panelOpen} setOpen={setPanelOpen} hidden={hidden} />
     </div>
   );
 }
@@ -394,18 +397,27 @@ const LEGEND: { key: LayerKey; title: string; entries: LegendEntry[] }[] = [
   },
 ];
 
+export function hideLayers(layers: Layers, hidden: LayerKey[]): Layers {
+  if (hidden.length === 0) return layers;
+  const next = { ...layers };
+  for (const k of hidden) next[k] = { ...layers[k], on: false };
+  return next;
+}
+
 function LayerPanel({
   layers,
   setLayers,
   dates,
   open,
   setOpen,
+  hidden,
 }: {
   layers: Layers;
   setLayers: (l: Layers) => void;
   dates: Partial<Record<LayerName, string>>;
   open: boolean;
   setOpen: (o: boolean) => void;
+  hidden: LayerKey[];
 }) {
   const set = (k: LayerKey, patch: Partial<Layers[LayerKey]>) => setLayers({ ...layers, [k]: { ...layers[k], ...patch } });
   return (
@@ -417,7 +429,7 @@ function LayerPanel({
         </button>
       </h3>
       {open &&
-        LEGEND.map((g) => (
+        LEGEND.filter((g) => !hidden.includes(g.key)).map((g) => (
           <div className="layer" key={g.key}>
             <div className="row">
               <label>
