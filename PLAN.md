@@ -6,9 +6,29 @@
 
 **Data policy:** all data comes from **data.gov.lv** (section 2).
 
-**Status (2026-10-11):** Phases 1–3 are done; Phase 4 (check engine v1) is built and tested, risk rules v1 are agreed (D4, 2026-10-11; to be revised after the test-set comparison), and the comparison with the colleagues' manual answers waits for the filled test-set files. Phase 5 (batch + Excel) is built and tested; its "done when" (pilot with 2–3 colleagues, time per object vs the baseline) is open. Earlier: Phase 0 steps 1 and 3 were done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
+**Status (2026-10-12):** Phase 7 (entry dialog, reruns, projects, Avoti / Žurnāls) is built and tested; Phase 6's zoning (module 8) is still open. Phases 1–3 are done; Phase 4 (check engine v1) is built and tested, risk rules v1 are agreed (D4, 2026-10-11; to be revised after the test-set comparison), and the comparison with the colleagues' manual answers waits for the filled test-set files. Phase 5 (batch + Excel) is built and tested; its "done when" (pilot with 2–3 colleagues, time per object vs the baseline) is open. Earlier: Phase 0 steps 1 and 3 were done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
 
 **Change log**
+- 2026-10-12 (Phase 7): entry dialog, new runs from a stored run, project groups, header tabs (decisions in `docs/decisions.md` "Phase 7", D7, D8).
+  - **Entry dialog** (§8.1), a modal on first open, reopened by "+ Jauna pārbaude":
+    - kadastrs and address type-ahead with type badges; an ambiguous 11-digit number shows both meanings;
+    - a property's units as a checklist (tri-state "Atzīmēt visu", "5 no 12", type filter), and "Rādīt visas īpašuma vienības" for a parcel; an address's objects with the same checkboxes;
+    - a notice when the kadastrs and the address point to different objects (module 2 checks it);
+    - "Projekta Nr." and "Pieteicēja reģ. Nr." (legal-entity pattern);
+    - the sources checklist from `GET /api/sources` (grouped; modules' sources can be unticked, base data always used; partial-coverage note from the new `partial_coverage` flag);
+    - CSV / XLSX import with a preview (`POST /api/batch/preview`, nothing stored; rows can be removed: the run re-sends the file with `skip_rows`);
+    - footer "1 īpašums · 12 vienības · 9 avoti", or "N objekti (M vienības) · K avoti" for mixed lists.
+  - **Only ticked units are checked:** `run_target.unit_selection`; the target warns "pārbaudītas 5 no 12 īpašuma vienībām", also in the Excel report.
+  - **New runs from a stored run**, linked by `run.parent_run_id`; the stored run is never changed:
+    - **Atjaunot** (filter bar: source chips with the banner "Filtru izmaiņas nav pielietotas") keeps the parent's pinned versions, rule set and evaluation time (`run.checked_as_of`), so only the source set changes;
+    - **Pārbaudīt ar jaunākajiem datiem** pins the live versions and lists the sources whose version changed.
+    - Layers of modules a run did not check are hidden.
+  - **Projects:** groups per run in the insert-only `work.run_grouping` (create, rename, delete, move objects; default from the input's project numbers, "Bez projekta"), an overview table per group, and a click on a group zooms the map to it. The Excel report follows the current grouping and names the grouping row it used on Avoti (`report.xlsx?grouping=<id>` rebuilds an older one).
+  - **Header tabs:** Atlase, Avoti (registry with data date, freshness, coverage, links, and the open run's versions) and **Žurnāls**:
+    - lists all runs on the server; per user once sign-in exists (Phase 10);
+    - 50 per page, search by project number and date range;
+    - runs of test servers (origin `test` / `e2e`) are hidden unless "Rādīt testa pārbaudes" is ticked; `api-e2e` and the screenshot server `api-screens` store their runs as `e2e`.
+  - Tests: unit selection, unticked source = module not run, both rerun kinds (old run replays unchanged), grouping insert-only and results unchanged, report per grouping row identical on rebuild, Žurnāls filters and paging, import preview; vitest for the checklist, footer and groups; Playwright: property → untick a unit → run → change sources → Atjaunot → Žurnāls, import preview, groups and map zoom.
 - 2026-10-12: source deep links "Skatīt avotā" (kadastrs.lv, BIS, Ozols, LVĢMC; verified patterns in `docs/data-sources.md` §8, decision "Source deep links"; links only open the source) in the view and the Excel column "Avots sistēmā". Rule set v2 (D4, agreed 2026-10-12): encumbrance codes 8317* are "Tehniskie apgrūtinājumi", never findings. Review fixes: zoom with ~30 % padding, layers of modules with findings switched on automatically, clean cards one line, labels "atrasts / nav atrasts" and "risks: …".
 - 2026-10-11 (Phase 6, results view): Vite + React + TypeScript + Leaflet frontend, built in the api image (no Node on the host) and served at `/`, replacing the plain form. Input: search (`/api/suggest`) plus paste/upload, all through `POST /api/batch`. Results per run (URL `?run=&target=&view=`): header with the kadastra numurs and address, status strip (chip per module; click = card + layer), map with the checked objects by worst risk, hatched attention areas (the engine's own overlaps, risk of the fired rule) and the layers Kadastrs, Plūdi (with "nav plūdu kartes"), Daba, BIS from the run's pinned versions (view box ≤ 6 km), module cards, target switcher, overview table, Excel download. Risk always colour + icon + word (Paul Tol vibrant). D2 decided: OSM tiles. Tests: map API, vitest, Playwright end-to-end in CI, pilot map checks. Not yet: zoning (module 8), the §8.2 header (Atlase / Avoti / Žurnāls) and filter bar, the full §8.3 list.
 - 2026-10-11 (freshness): freshness is checked against the source (§2.2, `docs/decisions.md` "Freshness"): "aktuāli" when we hold the latest release on data.gov.lv, a warning when a newer release is not imported or the publisher has been silent longer than `source_stale_after` (replaces `max_age`). Runs read `package_show` at start (the only live call), record it in `source_check`, and store the verdict with the run. Avoti and the source notes are in Latvian (`coverage_lv`, `processing_lv`).
@@ -363,7 +383,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
    - auto-detects the delimiter (`;`/`,`) and the encoding (UTF-8 / Windows-1257)
    - preview with detected type, match status, corrections and duplicates
    - error list download; limit 1,000 rows for the MVP
-   - files are parsed in the browser and not stored
+   - files are read on the server with the batch reader and not stored (decided 2026-10-12, Phase 7); removing a row in the preview re-sends the file with the rows to skip
 7. **Footer:** "N objects, M sources" + **Meklēt**.
 
 ### 8.2 Main screen
@@ -397,7 +417,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 
 **Plūdi layer:** shows only the 3rd-cycle spring-flood 10-year scenario. Other scenarios sit behind a config flag; a sea-surge (*Jūras vējuzplūdi*) switch appears only if the data exists for the area. Outside coverage: "Šajā teritorijā plūdu karte nav pieejama".
 
-**Sessions and Žurnāls** are stored on the **server** per user, once sign-in exists. Until then they are local, with JSON export and import. The URL holds `?project=&target=`.
+**Sessions and Žurnāls** are stored on the **server**. Until sign-in exists (Phase 10), Žurnāls lists every run on the server (runs of test servers hidden by default); with sign-in it becomes per user (decided 2026-10-12, Phase 7). The URL holds `?run=&target=&view=&tab=`.
 
 ### 8.3 UI acceptance criteria
 - `05000041006` shows the correct badge; its units appear, and Select all works in one click.
@@ -425,7 +445,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 4. Check engine v1 | Modules 1–6, spatial rules, risk rules v1, stored runs and results | The test set's findings match the colleagues' manual answers, with differences explained by data dates |
 | 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report; a plain input page. **Built and tested 2026-10-11** | **Pilot with 2–3 colleagues; measured time per object vs the baseline** (open) |
 | 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list. **Results view built 2026-10-11** (map, layers, attention areas, cards, overview); zoning, header tabs and filter bar open | UI criteria pass for the pilot area |
-| 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in) | UI criteria pass |
+| 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in). **Built 2026-10-12** (entry dialog, import preview, unit selection, Atjaunot and latest-data reruns, project groups, Avoti and Žurnāls); per-user sessions wait for sign-in (Phase 10) | UI criteria pass |
 | 8. Applicant & funding | Modules 7 and 9–14, and 17 | Each module verified on the test set |
 | 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history), re-check value of `pirmsregistretas-buves` on whole-country data | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
 | 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, D3 final: shared hosting, sign-in (required before sharing), security review, retention, maintenance, legal wording; deployment behind sign-in | A refresh runs unattended; a failed import alerts the owner |
@@ -457,8 +477,8 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | D4 | Risk rules v1, agreed with the team leads: **decided**, v1 agreed 2026-10-11 (revise after the test-set comparison) | Phase 4 |
 | D5 | Ownership module: **decided**, owner type only | Phase 8 |
 | D6 | Sanctions: **decided**, legal entities by reg. no. only (module 17) | Phase 8 |
-| D7 | Contents of Avoti and Žurnāls | Phase 6 |
-| D8 | Project number format (free text for now) | Phase 7 |
+| D7 | Contents of Avoti and Žurnāls: **decided** (2026-10-12, `docs/decisions.md`) | Phase 6 |
+| D8 | Project number format: **decided**, free text (2026-10-12) | Phase 7 |
 | D9 | Storage CRS: **decided** EPSG:10306 (LKS-2020); see `docs/decisions.md` | Phase 1 |
 
 D1 is **decided** (2026-10-09): listed agency-hosted resources are allowed; see `docs/decisions.md`.

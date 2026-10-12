@@ -235,7 +235,7 @@ Allow about 45 minutes for the import (step 2); do it before the session, not du
 
 A list in, a stored run and an Excel report out (PLAN.md §7.1). Input: a pasted list (one value per line, or a table copied from Excel with a header row) or a CSV / XLSX file with the column **"Kadastra Nr., apzīmējums vai adrese"** (required) and optionally "Projekta Nr.", "Pieteicēja reģ. Nr. (tikai juridiskām personām)", "Adrese pieteikumā (atbilstības pārbaudei)", "Objekta veids: īpašums / zemes vienība / būve (ja numurs divdomīgs)"; at most 1,000 rows. The old names `vertiba`, `projekta_nr`, `pieteicejs_reg_nr`, `adrese`, `veids` still work, and headers are matched without case, diacritics and by their first words (`engine/batch/headers.py`). The template (button "Lejupielādēt Excel veidni" on the input page, `GET /api/batch/template.xlsx`) has a "Saraksts" sheet (required column dark, optional light, a note on each header, code columns as text, the object type as a list) and an "Instrukcija" sheet. CSV: `;` or `,`, UTF-8 (BOM or not) or Windows-1257. XLSX: the sheet `Testa_kopa` or `Saraksts` if present (the test-set template works as input), else the first sheet; `PIEMĒRS…` rows are skipped. **The uploaded file is not stored**; only the cleaned rows (`work.run_input`) and the results are.
 
-**For colleagues without the command line:** open `http://127.0.0.1:8000/`, upload a file or paste a list, press the button, and the Excel file downloads. A blank input template: `http://127.0.0.1:8000/api/batch/template.xlsx`.
+**For colleagues without the command line:** open `http://127.0.0.1:8000/`, in the dialog choose **Importēt CSV / Excel**, upload a file or paste a list, check the preview, press **Pārbaudīt**, then **Lejupielādēt Excel**. A blank input template: `http://127.0.0.1:8000/api/batch/template.xlsx`.
 
 How rows become checked objects (decided 2026-10-11, `docs/decisions.md`):
 - resolved like `POST /api/resolve`; an address is checked on every cadastre object linked to it (one Kopsavilkums row each, "adresei N objekti");
@@ -262,14 +262,14 @@ Timing on the pilot import (`tests/pilot/test_pilot_batch.py`): 1,000 rows (600 
 
 ## Results view (Phase 6)
 
-Open `http://127.0.0.1:8000/`. Search a kadastra numurs, apzīmējums or address (suggestions as you type), or paste a list or upload a CSV / XLSX, and press **Pārbaudīt**. Everything goes through `POST /api/batch`, so the batch rules above apply. The results open at `/?run=<id>&target=<n>`; the link reopens the same view (`&view=all` for all objects).
+Open `http://127.0.0.1:8000/`; the entry dialog opens (next section). Everything goes through `POST /api/batch`, so the batch rules above apply. The results open at `/?run=<id>&target=<n>`; the link reopens the same view (`&view=all` for all objects, `&tab=avoti|zurnals` for the header tabs).
 
 - **Header:** kadastra numurs, address, type, overall risk; ◀ ▶, the object list (grouped by project) and a search box when there are several objects; **Lejupielādēt Excel** (the stored report) and **+ Jauna pārbaude**.
 - **Status strip:** one chip per module: "atrasts / nav atrasts" and "risks: augsts ▲ / vidējs ◆ / nezināms ? / zems ● / nav ✓" (grey "nav piemērojams"). A click opens the module's card and turns on its map layer. The layers of modules with a finding (risk zems or higher) are on when an object opens, the others off.
 - **Map:** the checked object coloured by its worst risk (dashed when checked on its parcel), the **attention areas** hatched in the colour of the rule that fired (click: module, rule text, m², %), and the layers Kadastrs, Plūdi (10-year zone; hatched "nav plūdu kartes" outside the 200-year mask), Daba (by kind) and BIS, each with opacity, legend and data date. Layers load for the current view from the run's **pinned** dataset versions, so the map matches the report; a view wider than about 6 km asks to zoom in ("Pietuviniet karti").
 - **Cards:** status, risk, rule text, items, warnings, units of a property, source, data date, freshness and data.gov.lv link. Findings open; clean and not-applicable modules as one line each. Technical encumbrances (8317*, rule set v2) under a collapsed "Tehniskie apgrūtinājumi" line.
 - **Skatīt avotā:** next to each item (and the object in the header) a link that opens it in the publisher's public system: kadastrs.lv, BIS, Ozols, the LVĢMC flood map. Where the system has no link that opens the object without login, the link goes to its search page and the number has a copy button. Patterns and limits: `docs/data-sources.md` §8. The Excel sheet "Detaļas" has the same link in the column "Avots sistēmā".
-- **Visi objekti:** risk counts, a map with a marker per object, the overview table (one row per object, one column per module) and the rows that were not checked (as on the Excel "Neatrasts" sheet).
+- **Visi objekti:** risk counts, a map with a marker per object, the projects (next section) and the rows that were not checked (as on the Excel "Neatrasts" sheet).
 
 The frontend lives in `web/` (Vite + React + TypeScript + Leaflet). It is built inside the api image (`api/Dockerfile`, stage `web`: vitest, `tsc`, `vite build`), so `docker compose up -d --build` is all it needs; Node never runs on the host. For frontend work with hot reload: `docker compose --profile web up web` and open `http://127.0.0.1:5173/` (proxies `/api` to the api container). After changing `web/package.json`, regenerate the lockfile in a container:
 
@@ -285,6 +285,48 @@ Map API (EPSG:4326 GeoJSON, pinned versions only): `GET /api/runs/{id}/map/targe
 docker compose --profile test run --rm tests python -m tests.e2e.seed
 docker compose --profile e2e up -d --force-recreate --wait api-e2e
 docker compose --profile e2e run --rm e2e
+```
+
+## Entry dialog, reruns, projects and Žurnāls (Phase 7)
+
+Decisions: `docs/decisions.md` "Phase 7".
+
+- **Entry dialog** ("Jauna pārbaude", opens on first load):
+  - **Kadastrs** (from 3 digits) and **Adrese** (from 2 characters) with suggestions and type badges.
+  - A property lists its units with **Atzīmēt visu**, the counter "5 no 12" and a type filter; only ticked units are checked. A parcel offers **Rādīt visas īpašuma vienības**; an address lists its objects. If the kadastrs and the address point to different objects, a notice says module 2 checks it.
+  - **Projekta Nr.**, **Pieteicēja reģ. Nr.**; **+ Pievienot sarakstam** adds the object and starts the next one.
+  - **Avoti** on the right: untick a source to leave its module out.
+  - **Importēt CSV / Excel:** a preview with the detected type, status, corrections, duplicates and the objects each row checks; × removes a row.
+  - The footer counts "1 īpašums · 12 vienības · 9 avoti" or "N objekti (M vienības) · K avoti".
+- **Filter bar** (results): source chips; a change shows "Filtru izmaiņas nav pielietotas". **Atjaunot** makes a new run with the same data versions; **Pārbaudīt ar jaunākajiem datiem** makes one on the live versions and lists the changed sources. The new run says where it came from; the old one is unchanged.
+- **Projects** (Visi objekti): a table per project; create, rename, delete, tick objects and move them. A click on a project name zooms the map to its objects, **Visi projekti** to all. Every change is a new grouping row; the Excel report follows the current one.
+- **Avoti:** every source with data date, freshness, coverage and links, and the versions the open run read.
+- **Žurnāls:** earlier runs, 50 per page; search by project number, date from / to; **Rādīt testa pārbaudes** also lists runs of test servers (origin `test` / `e2e`). A click reopens a run.
+
+API:
+
+```powershell
+curl.exe -s "http://127.0.0.1:8000/api/sources"
+curl.exe -s -F "file=@saraksts.xlsx" "http://127.0.0.1:8000/api/batch/preview"            # nothing stored
+curl.exe -s -F "file=@saraksts.xlsx" -F "skip_rows=3,5" "http://127.0.0.1:8000/api/batch"  # rows removed in the preview
+'[{"value": "09000360220", "kind": "property", "selected": [{"type": "parcel", "designation": "09000360220"}]}]' |
+  curl.exe -s -F "entries=<-" "http://127.0.0.1:8000/api/batch"                            # dialog rows, ticked units
+curl.exe -s "http://127.0.0.1:8000/api/runs?limit=50&offset=0&project=P-1&date_from=2026-10-01&tests=false"
+'{"kind": "sources", "sources": ["cadastre_text", "flood_10y"]}' |
+  curl.exe -s -X POST "http://127.0.0.1:8000/api/runs/30/rerun" -H "Content-Type: application/json" --data-binary "@-"  # Atjaunot
+'{"kind": "latest"}' |
+  curl.exe -s -X POST "http://127.0.0.1:8000/api/runs/30/rerun" -H "Content-Type: application/json" --data-binary "@-"  # live versions
+curl.exe -s "http://127.0.0.1:8000/api/runs/31/changes"
+curl.exe -s "http://127.0.0.1:8000/api/runs/30/groups"
+curl.exe -s -o parbaude.xlsx "http://127.0.0.1:8000/api/runs/30/report.xlsx?grouping=4"
+```
+
+**Review screenshots** on the dev DB (real pilot data) go through `api-screens`, whose runs are stored with origin `e2e` and stay out of the visible Žurnāls:
+
+```powershell
+docker compose --profile screens up -d --wait api-screens
+docker compose --profile e2e run --rm --no-deps -e SCREENSHOTS=1 -e E2E_BASE_URL=http://api-screens:8000 e2e npx playwright test screens
+# files: e2e/test-results/screens/*.png
 ```
 
 ## Run the tests
@@ -305,7 +347,7 @@ docker compose run --rm etl import all
 docker compose --profile test run --rm tests
 ```
 
-The pilot tests take about 3 minutes. The resolution checks (`tests/pilot/test_pilot_resolve.py`) cover the seed objects, every real property-or-parcel ambiguity, all leading-zero lengths, Excel-mangled inputs, typos and diacritics, renamed and deleted addresses, 300 random existing addresses, and `/api/suggest` p95 under 300 ms (printed with `-s`). The engine checks (`tests/pilot/test_pilot_checks.py`) run the flood regression parcels (`tests/data/flood_regression.yaml`), the seed objects and 100 parcels (under 30 s, then replayed with identical results); their runs stay in the dev DB like any run. The batch check (`tests/pilot/test_pilot_batch.py`) runs 1,000 real rows to an Excel report in under 5 minutes (time printed with `-s`). The BIS and encumbrance checks (`tests/pilot/test_pilot_bis_encumbrances.py`) recount rows from the raw files, compare every stored designation and ATVK with the raw file (no lost leading zero), check the BIS join counts and that the DAP `ATIS_CODE` values are classifier codes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
+The pilot tests take about 3 minutes. The resolution checks (`tests/pilot/test_pilot_resolve.py`) cover the seed objects, every real property-or-parcel ambiguity, all leading-zero lengths, Excel-mangled inputs, typos and diacritics, renamed and deleted addresses, 300 random existing addresses, and `/api/suggest` p95 under 300 ms (printed with `-s`). The engine checks (`tests/pilot/test_pilot_checks.py`) run the flood regression parcels (`tests/data/flood_regression.yaml`), the seed objects and 100 parcels (under 30 s, then replayed with identical results); their runs stay in the dev DB like any run, with origin `test` (hidden in Žurnāls unless "Rādīt testa pārbaudes" is ticked). The batch check (`tests/pilot/test_pilot_batch.py`) runs 1,000 real rows to an Excel report in under 5 minutes (time printed with `-s`). The BIS and encumbrance checks (`tests/pilot/test_pilot_bis_encumbrances.py`) recount rows from the raw files, compare every stored designation and ATVK with the raw file (no lost leading zero), check the BIS join counts and that the DAP `ATIS_CODE` values are classifier codes. The four giant flood polygons (over a million vertices) are not validated again there: the import validates every stored geometry and records the count in the version's processing notes, which the test checks (re-validating them takes over an hour).
 
 Without real data, run everything else:
 

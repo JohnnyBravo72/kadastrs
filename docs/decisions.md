@@ -10,8 +10,8 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 | D4 | Risk rules, agreed with the team leads | Phase 4 | **decided** | v1 agreed by Janis Bardavskis 2026-10-11, to be revised after the test-set comparison. **v2 agreed 2026-10-12:** encumbrance codes 8317010100, 8317020100, 8317030100 (areas assessed for the cadastral value, about 54,000 pilot parcels) are `not_findings`: listed apart as "Tehniskie apgrūtinājumi", never a finding (an object with only these: clear, risk none instead of low). `config/rules.yaml` `version: "2"`, `status: agreed`; runs keep the rule set they were made with (v1 runs replay unchanged) | Janis Bardavskis, 2026-10-11 / 2026-10-12 |
 | D5 | Ownership module | Phase 8 | **decided** | Built, with owner **type** only (`PersonStatus`); no names. See [Policy](#policy-open-data-only) | Janis, 2026-10-09 |
 | D6 | Sanctions module | Phase 8 | **decided** | Built for **legal entities by reg. no. only** (UR `sanctions`); natural-person fields never imported. See [Policy](#policy-open-data-only) | Janis, 2026-10-09 |
-| D7 | Contents of Avoti and Žurnāls | Phase 6 | open | | |
-| D8 | Project number format (free text for now) | Phase 7 | open | | |
+| D7 | Contents of Avoti and Žurnāls | Phase 6 | **decided** | Avoti: every source with data date, freshness, coverage, licence and data.gov.lv links, plus the versions the open run read. Žurnāls: runs with date, objects, projects, overall risk, module count and origin; see [Phase 7](#phase-7-entry-dialog-reruns-and-projects-decided-2026-10-12-janis) | Janis, 2026-10-12 |
+| D8 | Project number format (free text for now) | Phase 7 | **decided** | Free text, 1–100 characters, as typed (a code, never a number); group names unique per run ignoring case; "Bez projekta" reserved | Janis, 2026-10-12 |
 | D9 | Storage and analysis CRS | Phase 1 | **decided** | EPSG:10306 (LKS-2020 / Latvia TM), see [D9](#d9-storage-and-analysis-crs) | Janis, 2026-10-09 |
 
 ## Policy: open data only
@@ -70,6 +70,17 @@ How a batch list becomes checked objects (`engine/batch/plan.py`; runbook "Batch
 5. **`pieteicejs_reg_nr`:** stored only if it has the legal-entity pattern (11 digits, first digit 4, 5 or 9); anything else may be a personal code and is dropped with a note, its value not stored (Policy above, CLAUDE.md rule 5). A `vertiba` shaped like a personal code (`DDMMYY-NNNNN`) is not resolved or stored either.
 
 Module 2 without any address is shown as **"nav piemērojams"** in the report (decided 2026-10-11 in Phase 4). The uploaded file is not stored; the cleaned rows are (`work.run_input`, insert-only like the other run tables), so the report is built from stored data only and a replayed run gives the same report.
+
+## Phase 7: entry dialog, reruns and projects (decided 2026-10-12, Janis)
+
+1. **Atjaunot** (filter bar) makes a **new** run with the same targets, unit selections and input rows and the new source set. It keeps the parent's **pinned dataset versions, rule set and evaluation time** (`run.checked_as_of`; BIS rates a case by its age on that day), so the modules still run give exactly the parent's results. The parent run is never changed (CLAUDE.md rule 3) and is linked by `run.parent_run_id`.
+2. **Pārbaudīt ar jaunākajiem datiem** makes a new run on the **live** versions with the current rule set and lists the sources whose version changed. Also linked by `parent_run_id`.
+3. **Only ticked units are checked.** A property with a partial selection carries "pārbaudītas N no M īpašuma vienībām (atzīmētās ievades logā)" on its results and in the Excel warnings column. All units ticked = the whole property (no selection stored).
+4. **Project groups** are a view on a stored run: each change is a new row in the insert-only `work.run_grouping` (the newest is current; without a row, groups come from the input's project numbers). Check results are never touched. A deleted group's objects go to "Bez projekta". Runs made from a run start with its grouping.
+5. **The Excel report follows the current grouping** (column "Projekta Nr." on Kopsavilkums) and names the grouping row it used, with its date, on Avoti ("Projektu grupējums"), so a report can be rebuilt for that row (`report.xlsx?grouping=<id>`). Runs without a grouping row show the input's project numbers, as before.
+6. **Imports are read on the server** with the batch reader and not stored; the preview stores nothing. Removing a row re-sends the file with `skip_rows`, so no value is echoed back (a value shaped like a personal code is never shown).
+7. **Žurnāls** lists every run on the server until sign-in exists (Phase 10, then per user), 50 per page, with search by project number and date range. Runs of test servers (origin `test` or `e2e`: the pilot tests, `api-e2e`, the screenshot server `api-screens`) are hidden unless "Rādīt testa pārbaudes" is ticked. Runs are never deleted (D3), so test runs made before 2026-10-12 through the normal server stay visible.
+8. **Sources checklist:** a source that selects a check module can be unticked (its module is not run, its map layer hidden). Base data every module reads (cadastre map, boundaries, ATIS classifier, frozen encumbrance list) is always used and shown greyed. `partial_coverage: true` in `config/sources.yaml` (flood, habitats) adds the note "daļējs pārklājums".
 
 ## D1: agency-hosted resources
 
