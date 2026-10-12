@@ -110,8 +110,9 @@ def _applicant(row: InputRow) -> tuple[str | None, dict | None]:
     )
 
 
-def _given_address(rr: ResolvedRow | None) -> tuple[str | None, list[Warning_], dict | None]:
-    """(VARIS code, target warnings, problem) for the `adrese` column."""
+def given_address(rr: ResolvedRow | None) -> tuple[str | None, list[Warning_], dict | None]:
+    """(VARIS code, target warnings, problem) for the `adrese` column (also used by
+    `check compare`, engine/checks/compare.py)."""
     if rr is None:
         return None, [], None
     if rr.status == "resolved" and rr.type == "address":
@@ -234,7 +235,7 @@ def prepare(conn, rows: list[InputRow]) -> Prepared:
             )
         else:
             objects, p_value = _objects(rr, kind)
-        given, given_notes, p_addr = _given_address(addr_rows.get(i))
+        given, given_notes, p_addr = given_address(addr_rows.get(i))
         problems += [x for x in (p_value, p_kind, p_addr, p_reg) if x]
         target_nos = []
         if objects:

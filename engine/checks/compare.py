@@ -27,7 +27,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
 from engine.batch.headers import canonical, fold
-from engine.batch.plan import ACCEPTS, KINDS
+from engine.batch.plan import ACCEPTS, KINDS, given_address
 from engine.checks import runner, summary
 from engine.checks.contract import TargetIn, Warning_
 from engine.resolve import service
@@ -104,6 +104,7 @@ class ManualRow:
     checked_on: date | None
     notes: str | None
     kind: str | None = None  # veids: property | parcel | building (removes ambiguity)
+    address: str | None = None  # adrese: the address in the application (module 2)
 
 
 def read_template(path: Path) -> list[ManualRow]:
@@ -148,6 +149,7 @@ def read_template(path: Path) -> list[ManualRow]:
                 checked_on=checked if isinstance(checked, date) else None,
                 notes=_text(get("avots_piezimes")),
                 kind=KINDS.get(fold(_text(get("veids")) or "")),
+                address=_text(get("adrese")),
             )
         )
     return out
@@ -171,8 +173,23 @@ def resolve_rows(conn, rows: list[ManualRow]) -> list[Resolved]:
         resolve_config(),
         [service.RowIn(value=r.value) for r in rows],
     )
+    # the address in the application, resolved like the batch `adrese` column
+    with_address = [i for i, r in enumerate(rows) if r.address]
+    given_rows = {}
+    if with_address:
+        given_res = service.resolve(
+            conn,
+            v,
+            load_places(conn, v, p),
+            p,
+            resolve_config(),
+            [service.RowIn(value=rows[i].address, kind="address") for i in with_address],
+        )
+        given_rows = dict(zip(with_address, given_res.rows, strict=True))
     out = []
-    for row, rr in zip(rows, res.rows, strict=True):
+    for i, (row, rr) in enumerate(zip(rows, res.rows, strict=True)):
+        given, given_notes, problem = given_address(given_rows.get(i))
+        given_note = f"norādītā adrese: {problem['reason']}" if problem else None
         if rr.status not in ("resolved", "ambiguous") or not rr.matches:
             out.append(Resolved(row, None, f"{rr.status}: {rr.reason or ''}".strip(": ")))
             continue
@@ -181,6 +198,7 @@ def resolve_rows(conn, rows: list[ManualRow]) -> list[Resolved]:
             m = next((x for x in rr.matches if x.type in ACCEPTS[row.kind]), m)
         notes = [Warning_(code=w.code, message=w.message) for w in rr.warnings]
         notes += [Warning_(code=c.code, message=c.message) for c in rr.corrections]
+        notes += given_notes
         note = None
         if rr.status == "ambiguous" and not (row.kind and m.type in ACCEPTS[row.kind]):
             note = f"neviennozīmīgs; pārbaudīts kā {m.label} {m.designation}"
@@ -197,7 +215,8 @@ def resolve_rows(conn, rows: list[ManualRow]) -> list[Resolved]:
                 type=obj.type,
                 designation=obj.designation,
                 input=row.value,
-                given_address=code,
+                # the application's address wins over the one typed as the value
+                given_address=given or (None if row.address else code),
                 project_no=row.project_no,
                 warnings=notes,
             )
@@ -206,9 +225,11 @@ def resolve_rows(conn, rows: list[ManualRow]) -> list[Resolved]:
                 type=m.type,
                 designation=m.designation,
                 input=row.value,
+                given_address=given,
                 project_no=row.project_no,
                 warnings=notes,
             )
+        note = "; ".join(n for n in (note, given_note) if n) or None
         out.append(Resolved(row, target, note))
     return out
 

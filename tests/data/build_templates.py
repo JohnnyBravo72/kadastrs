@@ -48,28 +48,29 @@ def test_set():
     ws.title = "Testa_kopa"
     # readable Latvian headers (old names still accepted, engine/batch/headers.py)
     by_name = {c.name: c for c in INPUT_COLUMNS + TEST_SET_COLUMNS}
-    names = ["projekta_nr", "vertiba", "veids", "pieteicejs_reg_nr",
+    names = ["projekta_nr", "vertiba", "adrese", "veids", "pieteicejs_reg_nr",
              "m1_kadastra_dati", "m2_adreses_atbilstiba", "m3_aizsargajama_daba", "m4_pludi_10_gadi",
              "m5_buvniecibas_lietas", "m6_apgrutinajumi", "parbaudes_datums", "avots_piezimes"]
-    widths = [16, 30, 26, 24, 34, 28, 34, 30, 34, 34, 16, 44]
+    widths = [16, 30, 32, 26, 24, 34, 28, 34, 30, 34, 34, 16, 44]
     style_headers(ws, [(by_name[n], w) for n, w in zip(names, widths)], rows=500)
     hint = "‹Ir: … / Nav / Nav datu / Nav pārklājuma›"
     examples = [
-        ["PIEMĒRS-1 (izdzēst)", "05000041006", "īpašums", "90000077325", hint, hint, hint, hint, hint, hint, None,
+        ["PIEMĒRS-1 (izdzēst)", "05000041006", "Tautas iela 11, Daugavpils", "īpašums", "90000077325", hint, hint, hint, hint, hint, hint, None,
          "Piemērs no sākotnējiem datiem: Daugavpils, Tautas iela 11. Atbildes aizpilda kolēģis."],
-        ["PIEMĒRS-2 (izdzēst)", "09000360220", None, None, hint, hint, hint, hint, hint, hint, None,
+        ["PIEMĒRS-2 (izdzēst)", "09000360220", None, None, None, hint, hint, hint, hint, hint, hint, None,
          "Piemērs no sākotnējiem datiem: Jelgava. Atbildes aizpilda kolēģis."],
     ]
     for r, row in enumerate(examples, 2):
         for c, v in enumerate(row, 1):
             cell = ws.cell(row=r, column=c, value=v)
             cell.fill, cell.alignment = EXAMPLE_FILL, WRAP
+    date_col = get_column_letter(names.index("parbaudes_datums") + 1)
     for r in range(2, 502):
-        ws[f"K{r}"].number_format = "yyyy-mm-dd"
+        ws[f"{date_col}{r}"].number_format = "yyyy-mm-dd"
     dv = DataValidation(type="date", operator="greaterThan", formula1="DATE(2020,1,1)", allow_blank=True,
                         error="Ievadiet datumu (GGGG-MM-DD).", errorTitle="Datums")
     ws.add_data_validation(dv)
-    dv.add("K2:K501")
+    dv.add(f"{date_col}2:{date_col}501")
 
     info = wb.create_sheet("Instrukcija", 0)
     instructions(info, [
@@ -81,7 +82,9 @@ def test_set():
         "• Viena rinda = viens objekts. Ja projektā ir vairāki objekti, katram sava rinda ar to pašu projekta_nr.",
         f"• {by_name['projekta_nr'].header}: projekta numurs (brīvs teksts).",
         f"• {by_name['vertiba'].header} (obligāta): kadastra numurs (11 cipari), kadastra apzīmējums (11, 14 vai 17 cipari) vai adrese. "
-        "Kolonnas A–D ir teksta formātā: ievadiet ciparus ar sākuma nullēm (piem., 05000041006).",
+        "Kolonnas A–E ir teksta formātā: ievadiet ciparus ar sākuma nullēm (piem., 05000041006).",
+        f"• {by_name['adrese'].header}: adrese, kā tā norādīta pieteikumā. Rīks pārbauda, vai tā atbilst "
+        "objektam (M2); bez tās M2 netiek salīdzināts.",
         f"• {by_name['veids'].header}: izvēlieties no saraksta, ja 11 ciparu numurs var būt gan "
         "īpašuma numurs, gan citam īpašumam piederošas zemes vienības apzīmējums; bez tā rīks pārbauda abus.",
         f"• {by_name['pieteicejs_reg_nr'].header}: pieteicēja juridiskās personas reģistrācijas numurs (ja ir). "
@@ -96,7 +99,7 @@ def test_set():
         "",
         "Moduļi:",
         "m1 Kadastra dati: zemes vienības / būves, platība, lietošanas mērķis, būves uz zemes vienības.",
-        "m2 Adreses atbilstība: vai norādītā adrese atbilst kadastra objektam («Neatbilst»).",
+        "m2 Adreses atbilstība: vai adrese pieteikumā (kolonna „Adrese pieteikumā”) atbilst kadastra objektam («Neatbilst»).",
         "m3 Aizsargājamā daba: ĪADT, mikroliegums, mikrolieguma buferzona, dabas piemineklis, aizsargājams biotops "
         "(katru atsevišķi).",
         "m4 Plūdi: 3. cikla pavasara palu karte, reizi 10 gados (10 % varbūtība). Vai objekts ir plūdu zonā, "

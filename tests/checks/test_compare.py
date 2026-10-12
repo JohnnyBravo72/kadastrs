@@ -39,10 +39,18 @@ ROWS = [
         date(2026, 10, 1),
     ),
     ("P-3", "12345", "Ir", None, None, None, None, None, None),
-    # property-or-parcel number; veids picks the parcel
-    ("P-4", "05000040014", "Ir", None, None, None, None, None, None),
+    # property-or-parcel number; veids picks the parcel; its application names another
+    # object's address (Salnas iela 22 belongs to 09000050405): M2 "Neatbilst"
+    ("P-4", "05000040014", "Ir", "Ir: neatbilst", None, None, None, None, None),
+    # the application's address is the object's own: M2 agrees "Nav"
+    ("P-5", "09000360220", "Ir", "Nav (atbilst)", None, None, None, None, None),
 ]
 KIND = {8: "zemes vienība"}  # row -> veids
+ADDRESS = {  # row -> "Adrese pieteikumā"
+    5: "Neesoša iela 1, Jelgava",  # not found: the object is still checked, M2 not compared
+    8: "Salnas iela 22, Jelgava",
+    9: "Institūta iela 4, Jelgava",
+}
 
 
 @pytest.fixture
@@ -54,6 +62,7 @@ def filled(tmp_path):
         ws.cell(row=r, column=col["projekta_nr"], value=project)
         ws.cell(row=r, column=col["vertiba"], value=value)  # 9000050400 as a number: zero lost
         ws.cell(row=r, column=col["veids"], value=KIND.get(r))
+        ws.cell(row=r, column=col["adrese"], value=ADDRESS.get(r))
         for name, a in zip(compare.MODULE_COLUMNS, answers, strict=True):
             ws.cell(row=r, column=col[name], value=a)
         ws.cell(row=r, column=col["parbaudes_datums"], value=checked)
@@ -84,7 +93,7 @@ def test_compare_filled_template(engine_db, filled, tmp_path):
     with engine_db() as conn:
         report = compare.compare(conn, filled)
     lines = {(line.row_no, line.module): line for line in report.lines}
-    assert {line.row_no for line in report.lines} == {4, 5, 6, 7, 8}  # examples skipped
+    assert {line.row_no for line in report.lines} == {4, 5, 6, 7, 8, 9}  # examples skipped
     assert report.rule_set == "2 (agreed)"
 
     flood = lines[(4, "flood_10y")]
@@ -101,6 +110,16 @@ def test_compare_filled_template(engine_db, filled, tmp_path):
     assert (differs.manual, differs.engine, differs.outcome) == ("clear", "not_covered", "differs")
     assert differs.newer_data is True  # data dated after the 2026-01-01 check
     assert lines[(5, "address_consistency")].outcome == "not_answered"
+    unresolved = lines[(5, "address_consistency")]  # the address in the application: not found
+    assert unresolved.engine == "not_applicable" and "norādītā adrese" in unresolved.note
+    assert lines[(5, "flood_10y")].designation == "05000010069"  # the object is still checked
+
+    # "Adrese pieteikumā" is the given address: M2 can be compared
+    mismatch = lines[(8, "address_consistency")]
+    assert (mismatch.manual, mismatch.engine, mismatch.outcome) == ("found", "found", "agrees")
+    assert mismatch.detail == "Neatbilst"
+    own = lines[(9, "address_consistency")]
+    assert (own.manual, own.engine, own.outcome) == ("clear", "clear", "agrees")
 
     addr = lines[(6, "address_consistency")]
     assert (addr.designation, addr.engine, addr.outcome) == ("09000360220", "clear", "agrees")
@@ -120,7 +139,7 @@ def test_compare_filled_template(engine_db, filled, tmp_path):
     assert counts["flood_10y"] == {
         "agrees": 2,
         "differs": 1,
-        "not_answered": 2,  # rows 7 (not resolved) and 8 (only m1 answered)
+        "not_answered": 3,  # rows 7 (not resolved), 8 and 9 (only m1, m2 answered)
         "not_comparable": 0,
     }
     assert counts["cadastre_facts"]["not_comparable"] == 1  # row 7 not resolved

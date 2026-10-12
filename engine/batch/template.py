@@ -37,7 +37,7 @@ NOTES = {
     "veids": "Neobligāta. Izvēlieties, ja 11 ciparu numurs var būt gan īpašums, gan citam"
     " īpašumam piederoša zemes vienība; bez tā rīks pārbauda abus.",
 }
-TEXT_COLUMNS = {"vertiba", "projekta_nr", "pieteicejs_reg_nr", "veids"}
+TEXT_COLUMNS = {"vertiba", "projekta_nr", "pieteicejs_reg_nr", "adrese", "veids"}
 
 
 def style_headers(ws: Worksheet, columns: Sequence[tuple[Column, int]], rows: int = ROWS) -> None:
