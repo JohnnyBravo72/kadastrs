@@ -211,8 +211,49 @@ services:
       db:
         condition: service_started  # only to make sure kadastrs-db:dev is built first
 
+  # --- e2e profile: the results view in a browser (Playwright) --------------------
+  #   docker compose --profile test run --rm tests python -m tests.e2e.seed
+  #   docker compose --profile e2e up -d --force-recreate --wait api-e2e
+  #   docker compose --profile e2e run --rm e2e
+
+  # The api image on the seeded kadastrs_test database; no network for freshness.
+  api-e2e:
+    profiles: [e2e]
+    image: kadastrs-api:dev
+    environment:
+      DATABASE_URL: postgresql://kadastrs:${KADASTRS_DB_PASSWORD:-kadastrs-dev}@db:5432/kadastrs_test
+      KADASTRS_FRESHNESS_CHECK: "off"
+    volumes:
+      - ../config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 3s
+      timeout: 6s
+      retries: 20
+      start_period: 3s
+    depends_on:
+      api:
+        condition: service_healthy  # same image, built by the api service
+
+  # Playwright in its official container (no Node on the host); OSM tiles are
+  # answered with a blank image inside the test.
+  e2e:
+    profiles: [e2e]
+    image: mcr.microsoft.com/playwright:v1.48.0-jammy
+    working_dir: /e2e
+    environment:
+      E2E_BASE_URL: http://api-e2e:8000
+    command: ["sh", "-c", "npm ci --ignore-scripts --no-audit --no-fund && npx playwright test"]
+    volumes:
+      - ../e2e:/e2e
+      - e2e_node_modules:/e2e/node_modules
+    depends_on:
+      api-e2e:
+        condition: service_healthy
+
 volumes:
   dbdata:
   web_node_modules:
+  e2e_node_modules:
   etl_raw:
   precommit_cache:

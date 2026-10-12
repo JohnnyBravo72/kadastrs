@@ -35,7 +35,8 @@ Full details in [docs/runbook.md](docs/runbook.md). From the repo root (PowerShe
 - **Stop:** `docker compose --profile test --profile etl down`. **Reset the DB:** add `-v`.
 - **Import data:** `docker compose run --rm etl import all` (or source ids), `docker compose run --rm etl status`.
 - **Checks:** `POST /api/runs` or `docker compose run --rm check run|show|replay|compare …` (engine in `engine/checks`). A run pins dataset versions; `replay <run_id>` must reproduce it. Compare returned test-set files with `check compare <file.xlsx>`.
-- **Batch + Excel:** `POST /api/batch`, `check batch <file|->`, or the page at `http://127.0.0.1:8000/`; report of a stored run: `GET /api/runs/{id}/report.xlsx` or `check report <id> [--replay]` (`reports/excel.py`, built only from stored results).
+- **Batch + Excel:** `POST /api/batch` or `check batch <file|->`; report of a stored run: `GET /api/runs/{id}/report.xlsx` or `check report <id> [--replay]` (`reports/excel.py`, built only from stored results).
+- **Results view:** `http://127.0.0.1:8000/` (`web/`, Vite + React + TS + Leaflet, built in the api image's `web` stage; Node only in containers). Map data only from a run's pinned versions (`engine/map/geo.py`). Dev server: `docker compose --profile web up web`. End-to-end: `docker compose --profile e2e run --rm e2e` after seeding (`docs/runbook.md`).
 - **Tests:** `docker compose --profile test run --rm tests`. Tests run in a container because Smart App Control blocks psycopg's DLL on the host; CI does the same. The `pilot` tests need a real import (twice) in the dev DB; without it use `-m "not pilot"`.
 - **Lint:** `docker compose --profile lint run --rm lint pre-commit run --all-files` (the git hook runs the same container on every commit).
 - **Load the source registry:** `docker compose exec api python -m etl.sources load`.

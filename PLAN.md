@@ -9,6 +9,7 @@
 **Status (2026-10-11):** Phases 1–3 are done; Phase 4 (check engine v1) is built and tested, risk rules v1 are agreed (D4, 2026-10-11; to be revised after the test-set comparison), and the comparison with the colleagues' manual answers waits for the filled test-set files. Phase 5 (batch + Excel) is built and tested; its "done when" (pilot with 2–3 colleagues, time per object vs the baseline) is open. Earlier: Phase 0 steps 1 and 3 were done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
 
 **Change log**
+- 2026-10-11 (Phase 6, results view): Vite + React + TypeScript + Leaflet frontend, built in the api image (no Node on the host) and served at `/`, replacing the plain form. Input: search (`/api/suggest`) plus paste/upload, all through `POST /api/batch`. Results per run (URL `?run=&target=&view=`): header with the kadastra numurs and address, status strip (chip per module; click = card + layer), map with the checked objects by worst risk, hatched attention areas (the engine's own overlaps, risk of the fired rule) and the layers Kadastrs, Plūdi (with "nav plūdu kartes"), Daba, BIS from the run's pinned versions (view box ≤ 6 km), module cards, target switcher, overview table, Excel download. Risk always colour + icon + word (Paul Tol vibrant). D2 decided: OSM tiles. Tests: map API, vitest, Playwright end-to-end in CI, pilot map checks. Not yet: zoning (module 8), the §8.2 header (Atlase / Avoti / Žurnāls) and filter bar, the full §8.3 list.
 - 2026-10-11 (freshness): freshness is checked against the source (§2.2, `docs/decisions.md` "Freshness"): "aktuāli" when we hold the latest release on data.gov.lv, a warning when a newer release is not imported or the publisher has been silent longer than `source_stale_after` (replaces `max_age`). Runs read `package_show` at start (the only live call), record it in `source_check`, and store the verdict with the run. Avoti and the source notes are in Latvian (`coverage_lv`, `processing_lv`).
 - 2026-10-11 (Phase 5): batch input and the Excel report (§7.1).
   - Input: pasted list, CSV or XLSX (`vertiba`, optional `projekta_nr`, `pieteicejs_reg_nr`, `adrese`, new optional `veids`), at most 1,000 rows; via `POST /api/batch`, `check batch` and a plain page at `/` (upload or paste → Excel). The upload is not stored; the cleaned rows are (`work.run_input`, insert-only).
@@ -79,7 +80,7 @@
 - **Rule:** every dataset the platform uses must be listed on **data.gov.lv**. Nothing comes from scraping, commercial services (Lursoft) or login-protected portals.
 - **Agency-hosted resources (D1, decided 2026-10-09):** an official agency resource referenced from a data.gov.lv dataset page (file, WFS, ArcGIS service) is allowed. It must be listed by name in `docs/decisions.md` (D1) and in `config/sources.yaml` (`allowed_external_resources`).
 - **Open data only:** the project needs no external permissions or approvals. If a dataset is missing or not open, the module is not built and shows as *unavailable* in the source registry.
-- **Basemap:** background tiles are not datasets. **Decision needed:** OSM tiles (as in the prototype, attribution required) or a plain background drawn only from imported parcels and buildings.
+- **Basemap (D2, decided 2026-10-11):** background tiles are not datasets. OpenStreetMap tiles with attribution; own tiles or a provider before shared hosting (`docs/decisions.md` D2).
 
 ### 2.2 How data gets in
 - **Find:** datasets are found through the data.gov.lv CKAN API (`package_search`, `package_show`).
@@ -422,7 +423,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 3. Resolution | `/suggest`, `/resolve`, property units; leading-zero repair | Test-set inputs resolve correctly, including ambiguous ones |
 | 4. Check engine v1 | Modules 1–6, spatial rules, risk rules v1, stored runs and results | The test set's findings match the colleagues' manual answers, with differences explained by data dates |
 | 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report; a plain input page. **Built and tested 2026-10-11** | **Pilot with 2–3 colleagues; measured time per object vs the baseline** (open) |
-| 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list | UI criteria pass for the pilot area |
+| 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list. **Results view built 2026-10-11** (map, layers, attention areas, cards, overview); zoning, header tabs and filter bar open | UI criteria pass for the pilot area |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in) | UI criteria pass |
 | 8. Applicant & funding | Modules 7 and 9–14, and 17 | Each module verified on the test set |
 | 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history), re-check value of `pirmsregistretas-buves` on whole-country data | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
@@ -450,7 +451,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | # | Decision | Needed by |
 |---|---|---|
 | D1 | Agency-hosted resources listed on data.gov.lv count as data.gov.lv? | Phase 0 |
-| D2 | Basemap: OSM or plain | Phase 6 |
+| D2 | Basemap: **decided** OSM tiles with attribution (2026-10-11) | Phase 6 |
 | D3 | Hosting, sign-in, security review, retention, maintenance, legal status (section 1; interim answers recorded) | Phase 10 |
 | D4 | Risk rules v1, agreed with the team leads: **decided**, v1 agreed 2026-10-11 (revise after the test-set comparison) | Phase 4 |
 | D5 | Ownership module: **decided**, owner type only | Phase 8 |

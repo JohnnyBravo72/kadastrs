@@ -31,16 +31,24 @@ jobs:
     # 10306, Odukalns within 1 cm, and the no-grid negative checks) and the ETL
     # rule tests T-E1..T-E7 on synthetic files.
     runs-on: ubuntu-24.04   # pinned; upgrade deliberately (docs/runbook.md)
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - name: Build and start db, migrate, api
         run: docker compose up -d --build --wait
       - name: Run tests (fixture-based; real pilot data runs in pilot-import.yml)
         run: docker compose --profile test run --rm tests python -m pytest -p no:cacheprovider -m "not pilot"
+      # The results view in a browser (Playwright container) on the synthetic seed;
+      # the frontend itself (vitest, tsc, vite build) is built with the api image above.
+      - name: Seed the end-to-end database
+        run: docker compose --profile test run --rm tests python -m tests.e2e.seed
+      - name: End-to-end test (search, chips, layer, Excel)
+        run: |
+          docker compose --profile e2e up -d --force-recreate --wait api-e2e
+          docker compose --profile e2e run --rm e2e
       - name: Service logs
         if: failure()
-        run: docker compose --profile test logs --no-color
+        run: docker compose --profile test --profile e2e logs --no-color
       - name: Stop
         if: always()
-        run: docker compose --profile test down -v
+        run: docker compose --profile test --profile e2e down -v

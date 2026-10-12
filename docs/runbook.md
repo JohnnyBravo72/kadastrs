@@ -260,6 +260,32 @@ docker compose run --rm check report 30 --out parbaude.xlsx [--replay]
 
 Timing on the pilot import (`tests/pilot/test_pilot_batch.py`): 1,000 rows (600 parcels, 300 buildings, 100 addresses → 1,227 objects) in about 26 s including the report; the §9 target is under 5 minutes.
 
+## Results view (Phase 6)
+
+Open `http://127.0.0.1:8000/`. Search a kadastra numurs, apzīmējums or address (suggestions as you type), or paste a list or upload a CSV / XLSX, and press **Pārbaudīt**. Everything goes through `POST /api/batch`, so the batch rules above apply. The results open at `/?run=<id>&target=<n>`; the link reopens the same view (`&view=all` for all objects).
+
+- **Header:** kadastra numurs, address, type, overall risk; ◀ ▶, the object list (grouped by project) and a search box when there are several objects; **Lejupielādēt Excel** (the stored report) and **+ Jauna pārbaude**.
+- **Status strip:** one chip per module, colour + icon + word (augsts ▲, vidējs ◆, nezināms ?, zems ●, nav ✓; grey "Nav piemērojams"). A click opens the module's card and turns on its map layer.
+- **Map:** the checked object coloured by its worst risk (dashed when checked on its parcel), the **attention areas** hatched in the colour of the rule that fired (click: module, rule text, m², %), and the layers Kadastrs, Plūdi (10-year zone; hatched "nav plūdu kartes" outside the 200-year mask), Daba (by kind) and BIS, each with opacity, legend and data date. Layers load for the current view from the run's **pinned** dataset versions, so the map matches the report; a view wider than about 6 km asks to zoom in ("Pietuviniet karti").
+- **Cards:** status, risk, rule text, items, warnings, units of a property, source, data date, freshness and data.gov.lv link. Findings open, clean results collapsed.
+- **Visi objekti:** risk counts, a map with a marker per object, the overview table (one row per object, one column per module) and the rows that were not checked (as on the Excel "Neatrasts" sheet).
+
+The frontend lives in `web/` (Vite + React + TypeScript + Leaflet). It is built inside the api image (`api/Dockerfile`, stage `web`: vitest, `tsc`, `vite build`), so `docker compose up -d --build` is all it needs; Node never runs on the host. For frontend work with hot reload: `docker compose --profile web up web` and open `http://127.0.0.1:5173/` (proxies `/api` to the api container). After changing `web/package.json`, regenerate the lockfile in a container:
+
+```powershell
+docker run --rm -v "${PWD}/web:/web" -w /web node:22.11.0-bookworm-slim npm install --package-lock-only --ignore-scripts
+```
+
+Map API (EPSG:4326 GeoJSON, pinned versions only): `GET /api/runs/{id}/map/targets`, `/api/runs/{id}/targets/{n}/attention`, `/api/runs/{id}/layers/{kadastrs|pludi|daba|bis}?bbox=minLon,minLat,maxLon,maxLat`.
+
+**End-to-end test** (Playwright in its container, on the synthetic seed in `kadastrs_test`; runs in CI after pytest):
+
+```powershell
+docker compose --profile test run --rm tests python -m tests.e2e.seed
+docker compose --profile e2e up -d --force-recreate --wait api-e2e
+docker compose --profile e2e run --rm e2e
+```
+
 ## Run the tests
 
 ```powershell

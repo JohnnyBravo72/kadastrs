@@ -138,3 +138,10 @@ def test_target_results_carry_rule_texts(client, run):
             "text_lv": "Vismaz 10 % objekta atrodas 10 gadu plūdu zonā.",
         }
     ]
+
+
+def test_view_without_any_flood_map_is_all_no_flood_map(client, run):
+    """Daugavpils in the seed has no coverage mask: the whole view is hatched."""
+    body = client.get(f"/api/runs/{run}/layers/pludi", params={"bbox": "26.50,55.86,26.52,55.87"})
+    assert body.status_code == 200
+    assert [f["properties"]["kind"] for f in body.json()["features"]] == ["no_flood_map"]

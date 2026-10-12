@@ -375,7 +375,7 @@ def layer(conn, run_id: int, name: str, bbox: tuple[float, float, float, float])
                 f"""SELECT {GEOJSON.format(g="g")} FROM (
                         SELECT ST_SimplifyPreserveTopology(ST_Difference({env},
                                    coalesce(ST_Union(ST_Intersection(p.geom, {env})),
-                                            'POLYGON EMPTY'::geometry)), %s) AS g
+                                            ST_GeomFromText('POLYGON EMPTY', 10306))), %s) AS g
                         FROM ref.flood_zone_part p
                         WHERE p.dataset_version_id = %s AND p.role = 'coverage_mask'
                               AND p.geom && {env}) x

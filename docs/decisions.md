@@ -5,7 +5,7 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 | # | Decision | Needed by | Status | Outcome | Decided by / date |
 |---|---|---|---|---|---|
 | D1 | Agency-hosted resources listed on data.gov.lv count as data.gov.lv? | Phase 0 | **decided** | Yes, see [D1](#d1-agency-hosted-resources) | Janis, 2026-10-09 |
-| D2 | Basemap: OSM or plain | Phase 6 | open | | |
+| D2 | Basemap: OSM or plain | Phase 6 | **decided** | OpenStreetMap tiles with attribution, see [D2](#d2-basemap-openstreetmap-tiles) | Janis, 2026-10-11 |
 | D3 | Hosting, sign-in, security review, retention, maintenance, legal status (PLAN.md §1) | **Phase 10** | open (**interim answers in force**) | Interim (2026-10-09): local Docker on Janis's PC for Phases 1–9; no sign-in, local only (sign-in required before any shared hosting); security review before shared hosting; keep all runs; maintenance Janis; footer "Informatīvs pārskats, balstīts uz atvērtajiem datiem; nav oficiāls reģistra izraksts". Revisit in Phase 10 | Janis, 2026-10-09 (interim) |
 | D4 | Risk rules v1, agreed with the team leads | Phase 4 | **decided** | v1 agreed by Janis Bardavskis 2026-10-11, to be revised after the test-set comparison. `config/rules.yaml` `version: "1"`, `status: agreed`, one reason per rule; every run and report shows version and status | Janis Bardavskis, 2026-10-11 |
 | D5 | Ownership module | Phase 8 | **decided** | Built, with owner **type** only (`PersonStatus`); no names. See [Policy](#policy-open-data-only) | Janis, 2026-10-09 |
@@ -22,6 +22,14 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 - Sanctions cover **legal entities, matched by reg. no.** only.
 - **No names of natural persons are stored** (nor personal codes or birth dates).
 - Data that is not open (e.g. ATIS geometries, land book) is not used, and the affected check shows as *unavailable*.
+
+## D2: basemap, OpenStreetMap tiles (decided 2026-10-11, Janis)
+
+The results view (Phase 6) uses **OpenStreetMap standard tiles** (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`) as the background, with the attribution "© OpenStreetMap līdzautori" on the map and in the page footer.
+- Tiles are not datasets (PLAN §2.1): nothing from them is stored, checked or reported. Every feature drawn over them comes from our API for the run's pinned versions (data.gov.lv imports).
+- OSM's tile usage policy allows this low volume (a few pilot users, a normal browser, attribution shown). **Before shared hosting (Phase 10, D3)** use our own tiles or a tile provider with terms for that use.
+- Tile requests tell the OSM servers which area a user looks at; acceptable for the local pilot, to be reviewed with D3.
+- The tiles are shown slightly desaturated so the risk colours stand out. Automated tests never fetch them (the end-to-end test answers tile requests with a blank image).
 
 ## Freshness against the source (decided 2026-10-11, Janis)
 
