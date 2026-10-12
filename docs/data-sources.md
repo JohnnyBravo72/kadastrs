@@ -393,7 +393,22 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
 - [`uz`](https://data.gov.lv/dati/lv/dataset/uz) (UR, daily, CC0): `register.csv` (128.8 MB), 489,147 rows (221,415 not terminated).
 - Fields: `regcode, sepa, name, name_before_quotes, name_in_quotes, name_after_quotes, without_quotes, regtype, regtype_text, type, type_text, registered, terminated, closed, address, index, addressid, region, city, atvk, reregistration_term`.
 - **No NACE.** UR also publishes `area-of-activity` ("Tiesību subjektu darbības mērķi un veidi"), found in search but **not inspected**.
-- Other UR datasets found but not inspected: `patiesie-labuma-guveji`, `maksatnespejas-procesi`, `liquidations`, `gada-parskatu-finansu-dati`.
+- Other UR datasets found but not inspected: `patiesie-labuma-guveji`, `liquidations`, `gada-parskatu-finansu-dati`.
+
+**Phase 8a check (2026-10-12; CKAN `package_show`, the file streamed and counted, no values printed):**
+- Resource `25e80bf3-f107-4ab4-89ef-251b5b9374e9` (`register.csv`, CSV, `;`-separated, UTF-8 with BOM, 128.8 MB), CKAN `last_modified` 2026-10-11, CC0-1.0, daily.
+- 489,210 rows. Columns as above (21, in that order; `config/schemas.yaml` `ur_register`).
+- `regcode`: 454,951 with the legal-entity pattern `^[459][0-9]{10}$`, 34,233 with 9 digits (old Uzņēmumu reģistra žurnāls numbers), **26 other 11-digit values** (not imported: they could be personal codes).
+- `closed`: `L` 258,735 (likvidēts / izslēgts; the file does not tell them apart), `R` 8,374 (reorganizēts), blank 222,101 (active). `terminated` is filled exactly for `L`/`R` (YYYY-MM-DD); `registered` YYYY-MM-DD (94 empty).
+- `type` (form): SIA 338,621, ZEM 38,960, BDR 30,216, **IK 28,211**, **IND 23,443**, MIL, KB, PAR, AS, … (`type_text` the Latvian name). IK (individuālais komersants) and IND (individuālais uzņēmums) are usually named after the owner: **their names are not stored** (D10).
+- `addressid` filled in every row (VARIS code of the legal address; 0 when unknown), `address` text in 488,632.
+- Insolvency is not in this file: see the next section.
+
+### 3.9a Insolvency proceedings (UR)
+- [`maksatnespejas-procesi`](https://data.gov.lv/dati/lv/dataset/maksatnespejas-procesi) (UR, daily, CC0-1.0), resource `8065ad80-1a4d-4afb-b1d1-d93b9a62b1cc` (CSV, `;`, 6.2 MB; an XLSX copy `0f6587a0-…` is not used). Checked 2026-10-12.
+- Columns: `proceeding_id, debtor_name, debtor_registration_number, debtor_cleaned_name, debtor_address, proceeding_started_on, proceeding_ended_on, proceeding_form, proceeding_type, proceeding_subtype, proceeding_resolution_type, proceeding_resolution_name, entry_created_on, court_case_initial_number, court_code, court_name, creditor_applications_deadline_*, legislation_number, legislation_version`.
+- The file is `insolvency_legal_person_proceeding.csv`: **18,020 rows, every `debtor_registration_number` with the legal-entity pattern** (checked 2026-10-12). Dates `YYYY-MM-DD` (`entry_created_on` with a time); `proceeding_ended_on` empty for 806 open proceedings. `proceeding_form`: `INSOLVENCY` 15,421, `LEGAL_PROTECTION` 2,139, `OUT_OF_COURT_LEGAL_PROTECTION` 460.
+- Imported: reg. no., proceeding id, dates, form, type, subtype and resolution; never the debtor's name or address. The legal-entity filter stays as a guard in case personal insolvency is ever added to the file (D10).
 
 ### 3.10 VID
 - [`nodoklu-maksataju-reitings`](https://data.gov.lv/dati/lv/dataset/nodoklu-maksataju-reitings) (VID, irregular, CC0): `Registracijas_kods, Nosaukums, Reitings, Skaidrojums, Informacijas_atjaunosanas_datums`.
@@ -440,7 +455,15 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
 ### 3.17 Sanctions
 - [`sanctions`](https://data.gov.lv/dati/lv/dataset/sanctions) (UR, daily, CC0, 22 KB CSV): persons in UR registers subject to sanctions, and entities possibly under their control.
   - Fields include `entity_type, name, birth_date, latvian_identity_number_masked, legal_entity_registration_number, sanctions_subject_registration_number, list, program, legal_base`.
+  - **Checked 2026-10-12** (counts only): resource `fa10a73f-0a10-4ce7-b0f8-f9652d572a10`, `;`-separated UTF-8, 23 columns (`config/schemas.yaml` `ur_sanctions`; field titles in `sanctions_metadata.json`, resource `fcf173e6-…`). **64 rows: `NATURAL_PERSON` 59, `LEGAL_ENTITY` 3, `FOREIGN_ENTITY` 2.** Lists `ES_SANCTIONS` 32, `SDN_OFAC_SANCTIONS` 31, `LV_SANCTIONS` 1.
+  - A `NATURAL_PERSON` row holds the person's name, birth date, part of the personal code and nationality, **and** in `sanctions_subject_registration_number` the Latvian legal entity linked to that person (58 of 59 rows, 38 distinct companies), with the relationship in `position_text_lv`.
+  - `LEGAL_ENTITY` rows: `legal_entity_registration_number` is a Latvian reg. no. (3 of 3). `FOREIGN_ENTITY` rows: foreign entity, its `sanctions_subject_registration_number` the Latvian link (2 of 2).
+  - **Imported (D10, option A):** `LEGAL_ENTITY` and `FOREIGN_ENTITY` rows only, without `name`, `birth_date`, `latvian_identity_number_masked` and `nationality`. Nothing from `NATURAL_PERSON` rows is stored (option B pending, D10).
 - [`sankciju-subjektu-lidzekli-…-iesaldeti-latvija`](https://data.gov.lv/dati/lv/dataset/sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija) (FID, irregular): XLSX of frozen assets by register, incl. "TA, VZD dati".
+  - **Checked 2026-10-12:** six XLSX resources (sheets `Dati` and `Informācija par datiem`). Imported: **"Sankciju subjekti (Excel)" `00f557d4-3096-4d8f-b0bb-c52f90ad50fb`** (CKAN `last_modified` 2026-10-09; 182 data rows), the list of all subjects whose funds or economic resources are frozen. Its header is the first row, ten numbered columns (`config/schemas.yaml` `fid_subjects`).
+  - Column 2 "Dzimšanas datums / reģistrācijas Nr." holds a Latvian legal-entity reg. no. (26 rows), a birth date (20), a foreign number (127) or nothing. **Column 6 names the sanctioned (often natural) person** and column 1 is a person's name when the subject is a person.
+  - **Imported:** rows whose column 2 is a Latvian legal-entity reg. no.; columns 1 (the entity's name), 2, 3, 4, 5, 7, 8, 10. Column 6 and every other row are never stored (D10).
+  - The register-specific files (UR, TA/VZD, PV, LDC, CSDD…) repeat these subjects per register. The **TA, VZD** file (`f8dd1178-…`) lists **cadastre numbers of frozen real estate** (14-digit building and 11-digit property numbers): a candidate object check for later, not imported.
 - EU/UN consolidated lists themselves: **NOT FOUND** on data.gov.lv (searched "sankcijas", "sankciju saraksts").
 
 ---
@@ -647,5 +670,8 @@ Links that only **open** an object in the publisher's own public system, next to
 | BIS (BVKB) | construction case | `https://bis.gov.lv/bisp/lv/planned_constructions?search[case_number]={case}&search_type=simple` | shows the case (BIS-BL-895076-16218 "Žogs", BIS-20076-697 "Skola", Institūta iela 4) | public list "Plānotie būvdarbi"; the case portal itself (`/bisp/`) needs login; search by kadastra apzīmējums found nothing |
 | Ozols (DAP) | nature overlap | `https://ozols.gov.lv/pub` | public map opens | the app reads **no URL parameters** (checked in its scripts): link to the map + copy the kadastra numurs (Ozols searches by it) |
 | LVĢMC | flood (3rd cycle) | `https://geodata.lvgmc.lv/portal/apps/webappviewer/index.html?id=45020161703b4e1b936b5d8d65e144c2&center={lon},{lat},4326&level=17` | opens "3. cikla iespējamo plūdu postījuma vietu un plūdu riska kartes" centred on the object (09000050400, Uzvaras iela) | a notice dialog on opening; `marker` is not drawn; the point is on the object's geometry of the run's pinned map version. The 2nd-cycle viewer (`id=8cee7f5e…`) is not used |
+
+| UR | legal entity (applicant) | — | `https://info.ur.gov.lv/#/data-search` opens the public search (logged out, 200); a search runs only from its own box (a single-page app calling `/api/legalentity/search`), and **no URL opens a company** | link to the search page + copy the reg. no. ("Skatīt UR") |
+| FID | sanctions lists (EU, UN, OFAC, LV) | `https://sankcijas.fid.gov.lv/lv/meklet-sankciju-sarakstos/1/0?searchText={query}&exactSearch=0` | runs the public search (logged out, checked with the query "Gazprom": results listed, the query in the search box) | searches by name: the applicant's company name, or the reg. no. when its name is not stored (IK, IND). UR has no public sanctions search; FID's list search is used for "Skatīt sankciju sarakstā" |
 
 `varis.vzd.gov.lv` and `atis.vzd.gov.lv` do not resolve (2026-10-12). Re-check the table when a link stops opening its object (a system redesign changes these patterns without notice).

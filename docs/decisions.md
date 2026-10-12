@@ -13,6 +13,7 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 | D7 | Contents of Avoti and Žurnāls | Phase 6 | **decided** | Avoti: every source with data date, freshness, coverage, licence and data.gov.lv links, plus the versions the open run read. Žurnāls: runs with date, objects, projects, overall risk, module count and origin; see [Phase 7](#phase-7-entry-dialog-reruns-and-projects-decided-2026-10-12-janis) | Janis, 2026-10-12 |
 | D8 | Project number format (free text for now) | Phase 7 | **decided** | Free text, 1–100 characters, as typed (a code, never a number); group names unique per run ignoring case; "Bez projekta" reserved | Janis, 2026-10-12 |
 | D9 | Storage and analysis CRS | Phase 1 | **decided** | EPSG:10306 (LKS-2020 / Latvia TM), see [D9](#d9-storage-and-analysis-crs) | Janis, 2026-10-09 |
+| D10 | Applicant data from UR and FID: which files, rows and fields | Phase 8 | **decided** (option B pending) | Legal-entity rows and fields only; option A for sanctions; see [D10](#d10-applicant-data-ur-fid) | Janis, 2026-10-12 |
 
 ## Policy: open data only
 
@@ -165,3 +166,14 @@ Sources:
 - Odukalns error with the grid: **0.13 cm** on both the geographic path (4661 → 10305) and the projected path (3059 → 10306). Without the grid (`db-nogrid` test service): **9.53 cm**, with no error raised.
 - For imports, use the SQL function `lks92_to_lks2020(geom)` (explicit EPSG:10838 grid pipeline). It raises an error when the grid is missing, instead of silently falling back.
 - Tests: `tests/test_crs.py`, run in CI.
+
+## D10: applicant data (UR, FID)
+
+**Decided 2026-10-12 (Janis).** Rule 5 in CLAUDE.md applied to the applicant modules (9, 14, 17):
+1. **Imported:** UR `register.csv` (whole country: reg. no., form, register, status, registration and end dates, legal address and its VARIS code), UR insolvency proceedings of **legal entities**, the UR sanctions file and FID's "Sankciju subjekti" (rows below). Details: `docs/data-sources.md` §3.9, §3.9a, §3.17.
+2. **Never imported:** UR officers (amatpersonas), members (dalībnieki), beneficial owners (patiesā labuma guvēji, PLG), procurations (prokūras), and any other file about natural persons.
+3. **No names of individual merchants:** the names of `IK` (individuālais komersants) and `IND` (individuālais uzņēmums) are not stored; they are usually the owner's name. Their reg. no., form, status and address are. Farms (`ZEM`) keep their names. A database constraint enforces it.
+4. **Legal-entity numbers only:** every stored registration number has the pattern `^[459][0-9]{10}$` (UR's 9-digit old numbers allowed in the company table); 11-digit numbers of any other shape could be personal codes and are dropped. Personal insolvency rows are dropped.
+5. **Sanctions, option A (in force):** module 17 matches the applicant's reg. no. only against UR `LEGAL_ENTITY` / `FOREIGN_ENTITY` rows and FID rows with a Latvian legal-entity reg. no. **No data from `NATURAL_PERSON` rows is stored**, and FID's column 6 (the sanctioned person) never is. A name-only hit (a UR `FOREIGN_ENTITY` name equal to the applicant's name, no reg. no.) is flagged for manual review with no risk level of its own.
+6. **Sanctions, option B (pending DPO assessment; CFLA's duties under the sanctions law are the likely legal basis):** from a `NATURAL_PERSON` row, store only the **linked company's** fields (reg. no., legal form, relationship `position_text_lv`, list, program, entry date), **never** a person field (name, birth date, personal code part, nationality). Module 17 would then report "uzņēmums saistīts ar sankciju sarakstā iekļautu personu (saistība: …)". Ready to build when decided: one extra table of company links (no person columns, same reg.-no. constraint), an importer branch for `NATURAL_PERSON` rows that copies only those fields, and one rule. Until this decision is updated, **no code path reads those rows** (a test checks it).
+7. **Deep links:** "Skatīt UR" opens UR's public search with the reg. no. to copy; "Skatīt sankciju sarakstā" runs FID's public list search for the applicant (verified patterns, `docs/data-sources.md` §8). Nothing is fetched from those systems.
