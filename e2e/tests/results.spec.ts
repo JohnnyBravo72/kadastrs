@@ -45,7 +45,7 @@ test("search, chips, layer, Excel", async ({ page }) => {
   await expect(page).toHaveURL(/[?&]run=\d+/);
   await expect(page.getByTestId("designation")).toHaveText("09000050400");
   const strip = page.getByTestId("status-strip");
-  await expect(strip.locator(".chip")).toHaveCount(6);
+  await expect(strip.locator(".chip")).toHaveCount(7); // modules 1-6 and 14
   await expect(strip.locator('[data-module="flood_10y"]')).toContainText("atrasts · risks: augsts");
   await expect(strip.locator('[data-module="address_consistency"]')).toContainText("nav piemērojams");
 
@@ -137,7 +137,7 @@ test("property -> untick one unit -> run -> change sources -> Atjaunot -> Žurn�
   await expect(page.getByTestId("parent-note")).toContainText(`Atjaunots no pārbaudes nr. ${first}`);
   await expect(page.getByTestId("pending")).toHaveCount(0);
   await expect(strip.locator('[data-module="bis"]')).toHaveCount(0);
-  await expect(strip.locator(".chip")).toHaveCount(5);
+  await expect(strip.locator(".chip")).toHaveCount(6);
   await expect(page.locator("#card-bis")).toHaveCount(0);
   // its layer is gone from the map panel
   await expect(page.getByTestId("layer-panel")).not.toContainText("Būvniecības lietas (BIS)");
@@ -224,7 +224,42 @@ test("import: preview, remove a row, check", async ({ page }) => {
   await page.getByLabel("Meklēt pēc projekta Nr.").fill("kopēj");
   const journal = page.getByTestId("journal");
   await expect(journal.locator(`tr[data-run="${runNo}"]`)).toBeVisible();
-  await expect(journal.locator("tr[data-run]")).toHaveCount(1);
+  // every listed run has that project (earlier e2e runs on the same DB may too)
+  await expect(journal.locator("tr[data-run]").filter({ hasNotText: "Kopējais" })).toHaveCount(0);
   await page.getByLabel("Meklēt pēc projekta Nr.").fill("nav-tāda-projekta");
   await expect(page.getByText("Atlasei neatbilst neviena pārbaude.")).toBeVisible();
+});
+
+test("an applicant: its own section with UR status, sanctions and links", async ({ page }) => {
+  await noTiles(page);
+  await page.goto("/");
+  const dialog = page.getByRole("dialog", { name: "Jauna pārbaude" });
+  await expect(dialog.getByTestId("sources-list")).toContainText("Pieteicējs");
+  await pickCadastre(page, "090000504", "09000050400", "zemes vienības apzīmējums");
+  // a synthetic legal entity on the UR sanctions file (tests/checks/conftest.py)
+  await dialog.getByLabel("Pieteicēja reģ. Nr.").fill("40003100005");
+  await dialog.getByRole("button", { name: "Pārbaudīt" }).click();
+
+  await expect(page).toHaveURL(/[?&]run=\d+/);
+  const section = page.getByTestId("applicants");
+  await expect(section).toContainText("Pieteicējs");
+  const one = section.locator('[data-reg="40003100005"]');
+  await expect(one).toContainText('SIA "Epsilon"');
+  await expect(one.locator('[data-module="applicant_company"]')).toContainText("atrasts · risks: nav");
+  await expect(one.locator('[data-module="sanctions"]')).toContainText("atrasts · risks: augsts");
+  await expect(one.locator("#card-sanctions")).toContainText("reģistrācijas numurs sarakstā");
+  // "Skatīt UR" opens UR's public search with the number to copy; the sanctions
+  // link runs FID's public list search (verified patterns, nothing fetched)
+  await expect(one.locator(".applicant-head").getByRole("link", { name: /Skatīt UR/ })).toHaveAttribute("href", "https://info.ur.gov.lv/#/data-search");
+  await expect(one.locator(".applicant-head").getByRole("link", { name: /Skatīt sankciju sarakstā/ })).toHaveAttribute(
+    "href",
+    /^https:\/\/sankcijas\.fid\.gov\.lv\/lv\/meklet-sankciju-sarakstos\/1\/0\?searchText=SIA/,
+  );
+  // the applicant modules are not object chips
+  const strip = page.getByTestId("status-strip");
+  await expect(strip.locator('[data-module="sanctions"]')).toHaveCount(0);
+  await expect(strip.locator('[data-module="companies_at_address"]')).toHaveCount(1);
+  // and the overview lists the applicant once
+  await page.reload();
+  await expect(page.getByTestId("applicants").locator(".applicant")).toHaveCount(1);
 });

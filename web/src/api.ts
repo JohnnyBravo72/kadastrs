@@ -38,6 +38,7 @@ export interface RunSummary {
   rerun_kind: "sources" | "latest" | null;
   modules: string[];
   module_names: Record<string, string>;
+  module_subjects?: Record<string, "object" | "applicant">;
   targets: number;
   rule_set: { version: string; status: string; sha256: string };
   dataset_versions: DatasetVersion[];
@@ -53,8 +54,19 @@ export interface TargetLine {
   given_address: string | null;
   project_no: string | null;
   label: string | null;
+  applicant_reg_no?: string | null;
   warnings: { code: string; message: string }[];
   modules: Record<string, { status: string; summary_status: Bucket; reason: string | null; risk: Risk }>;
+}
+
+/** GET /api/runs/{id}/applicants: modules 9 and 17 per applicant (Phase 8a). */
+export interface Applicant {
+  reg_no: string;
+  name: string | null;
+  target_nos: number[];
+  modules: TargetLine["modules"];
+  results: ModuleResult[];
+  links: SourceLink[];
 }
 
 export interface Warning {
@@ -76,6 +88,7 @@ export interface SourceRef {
 export interface SourceLink {
   system: string;
   url: string;
+  label?: string; // own wording, e.g. Skatīt UR
   copy?: string;
   note?: string;
 }
@@ -331,6 +344,7 @@ export const api = {
   targets: (id: number) => get<TargetLine[]>(`/api/runs/${id}/targets`),
   target: (id: number, no: number) => get<TargetDetail>(`/api/runs/${id}/targets/${no}`),
   inputs: (id: number) => get<InputRow[]>(`/api/runs/${id}/inputs`),
+  applicants: (id: number) => get<Applicant[]>(`/api/runs/${id}/applicants`),
   outlines: (id: number) => get<FeatureCollection<OutlineProps>>(`/api/runs/${id}/map/targets`),
   attention: (id: number, no: number) =>
     get<FeatureCollection<AttentionProps>>(`/api/runs/${id}/targets/${no}/attention`),

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   api,
   type AttentionProps,
+  type Applicant,
   type FeatureCollection,
   type Grouping,
   type InputRow,
@@ -11,6 +12,7 @@ import {
   type TargetLine,
 } from "../api";
 import { FOOTER } from "../App";
+import { ApplicantSection } from "../components/ApplicantSection";
 import { FilterBar, ParentNote } from "../components/FilterBar";
 import { DEFAULT_LAYERS, MapView, type LayerKey, type Layers } from "../components/MapView";
 import { isOpenCard, ModuleCard } from "../components/ModuleCard";
@@ -21,6 +23,7 @@ import { SourceLinks } from "../components/SourceLinks";
 import { TYPE_LV } from "../format";
 import { cellStyle, FINDING_RISKS, riskText, STATUS_LV, type Risk } from "../risk";
 import { grouped } from "../groups";
+import { objectModules } from "../modules";
 import type { UrlState } from "../url";
 
 export const MODULE_SHORT: Record<string, string> = {
@@ -30,6 +33,9 @@ export const MODULE_SHORT: Record<string, string> = {
   flood_10y: "Plūdi",
   bis: "BIS",
   encumbrances: "Apgrūtinājumi",
+  companies_at_address: "Uzņēmumi adresē",
+  applicant_company: "Pieteicējs (UR)",
+  sanctions: "Sankcijas",
 };
 const MODULE_LAYER: Record<string, LayerKey> = {
   cadastre_facts: "kadastrs",
@@ -38,7 +44,9 @@ const MODULE_LAYER: Record<string, LayerKey> = {
   flood_10y: "pludi",
   bis: "bis",
   encumbrances: "kadastrs",
+  companies_at_address: "kadastrs",
 };
+
 const INPUT_STATUS_LV: Record<string, string> = {
   not_found: "nav atrasts",
   ambiguous: "neviennozīmīgs",
@@ -94,6 +102,7 @@ export function ResultsPage({ state, navigate }: Props) {
   const [attention, setAttention] = useState<FeatureCollection<AttentionProps> | null>(null);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
   const [grouping, setGrouping] = useState<Grouping | null>(null);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,6 +117,7 @@ export function ResultsPage({ state, navigate }: Props) {
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     api.outlines(runId).then(setOutlines, () => setOutlines(null));
+    api.applicants(runId).then(setApplicants, () => setApplicants([]));
   }, [runId]);
 
   const count = targets?.length ?? 0;
@@ -159,6 +169,7 @@ export function ResultsPage({ state, navigate }: Props) {
           setLayers={setLayers}
           hidden={hidden}
           grouping={grouping}
+          applicants={applicants}
           go={go}
           onAll={() => go(target, "all")}
         />
@@ -172,6 +183,7 @@ export function ResultsPage({ state, navigate }: Props) {
           hidden={hidden}
           grouping={grouping}
           setGrouping={setGrouping}
+          applicants={applicants}
           open={(t) => go(t, "object")}
         />
       )}
@@ -198,6 +210,7 @@ function ObjectView({
   setLayers,
   hidden,
   grouping,
+  applicants,
   go,
   onAll,
 }: {
@@ -211,6 +224,7 @@ function ObjectView({
   setLayers: (l: Layers) => void;
   hidden: LayerKey[];
   grouping: Grouping;
+  applicants: Applicant[];
   go: (t: number) => void;
   onAll: () => void;
 }) {
@@ -261,7 +275,7 @@ function ObjectView({
       </div>
 
       <div className="strip" data-testid="status-strip">
-        {run.modules.map((m) => {
+        {objectModules(run).map((m) => {
           const s = line.modules[m];
           if (!s) return null;
           const st = cellStyle(s.summary_status, s.risk);
@@ -299,7 +313,13 @@ function ObjectView({
           <span className="spinner" /> Ielādē moduļu rezultātus…
         </p>
       ) : (
-        <Cards detail={detail} run={run} />
+        <>
+          <ApplicantSection
+            run={run}
+            applicants={applicants.filter((a) => a.reg_no === line.applicant_reg_no)}
+          />
+          <Cards detail={detail} run={run} />
+        </>
       )}
     </>
   );
@@ -399,6 +419,7 @@ function AllView({
   hidden,
   grouping,
   setGrouping,
+  applicants,
   open,
 }: {
   run: RunSummary;
@@ -409,6 +430,7 @@ function AllView({
   hidden: LayerKey[];
   grouping: Grouping;
   setGrouping: (g: Grouping) => void;
+  applicants: Applicant[];
   open: (t: number) => void;
 }) {
   // a project group picked in the projects panel: the map zooms to its objects
@@ -456,6 +478,7 @@ function AllView({
         fit={fit}
         compact
       />
+      <ApplicantSection run={run} applicants={applicants} compact />
       <ProjectsPanel
         run={run}
         targets={targets}

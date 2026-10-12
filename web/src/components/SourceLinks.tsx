@@ -10,7 +10,7 @@ export function SourceLinks({ links, compact }: { links: SourceLink[] | undefine
       {links.map((l) => (
         <span key={`${l.system}-${l.url}-${l.copy ?? ""}`} className="srclink">
           <a href={l.url} target="_blank" rel="noreferrer" title={l.note ?? `Atvērt ${l.system}`}>
-            {compact ? l.system : `Skatīt avotā: ${l.system}`} ↗
+            {l.label ?? (compact ? l.system : `Skatīt avotā: ${l.system}`)} ↗
           </a>
           {l.copy && <CopyButton value={l.copy} note={l.note} />}
         </span>

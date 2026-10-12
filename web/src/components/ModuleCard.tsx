@@ -39,7 +39,9 @@ function lines(results: ModuleResult[]): { findings: Line[]; technical: Line[] }
 }
 
 export function isOpenCard(result: ModuleResult) {
-  return !["clear", "not_applicable"].includes(result.summary_status);
+  // a sanctions name-only hit is clear but needs a manual look (D10)
+  const review = result.warnings.some((w) => w.code === "sanctions_name_only");
+  return review || !["clear", "not_applicable"].includes(result.summary_status);
 }
 
 /** One module: status, risk, the fired rules' text, items with "Skatīt avotā",

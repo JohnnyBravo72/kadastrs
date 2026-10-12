@@ -21,6 +21,10 @@ SOURCES = (
     "cadastre_encumbrances",
     "encumbrances_frozen",
     "bis_cases",
+    "ur_companies",
+    "ur_insolvency",
+    "ur_sanctions",
+    "fid_sanctions",
 )
 RAW = Path(os.environ.get("KADASTRS_RAW_DIR", "/data/raw"))
 HINT = "import first: docker compose run --rm etl import all (twice; docs/runbook.md)"

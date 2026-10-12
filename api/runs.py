@@ -36,7 +36,9 @@ def _summary(conn, run_id: int) -> dict[str, Any]:
     if s is None:
         raise HTTPException(status_code=404, detail=f"pārbaude {run_id} nav atrasta")
     names = {m: BY_ID[m].name_lv for m in s["modules"] if m in BY_ID}
-    return s | {"module_names": names}
+    # object modules (chips, cards, overview columns) vs applicant modules (own section)
+    subjects = {m: BY_ID[m].subject for m in s["modules"] if m in BY_ID}
+    return s | {"module_names": names, "module_subjects": subjects}
 
 
 @router.post("/runs", status_code=201)

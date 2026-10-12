@@ -319,3 +319,15 @@ table.overview tr.test-run td { color: var(--ink-3); }
 .group-zoom { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .group-zoom:disabled { cursor: default; text-decoration: none; }
 .project.zoomed .project-head h3 { background: #eef4fb; border-radius: 4px; padding: 1px 6px; }
+
+/* --- Phase 8a: applicant section ---------------------------------------------- */
+.applicants { margin-top: 14px; border-top: 2px solid var(--line); padding-top: 10px; }
+.applicants h2 { font-size: 16px; margin: 0 0 8px; color: var(--brand); }
+.applicant { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; }
+.applicant-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.applicant-head .big { font-size: 17px; font-weight: 700; }
+.applicant-head .name { font-weight: 600; }
+.applicant-head .chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.mini-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; border: 1px solid var(--line); border-radius: 12px; padding: 1px 8px 1px 2px; background: #fff; }
+.mini-chip .ico { width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; font-weight: 800; font-size: 11px; }
+.applicant .cards { margin-top: 10px; }

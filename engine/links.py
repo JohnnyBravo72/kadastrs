@@ -36,6 +36,7 @@ class Link:
     url: str
     copy: str | None = None  # when set, the page is a search page: paste this there
     note: str | None = None
+    label: str | None = None  # own link text instead of "Skatīt avotā: <system>"
 
     def as_json(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -92,7 +93,13 @@ def nature_link(code: str) -> Link:
 def ur_link(reg_no: str) -> Link:
     # the UR portal runs a search only from its own box; no URL opens a company
     # (tested 2026-10-12, docs/data-sources.md §8)
-    return Link("UR", UR_SEARCH, copy=reg_no, note="meklēt pēc reģistrācijas numura")
+    return Link(
+        "UR",
+        UR_SEARCH,
+        copy=reg_no,
+        note="meklēt pēc reģistrācijas numura",
+        label="Skatīt UR",
+    )
 
 
 def sanctions_link(reg_no: str, name: str | None) -> Link:
@@ -103,6 +110,7 @@ def sanctions_link(reg_no: str, name: str | None) -> Link:
         "FID sankciju saraksti",
         f"{FID_SEARCH}?{urlencode({'searchText': query, 'exactSearch': '0'})}",
         note=None if name else "meklēts pēc reģistrācijas numura",
+        label="Skatīt sankciju sarakstā",
     )
 
 

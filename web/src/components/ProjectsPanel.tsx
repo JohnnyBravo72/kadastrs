@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, type Grouping, type RunSummary, type TargetLine } from "../api";
 import { addGroup, deleteGroup, grouped, moveTargets, nameTaken, NONE_ID, renameGroup, type GroupState } from "../groups";
 import { worst } from "../risk";
+import { objectModules } from "../modules";
 import { OverviewTable, targetWorst } from "./OverviewTable";
 import { RiskPill } from "./RiskPill";
 
@@ -176,7 +177,7 @@ export function ProjectsPanel({
           {g.targets.length > 0 ? (
             <OverviewTable
               targets={g.targets}
-              modules={run.modules}
+              modules={objectModules(run)}
               names={names}
               onOpen={open}
               picked={picked}
