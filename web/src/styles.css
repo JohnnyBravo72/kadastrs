@@ -150,7 +150,7 @@ textarea { width: 100%; min-height: 150px; padding: 10px; border: 1px solid #c6d
 .swatch.hatch { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.45) 0 1.5px, transparent 1.5px 5px); }
 .swatch.dot { width: 11px; height: 11px; border-radius: 50%; }
 
-.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; align-items: start; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); border-left-width: 5px; scroll-margin-top: 70px; }
 .card > summary { list-style: none; cursor: pointer; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
 .card > summary::-webkit-details-marker { display: none; }
@@ -185,3 +185,17 @@ table.overview tbody tr.obj:hover td { background: #f3f8fe; }
 .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #c9d6e6; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .center-msg { padding: 60px 20px; text-align: center; color: var(--ink-2); }
+
+/* --- review 2026-10-12: compact clean cards, source links ---------------------------------- */
+.card > summary .ico { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-weight: 800; font-size: 12px; flex: none; }
+.compact-list { display: grid; gap: 6px; margin-top: 12px; }
+.card.compact { border-left-width: 4px; box-shadow: none; }
+.card.compact > summary { padding: 6px 12px; }
+.card.compact > summary .t { font-weight: 600; }
+.card.compact[open] > summary { border-bottom: 1px solid #eef1f4; }
+.srclinks { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; margin-left: 4px; font-size: 12.5px; }
+.srclink { display: inline-flex; align-items: center; gap: 6px; }
+.srclink a { white-space: nowrap; }
+.copy { border: 1px solid var(--line); background: #f8fafc; border-radius: 5px; padding: 0 6px; font-size: 12px; cursor: pointer; color: var(--ink-2); }
+.copy:hover { border-color: #b8c3cf; }
+.popup .srclink { margin-top: 6px; }

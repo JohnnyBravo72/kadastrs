@@ -30,19 +30,28 @@ test("search, chips, layer, Excel", async ({ page }) => {
   await expect(page.getByTestId("designation")).toHaveText("09000050400");
   const strip = page.getByTestId("status-strip");
   await expect(strip.locator(".chip")).toHaveCount(6);
-  await expect(strip.locator('[data-module="flood_10y"]')).toContainText("augsts");
-  await expect(strip.locator('[data-module="address_consistency"]')).toContainText("Nav piemērojams");
+  await expect(strip.locator('[data-module="flood_10y"]')).toContainText("atrasts · risks: augsts");
+  await expect(strip.locator('[data-module="address_consistency"]')).toContainText("nav piemērojams");
+
+  // "Skatīt avotā": the object on kadastrs.lv (verified pattern, engine/links.py)
+  const own = page.locator(".object-head .srclink a").first();
+  await expect(own).toHaveAttribute("href", "https://www.kadastrs.lv/parcels/search?cad_num=09000050400");
 
   // the attention area of the flood finding is on the map
   await expect(page.locator(".leaflet-attention-pane path").first()).toBeVisible();
 
-  // chip click: Plūdi layer on, its card in view
-  const layerResponse = page.waitForResponse((r) => r.url().includes("/layers/pludi") && r.status() === 200);
-  await strip.locator('[data-module="flood_10y"]').click();
-  await layerResponse;
+  // the module with a finding (flood, risk high) has its layer on by itself; the
+  // clean ones (nature, BIS) are off
   await expect(page.getByLabel("Plūdi (10 gadu)", { exact: true })).toBeChecked();
+  await expect(page.getByLabel("Daba", { exact: true })).not.toBeChecked();
   await expect(page.locator(".leaflet-pludi-pane path").first()).toBeAttached();
+  // chip click: its card in view
+  await strip.locator('[data-module="flood_10y"]').click();
   await expect(page.locator("#card-flood_10y")).toContainText("Vismaz 10 % objekta atrodas 10 gadu plūdu zonā.");
+  await expect(page.locator("#card-flood_10y .srclink a").first()).toHaveAttribute("href", /geodata\.lvgmc\.lv.*center=/);
+  // a clean card is one line; the technical encumbrance is not a finding
+  await expect(page.locator("#card-encumbrances")).toHaveClass(/compact/);
+  await expect(page.locator("#card-encumbrances > summary")).toContainText("nav atrasts · risks: nav · 1 tehniskie");
 
   // a layer toggled from the panel
   const daba = page.waitForResponse((r) => r.url().includes("/layers/daba") && r.status() === 200);

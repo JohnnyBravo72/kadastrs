@@ -157,7 +157,8 @@ export function MapView({ runId, outlines, focus, attention, layers, setLayers, 
       : layer.getBounds().isValid()
         ? layer.getBounds()
         : null;
-    if (bounds) map.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 18 });
+    // ~30 % around the object(s): a single parcel lands at about zoom 17-18
+    if (bounds) map.current.fitBounds(bounds.pad(0.3), { maxZoom: 18 });
   }, [outlines, focus]);
 
   // --- attention areas --------------------------------------------------------------
@@ -319,7 +320,7 @@ function attentionPopup(p: AttentionProps): string {
   if (p.module === "bis") rows.push(["Saistība", p.match_label], ["Stadija", p.stage]);
   else rows.push(["Pārklājums", `${m2(p.overlap_m2)} (${pct(p.share)})`]);
   rows.push(["Vienība", p.unit]);
-  return popup(`${p.module_no}. ${p.module_name}`, rows, p.rule_ids.join(", "));
+  return popup(`${p.module_no}. ${p.module_name}`, rows, p.rule_ids.join(", "), p.links);
 }
 
 // --- hatch patterns (SVG fill url(#…), shared by every Leaflet SVG pane) ----------------

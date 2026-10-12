@@ -26,15 +26,25 @@ export const RISK: Record<Risk, { label: string; icon: string; color: string; te
 
 export const NOT_APPLICABLE = { label: "nav piemērojams", icon: "–", color: "#D9D9D9", text: "#333333" };
 
+// The web view says "atrasts / nav atrasts" (review 2026-10-12); the Excel report
+// keeps the colleagues' "Ir / Nav".
 export const STATUS_LV: Record<Bucket, string> = {
-  found: "Ir",
-  clear: "Nav",
-  no_data: "Nav datu",
-  not_covered: "Nav pārklājuma",
-  not_applicable: "Nav piemērojams",
-  source_unavailable: "Avots nav pieejams",
-  error: "Kļūda",
+  found: "atrasts",
+  clear: "nav atrasts",
+  no_data: "nav datu",
+  not_covered: "nav pārklājuma",
+  not_applicable: "nav piemērojams",
+  source_unavailable: "avots nav pieejams",
+  error: "kļūda",
 };
+
+/** "risks: augsts" (chips and cards). */
+export function riskText(risk: string | null | undefined): string {
+  return isRisk(risk) ? `risks: ${RISK[risk].label}` : "";
+}
+
+/** Risk levels that make a finding worth a map layer: low and up (not none, not unknown). */
+export const FINDING_RISKS: Risk[] = ["high", "medium", "low"];
 
 export function isRisk(value: unknown): value is Risk {
   return typeof value === "string" && value in RISK;

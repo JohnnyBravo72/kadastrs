@@ -11,11 +11,12 @@ import {
 } from "../api";
 import { FOOTER } from "../App";
 import { DEFAULT_LAYERS, MapView, type LayerKey, type Layers } from "../components/MapView";
-import { ModuleCard } from "../components/ModuleCard";
+import { isOpenCard, ModuleCard } from "../components/ModuleCard";
 import { groupByProject, OverviewTable, targetWorst } from "../components/OverviewTable";
 import { RiskPill } from "../components/RiskPill";
+import { SourceLinks } from "../components/SourceLinks";
 import { TYPE_LV } from "../format";
-import { cellStyle, STATUS_LV } from "../risk";
+import { cellStyle, FINDING_RISKS, riskText, STATUS_LV, type Risk } from "../risk";
 import type { UrlState } from "../url";
 
 export const MODULE_SHORT: Record<string, string> = {
@@ -46,6 +47,23 @@ const INPUT_STATUS_LV: Record<string, string> = {
   not_stored: "nav saglabāts",
 };
 const COLUMN_LV: Record<string, string> = { vertiba: "vērtība", adrese: "adrese", veids: "veids", pieteicejs_reg_nr: "pieteicēja reģ. nr." };
+
+/** Layers of the modules with a finding (risk low or higher) on, the others off
+ *  (review 2026-10-12); the attention areas always on. */
+export function autoLayers(old: Layers, detail: TargetDetail): Layers {
+  const on = new Set<LayerKey>();
+  for (const r of detail.results) {
+    const res = r.result;
+    if (res && res.summary_status === "found" && FINDING_RISKS.includes(res.risk as Risk)) {
+      const layer = MODULE_LAYER[r.module];
+      if (layer) on.add(layer);
+    }
+  }
+  const next = { ...old };
+  for (const k of ["kadastrs", "pludi", "daba", "bis"] as LayerKey[]) next[k] = { ...old[k], on: on.has(k) };
+  next.attention = { ...old.attention, on: true };
+  return next;
+}
 
 interface Props {
   state: UrlState;
@@ -83,7 +101,13 @@ export function ResultsPage({ state, navigate }: Props) {
     if (!targets || count === 0 || view !== "object") return;
     setDetail(null);
     setAttention(null);
-    api.target(runId, target).then(setDetail, (e) => setError(String(e)));
+    api.target(runId, target).then(
+      (d) => {
+        setDetail(d);
+        setLayers((old) => autoLayers(old, d));
+      },
+      (e) => setError(String(e)),
+    );
     api.attention(runId, target).then(setAttention, () => setAttention(null));
   }, [runId, target, targets, count, view]);
 
@@ -178,6 +202,7 @@ function ObjectView({
             {line.project_no && <span>Projekts {line.project_no}</span>}
             {line.input && line.input !== line.designation && <span>ievadīts: {line.input}</span>}
             <RiskPill risk={targetWorst(line)} prefix="Kopējais risks:" />
+            <SourceLinks links={detail?.links} />
           </div>
         </div>
         <div className="head-actions">
@@ -208,7 +233,7 @@ function ObjectView({
                 <br />
                 <span className="state">
                   {STATUS_LV[s.summary_status]}
-                  {s.summary_status !== "not_applicable" ? ` · ${st.label}` : ""}
+                  {s.summary_status !== "not_applicable" ? ` · ${riskText(s.risk)}` : ""}
                 </span>
               </span>
             </button>
@@ -231,15 +256,23 @@ function ObjectView({
           <span className="spinner" /> Ielādē moduļu rezultātus…
         </p>
       ) : (
-        <div className="cards">
-          {detail.results
-            .filter((r) => r.result)
-            .sort((a, b) => a.module_no - b.module_no)
-            .map((r) => (
-              <ModuleCard key={r.module} result={r.result!} units={r.units} versions={run.dataset_versions} />
-            ))}
-        </div>
+        <Cards detail={detail} run={run} />
       )}
+    </>
+  );
+}
+
+function Cards({ detail, run }: { detail: TargetDetail; run: RunSummary }) {
+  const results = detail.results.filter((r) => r.result).sort((a, b) => a.module_no - b.module_no);
+  const open = results.filter((r) => isOpenCard(r.result!));
+  const quiet = results.filter((r) => !isOpenCard(r.result!));
+  const card = (r: (typeof results)[number]) => (
+    <ModuleCard key={r.module} result={r.result!} units={r.units} versions={run.dataset_versions} />
+  );
+  return (
+    <>
+      {open.length > 0 && <div className="cards">{open.map(card)}</div>}
+      {quiet.length > 0 && <div className="compact-list">{quiet.map(card)}</div>}
     </>
   );
 }

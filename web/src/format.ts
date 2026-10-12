@@ -24,13 +24,28 @@ export function esc(text: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
-/** A popup: a title and label/value rows (values escaped; empty rows left out). */
-export function popup(title: string, rows: [string, unknown][], footer?: string): string {
+/** A popup: a title and label/value rows (values escaped; empty rows left out),
+ *  then the "Skatīt avotā" links (a search page shows the number to paste). */
+export function popup(
+  title: string,
+  rows: [string, unknown][],
+  footer?: string,
+  links?: { system: string; url: string; copy?: string }[],
+): string {
   const body = rows
     .filter(([, v]) => v !== null && v !== undefined && v !== "")
     .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`)
     .join("");
-  return `<div class="popup"><h4>${esc(title)}</h4><table>${body}</table>${footer ? `<div class="hint">${esc(footer)}</div>` : ""}</div>`;
+  const safe = (u: string) => (/^https:\/\//.test(u) ? u : "#");
+  const linkHtml = (links ?? [])
+    .map(
+      (l) =>
+        `<div class="srclink"><a href="${esc(safe(l.url))}" target="_blank" rel="noreferrer">Skatīt avotā: ${esc(l.system)} ↗</a>` +
+        (l.copy ? ` <span class="hint">meklēt: <span class="mono">${esc(l.copy)}</span></span>` : "") +
+        `</div>`,
+    )
+    .join("");
+  return `<div class="popup"><h4>${esc(title)}</h4><table>${body}</table>${linkHtml}${footer ? `<div class="hint">${esc(footer)}</div>` : ""}</div>`;
 }
 
 export const TYPE_LV: Record<string, string> = {

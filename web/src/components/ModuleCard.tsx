@@ -1,8 +1,15 @@
-import type { DatasetVersion, ModuleResult } from "../api";
-import { cellStyle, isRisk, RISK, STATUS_LV } from "../risk";
-import { RiskPill, StatusCell } from "./RiskPill";
+import type { DatasetVersion, ModuleResult, SourceLink } from "../api";
+import { cellStyle, isRisk, RISK, riskText, STATUS_LV } from "../risk";
+import { StatusCell } from "./RiskPill";
+import { SourceLinks } from "./SourceLinks";
 
 const MAX_ITEMS = 12;
+const TECHNICAL_LABEL = "Tehniskie apgrūtinājumi (kadastrālās vērtības aprēķinam)";
+
+interface Line {
+  text: string;
+  links: SourceLink[];
+}
 
 function warningLines(results: ModuleResult[]): string[] {
   const lines: string[] = [];
@@ -19,8 +26,24 @@ function warningLines(results: ModuleResult[]): string[] {
   return lines;
 }
 
-/** One module: status, risk, the fired rules' text, items, warnings and the source.
- *  Findings and data gaps open; clean (and not applicable) results collapsed. */
+/** Item lines with their source links; technical records (rules not_findings) apart. */
+function lines(results: ModuleResult[]): { findings: Line[]; technical: Line[] } {
+  const findings: Line[] = [];
+  const technical: Line[] = [];
+  for (const r of results)
+    r.items.forEach((item, i) => {
+      const line = { text: r.items_text[i] ?? "", links: r.item_links?.[i] ?? [] };
+      (item.technical ? technical : findings).push(line);
+    });
+  return { findings, technical };
+}
+
+export function isOpenCard(result: ModuleResult) {
+  return !["clear", "not_applicable"].includes(result.summary_status);
+}
+
+/** One module: status, risk, the fired rules' text, items with "Skatīt avotā",
+ *  warnings and the source. Clean and not-applicable results: one line. */
 export function ModuleCard({
   result,
   units,
@@ -32,47 +55,70 @@ export function ModuleCard({
 }) {
   const bucket = result.summary_status;
   const style = cellStyle(bucket, result.risk);
-  const open = !["clear", "not_applicable"].includes(bucket);
+  const open = isOpenCard(result);
   const src = result.source;
   const version = versions.find((v) => v.id === src?.id);
-  const items = result.items_text;
+  const { findings, technical } = lines(units.length ? units : [result]);
   const warnings = warningLines(units.length ? units : [result]);
   const rules = bucket === "not_applicable" ? [] : result.rules;
+  const status = STATUS_LV[bucket];
   return (
-    <details className="card" id={`card-${result.module}`} open={open} style={{ borderLeftColor: style.color }}>
+    <details
+      className={`card ${open ? "" : "compact"}`}
+      id={`card-${result.module}`}
+      open={open}
+      style={{ borderLeftColor: style.color }}
+    >
       <summary>
-        {bucket === "not_applicable" ? (
-          <span className="risk-pill" style={{ background: style.color, color: style.text }}>
-            – nav piemērojams
-          </span>
-        ) : (
-          <RiskPill risk={result.risk} />
-        )}
+        <span className="ico" style={{ background: style.color, color: style.text }} aria-hidden>
+          {style.icon}
+        </span>
         <span className="t">
           {result.module_no}. {result.module_name}
         </span>
-        <span className="st">{STATUS_LV[bucket]}</span>
+        <span className="st">
+          {status}
+          {bucket !== "not_applicable" && isRisk(result.risk) ? ` · ${riskText(result.risk)}` : ""}
+          {!open && technical.length > 0 ? ` · ${technical.length} tehniskie` : ""}
+        </span>
       </summary>
       <div className="content">
-        {rules.length > 0 &&
-          rules.map((r) => (
-            <div className="rule" key={r.id}>
-              {isRisk(r.level) && (
-                <span style={{ color: RISK[r.level].color, fontWeight: 700 }} aria-hidden>
-                  {RISK[r.level].icon}{" "}
-                </span>
-              )}
-              {r.text_lv}
-            </div>
-          ))}
+        {rules.map((r) => (
+          <div className="rule" key={r.id}>
+            {isRisk(r.level) && (
+              <span style={{ color: RISK[r.level].color, fontWeight: 700 }} aria-hidden>
+                {RISK[r.level].icon}{" "}
+              </span>
+            )}
+            {r.text_lv}
+          </div>
+        ))}
         {result.reason && <p className="reason">{result.reason}</p>}
-        {items.length > 0 && (
+        {findings.length > 0 && (
           <ul className="items">
-            {items.slice(0, MAX_ITEMS).map((t, i) => (
-              <li key={i}>{t}</li>
+            {findings.slice(0, MAX_ITEMS).map((l, i) => (
+              <li key={i}>
+                {l.text} <SourceLinks links={l.links} compact />
+              </li>
             ))}
-            {items.length > MAX_ITEMS && <li className="hint">… vēl {items.length - MAX_ITEMS} (sk. Excel „Detaļas”)</li>}
+            {findings.length > MAX_ITEMS && (
+              <li className="hint">… vēl {findings.length - MAX_ITEMS} (sk. Excel „Detaļas”)</li>
+            )}
           </ul>
+        )}
+        {technical.length > 0 && (
+          <details className="units">
+            <summary>
+              {TECHNICAL_LABEL}: {technical.length} – nav atradnes
+            </summary>
+            <ul className="items">
+              {technical.map((l, i) => (
+                <li key={i}>
+                  {l.text} <SourceLinks links={l.links} compact />
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
         {warnings.length > 0 && (
           <ul className="warn">

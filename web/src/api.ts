@@ -68,6 +68,15 @@ export interface SourceRef {
   datagov_url: string | null;
 }
 
+/** "Skatīt avotā": opens the object in the publisher's public system (engine/links.py).
+ *  With `copy`, the page is a search page: paste that number there. */
+export interface SourceLink {
+  system: string;
+  url: string;
+  copy?: string;
+  note?: string;
+}
+
 export interface ModuleResult {
   module: string;
   module_no: number;
@@ -82,6 +91,7 @@ export interface ModuleResult {
   rules: { id: string; level: Risk; text_lv: string }[];
   items: Record<string, unknown>[];
   items_text: string[];
+  item_links: SourceLink[][];
   match_type: string | null;
   warnings: Warning[];
   source: SourceRef | null;
@@ -89,6 +99,7 @@ export interface ModuleResult {
 
 export interface TargetDetail extends TargetLine {
   results: { module: string; module_no: number; result: ModuleResult | null; units: ModuleResult[] }[];
+  links: SourceLink[];
 }
 
 export interface InputRow {
@@ -143,6 +154,7 @@ export interface AttentionProps {
   case_number?: string;
   match_label?: string;
   stage?: string;
+  links?: SourceLink[];
 }
 
 export type LayerName = "kadastrs" | "pludi" | "daba" | "bis";
