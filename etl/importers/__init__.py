@@ -16,6 +16,7 @@ from etl.importers.nature import (
     NatureMonuments,
     NatureProtectedAreas,
 )
+from etl.importers.ur import FidSanctions, UrCompanies, UrInsolvency, UrSanctions
 from etl.importers.varis import VarisAddresses
 
 IMPORTERS = {
@@ -32,4 +33,8 @@ IMPORTERS = {
     "cadastre_encumbrances": CadastreEncumbrances,
     "encumbrances_frozen": EncumbrancesFrozen,
     "bis_cases": BisCases,
+    "ur_companies": UrCompanies,
+    "ur_insolvency": UrInsolvency,
+    "ur_sanctions": UrSanctions,
+    "fid_sanctions": FidSanctions,
 }

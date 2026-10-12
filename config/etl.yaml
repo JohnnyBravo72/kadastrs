@@ -72,3 +72,16 @@ sources:
       riga_part: "89ace2d7-2bf1-4b51-843a-82aee7730f2d"
       zemgale_parcel: "9ede9729-b682-4eeb-8779-3329e802a832"
       zemgale_part: "06533bca-0146-4b7d-a4ae-9ca750e28e51"
+  # --- Phase 8a: applicant (national files; legal-entity rows only, D10) ------
+  ur_companies:
+    files:
+      register: "25e80bf3-f107-4ab4-89ef-251b5b9374e9"
+  ur_insolvency:
+    files:
+      proceedings: "8065ad80-1a4d-4afb-b1d1-d93b9a62b1cc"
+  ur_sanctions:
+    files:
+      sanctions: "fa10a73f-0a10-4ce7-b0f8-f9652d572a10"
+  fid_sanctions:
+    files:
+      subjects: "00f557d4-3096-4d8f-b0bb-c52f90ad50fb"

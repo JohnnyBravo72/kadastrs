@@ -293,6 +293,90 @@ sources:
         - "06533bca-0146-4b7d-a4ae-9ca750e28e51"   # 10. zemes vienību daļām Zemgalē
     licence: CC-BY-4.0
 
+  # --- Phase 8a: applicant (verified 2026-10-12, docs/data-sources.md §3.9, §3.17) ---
+  # Personal data (CLAUDE.md rule 5, docs/decisions.md D10): only legal-entity rows
+  # and fields; no names of individual merchants (IK, IND); never the officers,
+  # members, beneficial owners or procuration files.
+  - id: ur_companies
+    names:
+      lv: "Uzņēmumu reģistrs (juridiskās personas)"
+      en: "Register of Enterprises (legal entities)"
+    owner: UR
+    group: Pieteicējs
+    order: 70
+    type: check
+    subject_kinds: [applicant, object]
+    default_selected: true
+    # coverage (en): Whole country: every legal entity, including ended ones
+    coverage_lv: "Visa valsts: visi tiesību subjekti, arī likvidētie"
+    processing_lv:
+      - "Individuālo komersantu un individuālo uzņēmumu nosaukumi netiek saglabāti (tie parasti ir personas vārds)."
+      - "Saglabāts tikai reģistrācijas numurs, forma, statuss, datumi un juridiskā adrese ar VARIS kodu."
+    source_stale_after: P7D
+    datagov:
+      dataset_id: uz
+      resource_ids: ["25e80bf3-f107-4ab4-89ef-251b5b9374e9"]   # register.csv
+    licence: CC0-1.0
+  - id: ur_insolvency
+    names:
+      lv: "Maksātnespējas procesi (UR)"
+      en: "Insolvency proceedings (UR)"
+    owner: UR
+    group: Pieteicējs
+    order: 71
+    type: reference
+    subject_kinds: [applicant]
+    default_selected: true
+    # coverage (en): Whole country: insolvency and legal protection proceedings of legal entities
+    coverage_lv: "Visa valsts: juridisko personu maksātnespējas un tiesiskās aizsardzības procesi"
+    processing_lv:
+      - "Importētas tikai rindas ar juridiskās personas reģistrācijas numuru; parādnieka nosaukums un adrese netiek saglabāti."
+    source_stale_after: P7D
+    datagov:
+      dataset_id: maksatnespejas-procesi
+      resource_ids: ["8065ad80-1a4d-4afb-b1d1-d93b9a62b1cc"]   # CSV
+    licence: CC0-1.0
+  - id: ur_sanctions
+    names:
+      lv: "Sankciju riski (UR)"
+      en: "Sanctions risks (UR)"
+    owner: UR
+    group: Pieteicējs
+    order: 72
+    type: check
+    subject_kinds: [applicant]
+    default_selected: true
+    # coverage (en): Legal entities on the EU, OFAC and Latvian lists that are linked to UR registers; natural persons not imported
+    coverage_lv: "Juridiskās personas ES, OFAC un Latvijas sarakstos, kas saistītas ar UR reģistriem; fiziskās personas netiek importētas"
+    partial_coverage: true
+    processing_lv:
+      - "Importēti tikai juridisko personu ieraksti (LEGAL_ENTITY, FOREIGN_ENTITY); fizisko personu ieraksti netiek saglabāti (D10)."
+    source_stale_after: P7D
+    datagov:
+      dataset_id: sanctions
+      resource_ids: ["fa10a73f-0a10-4ce7-b0f8-f9652d572a10"]   # sanctions.csv
+    licence: CC0-1.0
+  - id: fid_sanctions
+    names:
+      lv: "Iesaldētie aktīvi: sankciju subjekti (FID)"
+      en: "Frozen assets: sanctions subjects (FID)"
+    owner: FID
+    group: Pieteicējs
+    order: 73
+    type: check
+    subject_kinds: [applicant]
+    default_selected: true
+    # coverage (en): Subjects whose funds or economic resources are frozen in Latvia; only rows with a Latvian legal-entity reg. no.
+    coverage_lv: "Subjekti, kuru līdzekļi vai saimnieciskie resursi iesaldēti Latvijā; tikai ieraksti ar Latvijas juridiskās personas reģistrācijas numuru"
+    partial_coverage: true
+    processing_lv:
+      - "Importēti tikai ieraksti ar juridiskās personas reģistrācijas numuru; sankciju sarakstā iekļautās personas vārds un dzimšanas dati netiek saglabāti."
+    source_stale_after: P1Y
+    datagov:
+      dataset_id: sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija
+      resource_ids: ["00f557d4-3096-4d8f-b0bb-c52f90ad50fb"]   # Sankciju subjekti (Excel)
+    licence: CC0-1.0
+
 # Example entry (placeholder values, not verified):
 #
 # sources:

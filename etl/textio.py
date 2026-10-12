@@ -38,23 +38,27 @@ def detect_encoding(path: Path, declared: str | None = None) -> tuple[str, str |
     return codec, note
 
 
-def iter_csv(path: Path, declared_encoding: str | None = None) -> Iterator[dict[str, str]]:
+def iter_csv(
+    path: Path, declared_encoding: str | None = None, delimiter: str = ","
+) -> Iterator[dict[str, str]]:
     """Rows as dicts of str (never numbers). A real CSV parser: `"` quoting and
     `""` escaping, so a field written `\"\"\"4\"\"\"` is the value `"4"`.
-    Invalid UTF-8 raises UnicodeDecodeError (strict)."""
+    Invalid UTF-8 raises UnicodeDecodeError (strict). UR files use `;`."""
     codec, _ = detect_encoding(path, declared_encoding)
     with open(path, encoding=codec, errors="strict", newline="") as f:
-        reader = csv.DictReader(f, delimiter=",", quotechar='"', doublequote=True, strict=True)
+        reader = csv.DictReader(
+            f, delimiter=delimiter, quotechar='"', doublequote=True, strict=True
+        )
         for row in reader:
             if None in row:
                 raise ValueError(f"{path.name} line {reader.line_num}: more fields than the header")
             yield row
 
 
-def csv_header(path: Path) -> list[str]:
+def csv_header(path: Path, delimiter: str = ",") -> list[str]:
     codec, _ = detect_encoding(path)
     with open(path, encoding=codec, errors="strict", newline="") as f:
-        return next(csv.reader(f))
+        return next(csv.reader(f, delimiter=delimiter))
 
 
 # --- XML (E4) ------------------------------------------------------------------

@@ -30,6 +30,10 @@ DATASETS = {
     "cadastre_encumbrances": "kadastra-informacijas-sistemas-atvertie-dati",
     "atis_classifier": "atis-datu-un-kadastra-objektu-apgrutinajumu-klasifikators",
     "encumbrances_frozen": "apgrutinajumi-kas-kadastra-registreti-lidz-2025-gada-31-janvarim",
+    "ur_companies": "uz",
+    "ur_insolvency": "maksatnespejas-procesi",
+    "ur_sanctions": "sanctions",
+    "fid_sanctions": "sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija",
 }
 # Sources whose resources sit in several CKAN datasets (config/sources.yaml).
 ROLE_DATASETS = {
@@ -37,16 +41,23 @@ ROLE_DATASETS = {
     ("bis_cases", "objects"): "bis_tln9s3hrpjlnucmjip9r3g",
 }
 # Licences as on data.gov.lv: VZD data CC-BY-4.0 (FakeServer.licence), these CC0-1.0.
-CC0_DATASETS = {
-    DATASETS[s]: "CC0-1.0"
-    for s in (
-        "flood_10y",
-        "nature_protected_areas",
-        "nature_microreserves",
-        "nature_monuments",
-        "nature_habitats",
-    )
-} | {ds: "CC0-1.0" for ds in ROLE_DATASETS.values()}
+CC0_DATASETS = (
+    {
+        DATASETS[s]: "CC0-1.0"
+        for s in (
+            "flood_10y",
+            "nature_protected_areas",
+            "nature_microreserves",
+            "nature_monuments",
+            "nature_habitats",
+        )
+    }
+    | {ds: "CC0-1.0" for ds in ROLE_DATASETS.values()}
+    | {
+        DATASETS[s]: "CC0-1.0"
+        for s in ("ur_companies", "ur_insolvency", "ur_sanctions", "fid_sanctions")
+    }
+)
 # D1 E7 service (config/sources.yaml); the fake answers it, no network in tests.
 E7_BASE = "https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer"
 
@@ -217,10 +228,10 @@ def _writestr(z: zipfile.ZipFile, name: str, data) -> None:
 # --- VARIS CSV -------------------------------------------------------------------
 
 
-def csv_bytes(name: str, rows: list[dict], bom: bool = True) -> bytes:
+def csv_bytes(name: str, rows: list[dict], bom: bool = True, delimiter: str = ",") -> bytes:
     header = schemas()["csv"][name]
     buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=header, lineterminator="\r\n")
+    w = csv.DictWriter(buf, fieldnames=header, lineterminator="\r\n", delimiter=delimiter)
     w.writeheader()
     for r in rows:
         w.writerow({k: r.get(k, "") for k in header})
@@ -943,3 +954,246 @@ def publish_frozen(server, files=None, date="20250131", **kw):
         server.publish(
             "encumbrances_frozen", role, name, csv_bytes("encumbrances_frozen", rows), **kw
         )
+
+
+# --- Phase 8a: applicant sources (shapes as verified 2026-10-12, data-sources.md §3.9) ---
+# Synthetic rows only. Natural-person rows carry obviously fake person data, so the
+# tests can prove that none of it is stored.
+FAKE_PERSON = "Personvārds UZVĀRDS"
+FAKE_BIRTH = "1960-01-01"
+FAKE_PERSONAL_CODE = "010160-12345"
+
+UR_REGISTER = [
+    {
+        "regcode": "40003000001",
+        "name": 'SIA "Alfa"',
+        "type": "SIA",
+        "type_text": "Sabiedrība ar ierobežotu atbildību",
+        "regtype": "K",
+        "regtype_text": "Komercreģistrs",
+        "registered": "2010-05-04",
+        "closed": " ",
+        "address": "Lielā iela 3, Jelgava",
+        "addressid": "101000001",
+        "atvk": "0003000",
+    },
+    {
+        "regcode": "40003000002",
+        "name": 'SIA "Beta"',
+        "type": "SIA",
+        "regtype_text": "Komercreģistrs",
+        "registered": "2005-01-01",
+        "terminated": "2020-02-02",
+        "closed": "L",
+        "address": "Lielā iela 3, Jelgava",
+        "addressid": "101000001",
+        "atvk": "0003000",
+    },
+    # an individual merchant is named after its owner: the name is never stored
+    {
+        "regcode": "40003000003",
+        "name": f'IK "{FAKE_PERSON}"',
+        "type": "IK",
+        "type_text": "Individuālais komersants",
+        "registered": "2019-03-03",
+        "address": "Lielā iela 5, Jelgava",
+        "addressid": "101000002",
+        "atvk": "0003000",
+    },
+    {
+        "regcode": "123456789",
+        "name": f"{FAKE_PERSON} uzņēmums",
+        "type": "IND",
+        "registered": "1995-01-01",
+        "terminated": "1999-01-01",
+        "closed": "L",
+        "addressid": "0",
+    },
+    # an 11-digit number of another shape could be a personal code: never stored
+    {"regcode": "01016012345", "name": "X", "type": "SIA", "registered": "2001-01-01"},
+    {
+        "regcode": "50003000004",
+        "name": 'Zemnieku saimniecība "Kalni"',
+        "type": "ZEM",
+        "registered": "2000-06-06",
+        "terminated": "2015-01-01",
+        "closed": "R",
+        "addressid": "0",
+        "atvk": "0002000",
+    },
+]
+
+UR_INSOLVENCY = [
+    {
+        "proceeding_id": "1001",
+        "debtor_name": 'SIA "Beta"',
+        "debtor_registration_number": "40003000002",
+        "debtor_address": "Lielā iela 3, Jelgava",
+        "proceeding_started_on": "2019-01-01",
+        "proceeding_ended_on": "2020-01-01",
+        "proceeding_form": "INSOLVENCY",
+        "proceeding_type": "NATIONAL",
+        "entry_created_on": "2019-01-01 10:00:00",
+    },
+    {
+        "proceeding_id": "1002",
+        "debtor_name": 'SIA "Alfa"',
+        "debtor_registration_number": "40003000001",
+        "proceeding_started_on": "2026-09-01",
+        "proceeding_form": "LEGAL_PROTECTION",
+        "proceeding_type": "NATIONAL",
+        "entry_created_on": "2026-09-01 10:00:00",
+    },
+    # personal insolvency: never stored
+    {
+        "proceeding_id": "1003",
+        "debtor_name": FAKE_PERSON,
+        "debtor_registration_number": FAKE_PERSONAL_CODE,
+        "debtor_address": "Mājas iela 1",
+        "proceeding_started_on": "2024-01-01",
+        "proceeding_form": "INSOLVENCY",
+        "entry_created_on": "2024-01-01 10:00:00",
+    },
+]
+
+UR_SANCTIONS = [
+    {
+        "id": "1",
+        "registered_on": "2022-03-01",
+        "entity_type": "NATURAL_PERSON",
+        "name": FAKE_PERSON,
+        "birth_date": FAKE_BIRTH,
+        "latvian_identity_number_masked": "010160-*****",
+        "nationality": "RU",
+        "position_text_lv": "Valdes loceklis",
+        "sanctions_subject_legal_form_code": "SIA",
+        "sanctions_subject_registration_number": "40003000005",
+        "sanctions_subject_name": 'SIA "Gamma"',
+        "list": "ES_SANCTIONS",
+        "program": "UKR",
+        "entry_date": "2022-02-28",
+        "legal_base": "269/2014",
+    },
+    {
+        "id": "2",
+        "registered_on": "2022-04-01",
+        "entity_type": "LEGAL_ENTITY",
+        "legal_form_code": "LIMITED_LIABILITY_COMPANY_SIA",
+        "legal_entity_registration_number": "40003000006",
+        "legal_entity_name": 'SIA "Delta"',
+        "legal_entity_country": "LV",
+        "list": "ES_SANCTIONS",
+        "list_text": "ES sankciju saraksts",
+        "program": "UKR",
+        "entry_date": "2022-04-01",
+        "legal_base": "269/2014",
+    },
+    {
+        "id": "3",
+        "registered_on": "2023-05-01",
+        "entity_type": "FOREIGN_ENTITY",
+        "legal_entity_registration_number": "1027700000",
+        "legal_entity_name": "OOO Epsilon",
+        "legal_entity_country": "RU",
+        "position_text_lv": "Dalībnieks",
+        "sanctions_subject_registration_number": "40003000007",
+        "sanctions_subject_name": 'SIA "Zeta"',
+        "list": "SDN_OFAC_SANCTIONS",
+        "program": "RUSSIA-EO14024",
+        "entry_date": "2023-05-01",
+        "legal_base": "EO 14024",
+    },
+]
+
+FID_ROWS = [
+    # an entity with a Latvian reg. no.; column 6 names the sanctioned person (never stored)
+    [
+        'SIA "Theta"',
+        "40003000008",
+        "Latvija",
+        "Līdzekļi; kapitāldaļas",
+        "Sankciju sarakstā iekļautas personas kontrole",
+        FAKE_PERSON,
+        "21.07.2022.",
+        "269/2014",
+        "Pārbaudīts",
+        "17.04.2024.",
+    ],
+    # a person: birth date in column 2, never stored
+    [
+        FAKE_PERSON,
+        FAKE_BIRTH,
+        "Krievija",
+        "Nekustamais īpašums",
+        "Īpašumtiesības",
+        FAKE_PERSON,
+        "21.07.2022.",
+        "269/2014",
+        "Pārbaudīts",
+        "17.04.2024.",
+    ],
+    # a foreign entity without a Latvian number: not stored
+    [
+        "OOO Iota",
+        "1027700000999",
+        "Krievija",
+        "Līdzekļi",
+        "Īpašumtiesības",
+        "OOO Iota",
+        "21.07.2022.",
+        "269/2014",
+        "Pārbaudīts",
+        "17.04.2024.",
+    ],
+    # a reg. no. that Excel stored as a number
+    [
+        'AS "Kappa"',
+        50003000009,
+        "Latvija",
+        "Kapitāldaļas",
+        "Kontrole",
+        FAKE_PERSON,
+        "25.02.2022.",
+        "269/2014",
+        "",
+        "17.04.2024.",
+    ],
+]
+
+
+def fid_xlsx(rows=None) -> bytes:
+    from openpyxl import Workbook
+
+    spec = schemas()["xlsx"]["fid_subjects"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = spec["sheet"]
+    ws.append([*spec["columns"], None, None])
+    for r in FID_ROWS if rows is None else rows:
+        ws.append(r)
+    wb.create_sheet("Informācija par datiem")
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def publish_applicant_sources(
+    server, register=None, insolvency=None, sanctions=None, fid=None, **kw
+) -> None:
+    """The four applicant sources (synthetic rows above unless given)."""
+    files = [
+        ("ur_companies", "register", "register.csv", "ur_register", register, UR_REGISTER),
+        (
+            "ur_insolvency",
+            "proceedings",
+            "insolvency_legal_person_proceeding.csv",
+            "ur_insolvency",
+            insolvency,
+            UR_INSOLVENCY,
+        ),
+        ("ur_sanctions", "sanctions", "sanctions.csv", "ur_sanctions", sanctions, UR_SANCTIONS),
+    ]
+    for source, role, filename, schema, rows, default in files:
+        body = csv_bytes(schema, default if rows is None else rows, delimiter=";")
+        server.publish(source, role, filename, body, **kw)
+    server.publish("fid_sanctions", "subjects", "Sankciju_subjekti.xlsx", fid_xlsx(fid), **kw)

@@ -15,6 +15,27 @@ csv:
   bis_objects: [Buvniecibas_lietas_numurs, Buves_kadastra_apzimejums, Objekta_identifikators_inzenierbuvem, Melioracijas_kadastra_numurs, Buves_atrasanas_vieta_geografiskais_garums, Buves_atrasanas_vieta_geografiskais_platums, Buves_nosaukums, Buves_objekta_adreses_teksts, Buves_objekta_adreses_kods, Buvniecibas_veids, Administrativas_teritorijas_kods, Administrativas_teritorijas_nosaukums]
   atis_classifier: [Dati, Grupa, Veids, Kods, Apraksts, Elements, DatiKadastra, Visparpieejami_dati, Ierobezoti_dati]
   encumbrances_frozen: [ADMRKIND, ADMTKIND, CAD_NR, ENCD_ID, DESCRIPTION, NR, ENC_DATE, ENC_SIZE, MEASURE]
+  # Phase 8a (verified 2026-10-12, docs/data-sources.md §3.9, §3.17); `;`-separated.
+  # The whole header is checked, also the columns that are never read (rule 5).
+  ur_register: [regcode, sepa, name, name_before_quotes, name_in_quotes, name_after_quotes, without_quotes, regtype, regtype_text, type, type_text, registered, terminated, closed, address, index, addressid, region, city, atvk, reregistration_term]
+  ur_insolvency: [proceeding_id, debtor_name, debtor_registration_number, debtor_cleaned_name, debtor_address, proceeding_started_on, proceeding_ended_on, proceeding_form, proceeding_type, proceeding_subtype, proceeding_resolution_type, proceeding_resolution_name, entry_created_on, court_case_initial_number, court_code, court_name, creditor_applications_deadline_date, creditor_applications_deadline_in_days, creditor_applications_deadline_in_weeks, creditor_applications_deadline_in_months, creditor_applications_deadline_in_years, legislation_number, legislation_version]
+  ur_sanctions: [id, registered_on, entity_type, name, birth_date, latvian_identity_number_masked, nationality, legal_form_code, legal_entity_registration_number, legal_entity_name, legal_entity_country, position, position_text_lv, position_text_en, sanctions_subject_legal_form_code, sanctions_subject_registration_number, sanctions_subject_name, list, list_text, program, entry_date, legal_base, legal_base_url]
+
+# XLSX sheets: the first row's column titles (empty trailing titles ignored).
+xlsx:
+  fid_subjects:
+    sheet: Dati
+    columns:
+      - "1. Sankciju subjekts, kā līdzekļi vai saimnieciskie resursi ir iesaldēti (vārds, uzvārds / nosaukums)"
+      - "2. Dzimšanas datums / reģistrācijas Nr."
+      - "3. Valstspiederība / reģistrācijas valsts"
+      - "4. Iesaldēto līdzekļu vai saimniecisko resursu veids"
+      - "5. Līdzekļu vai saimniecisko resursu iesaldēšanas pamatojums"
+      - "6. Sankciju sarakstā iekļautās personas vārds, uzvārds vai nosaukums"
+      - "7. Datums, no kura spēkā ir sankcijas, pret 6. kolonnā norādīto personu"
+      - "8. Normatīvais akts, saskaņā ar ko veikta iesaldēšana"
+      - "9. FID pārbaudīts*"
+      - "10. Datums, kad FID pirmo reizi publicējis informāciju par sankciju subjektu"
 
 # SHP layers: [name, DBF type, width]. CRS: EPSG code the .prj must name (or
 # the exact PROJCS name, for .prj files without an AUTHORITY clause).
