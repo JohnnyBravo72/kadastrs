@@ -6,9 +6,17 @@
 
 **Data policy:** all data comes from **data.gov.lv** (section 2).
 
-**Status (2026-10-12):** Phase 7 (entry dialog, reruns, projects, Avoti / Žurnāls) is built and tested; Phase 6's zoning (module 8) is still open. Phases 1–3 are done; Phase 4 (check engine v1) is built and tested, risk rules v1 are agreed (D4, 2026-10-11; to be revised after the test-set comparison), and the comparison with the colleagues' manual answers waits for the filled test-set files. Phase 5 (batch + Excel) is built and tested; its "done when" (pilot with 2–3 colleagues, time per object vs the baseline) is open. Earlier: Phase 0 steps 1 and 3 were done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
+**Status (2026-10-12):** Phase 8a (applicant: modules 9, 14, 17 from UR and FID open data) is built and tested; its risk rules (rule set v3) are a **draft** waiting for review. Phase 7 (entry dialog, reruns, projects, Avoti / Žurnāls) is built and tested; Phase 6's zoning (module 8) is still open. Phases 1–3 are done; Phase 4 (check engine v1) is built and tested, risk rules v1 are agreed (D4, 2026-10-11; to be revised after the test-set comparison), and the comparison with the colleagues' manual answers waits for the filled test-set files. Phase 5 (batch + Excel) is built and tested; its "done when" (pilot with 2–3 colleagues, time per object vs the baseline) is open. Earlier: Phase 0 steps 1 and 3 were done (2026-10-09): datasets, fields and join keys are confirmed in `docs/data-sources.md`. Samples (step 2), the baseline and the test set are still open.
 
 **Change log**
+- 2026-10-12 (Phase 8a, applicant): modules 9, 14 and 17 (D10 in `docs/decisions.md`; sources in `docs/data-sources.md` §3.9, §3.9a, §3.17).
+  - **Sources** (whole country, legal entities only): UR `register.csv` (`ur_companies`), UR insolvency proceedings (`ur_insolvency`), UR sanctions file (`ur_sanctions`, `LEGAL_ENTITY` / `FOREIGN_ENTITY` rows only) and FID "Sankciju subjekti" (`fid_sanctions`, rows with a Latvian legal-entity reg. no.). Never imported: officers, members, beneficial owners, procurations, natural-person sanctions rows, FID's sanctioned-person column. No names of individual merchants (IK, IND). Database constraints enforce it.
+  - **Applicant modules run once per applicant reg. no.** (results with scope `applicant`, stored on the first target that names it): 9 "Pieteicējs (UR)" (status aktīvs / likvidēts / reorganizēts, form, dates, legal address, open insolvency or legal protection) and 17 "Sankcijas" (reg. no. against UR entity rows and FID subjects, sanctioned entities linked to the applicant; a name-only hit is a manual-review flag, never a finding). Shown in their own section of the results page, on a new Excel sheet "Pieteicēji" and with their sources on Avoti.
+  - **Module 14 "Uzņēmumi adresē"** (object module): active and ended companies whose legal address is one of the object's VARIS addresses, with the building's use and area, labelled "juridiskā adrese, nav darbības pierādījums".
+  - **Links:** "Skatīt UR" (UR's public search, reg. no. to copy: no URL opens a company) and "Skatīt sankciju sarakstā" (FID's public list search; UR has no public sanctions search).
+  - **Rule set v3 (draft):** rules for 9, 14 and 17; module 14 medium for 10+ active companies in a residential (11xx) or < 300 m² building, from the pilot data (36 of 4,428 addresses have 10+, 5 of them residential houses).
+  - Sanctions option B (linked companies from natural-person rows, company fields only) is recorded in D10, **pending DPO assessment**; no code reads those rows.
+  - Candidate for later: FID "TA, VZD" lists cadastre numbers of frozen real estate (an object check).
 - 2026-10-12 (Phase 7): entry dialog, new runs from a stored run, project groups, header tabs (decisions in `docs/decisions.md` "Phase 7", D7, D8).
   - **Entry dialog** (§8.1), a modal on first open, reopened by "+ Jauna pārbaude":
     - kadastrs and address type-ahead with type badges; an ambiguous 11-digit number shows both meanings;
@@ -280,15 +288,15 @@ Inputs are normalised first: strip spaces and hyphens, `unaccent`, lowercase, ex
 | 6 | Registered encumbrances (apgrūtinājumi) | object | Cadastre text data (encumbrances resource, ATIS-coded) + frozen list until 2025-01-31 | 4 | **A list per parcel, parcel part or building:** code, description, area, registration date. No ATIS geometries are open, so there is no map layer and no spatial overlap. **Frozen-only encumbrances** (in the 2025-01-31 list, object still in the cadastre, code not in the current list; `ref.encumbrance_frozen_status`, column `frozen_only`) are **reported as a warning, never as a plain finding and never dropped**, with the text **"apgrūtinājums no 2025-01-31 saraksta, pašreizējos datos nav – pārbaudīt manuāli"**, one line per encumbrance with its code, description and date. An object whose only encumbrances are frozen-only gets the same warning and is never `clear`. The warning has no risk level of its own (risk comes only from `rules.yaml`) |
 | 7 | Ownership status | object | Cadastre (owner type only) | 8 | Owner type only (`PersonStatus`: natural / legal person, state, municipality, other). Never names of natural persons |
 | 8 | Zoning | object | TAPIS | 6 | Common legend mapping; partial coverage |
-| 9 | Applicant registry | applicant | UR | 8 | Status, form, legal address, dates |
+| 9 | Applicant registry | applicant | UR | 8 | Status, form, legal address, dates. **Built (8a):** UR register + insolvency proceedings of legal entities; IK/IND names not stored (D10) |
 | 10 | Applicant tax (VID rating) | applicant | VID | 8 | Rating A/B/C/J/N with its date. Freshness: `source_stale_after` about 120 days (the source is updated irregularly, at least 4× a year). **No tax-debt data on data.gov.lv**, so the module does not claim to check debts |
 | 11 | De minimis | applicant | FM | 8 | Aid in the relevant period. Legal-entity rows only |
 | 12 | EU double funding | object + applicant | EU projects | 8 | Other EU-funded projects on the same object or for the same applicant |
 | 13 | Procurement | applicant | IUB / EIS | 8 | |
-| 14 | Companies at address | object | UR | 8 | Legal address only, labelled "not proof of activity" |
+| 14 | Companies at address | object | UR | 8 | Legal address only, labelled "not proof of activity". **Built (8a):** join on the VARIS code (UR `addressid`), with the building's use and area |
 | 15 | Cultural heritage | object | KISC | later | Match on `Kadastra_apzimejums`; no geometry |
 | 16 | Municipal liabilities | municipality | Valsts kase | later | Per ATVK |
-| 17 | Sanctions (legal entities) | applicant | UR `sanctions` | 8 | Legal entities only. Match **only by reg. no.** (applicant reg. no. against `legal_entity_registration_number` / `sanctions_subject_registration_number`). A name-only hit is never a finding: it is flagged "manual review" with no risk level. Natural-person fields (name, birth date, personal code) are never imported |
+| 17 | Sanctions (legal entities) | applicant | UR `sanctions`, FID frozen-asset subjects | 8 | Legal entities only. Match **only by reg. no.** (applicant reg. no. against `legal_entity_registration_number` / `sanctions_subject_registration_number`). A name-only hit is never a finding: it is flagged "manual review" with no risk level. Natural-person fields (name, birth date, personal code) are never imported. **Built (8a), D10 option A:** natural-person rows not stored at all; option B pending DPO assessment |
 
 ### 6.2 Module contract
 ```
@@ -446,7 +454,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report; a plain input page. **Built and tested 2026-10-11** | **Pilot with 2–3 colleagues; measured time per object vs the baseline** (open) |
 | 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list. **Results view built 2026-10-11** (map, layers, attention areas, cards, overview); zoning, header tabs and filter bar open | UI criteria pass for the pilot area |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in). **Built 2026-10-12** (entry dialog, import preview, unit selection, Atjaunot and latest-data reruns, project groups, Avoti and Žurnāls); per-user sessions wait for sign-in (Phase 10) | UI criteria pass |
-| 8. Applicant & funding | Modules 7 and 9–14, and 17 | Each module verified on the test set |
+| 8. Applicant & funding | Modules 7 and 9–14, and 17. **8a built 2026-10-12:** modules 9, 14, 17 (UR, FID; rules v3 draft); 7, 10–13 open | Each module verified on the test set |
 | 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history), re-check value of `pirmsregistretas-buves` on whole-country data | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
 | 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, D3 final: shared hosting, sign-in (required before sharing), security review, retention, maintenance, legal wording; deployment behind sign-in | A refresh runs unattended; a failed import alerts the owner |
 

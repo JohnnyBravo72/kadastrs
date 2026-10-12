@@ -329,6 +329,20 @@ docker compose --profile e2e run --rm --no-deps -e SCREENSHOTS=1 -e E2E_BASE_URL
 # files: e2e/test-results/screens/*.png
 ```
 
+## Applicant checks (Phase 8a)
+
+Decisions: `docs/decisions.md` D10 (legal-entity data only). Import (national files; `ur_companies` is a 129 MB CSV, about 2 minutes):
+
+```powershell
+docker compose run --rm etl import ur_companies ur_insolvency ur_sanctions fid_sanctions
+```
+
+- Enter the applicant's reg. no. in the dialog ("Pieteicēja reģ. Nr.") or the list column "Pieteicēja reģ. Nr."; only the legal-entity pattern (11 digits starting with 4, 5 or 9) is kept.
+- Modules 9 "Pieteicējs (UR)" and 17 "Sankcijas" run **once per applicant** and show in the **Pieteicējs** section of the results page, on the Excel sheet **Pieteicēji** and on Detaļas ("pieteicējs <reg. no.>"). Module 14 "Uzņēmumi adresē" is an object module (chip, card, Kopsavilkums column).
+- "Skatīt UR" opens UR's public search with the reg. no. to copy; "Skatīt sankciju sarakstā" runs FID's public list search (`docs/data-sources.md` §8).
+- `GET /api/runs/{id}/applicants`: per applicant the targets, results and links.
+- Rule set v3 is a **draft**: reports show "noteikumi: melnraksts" until it is agreed (D4).
+
 ## Run the tests
 
 ```powershell
