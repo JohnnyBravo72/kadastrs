@@ -18,7 +18,8 @@ Nature: 13000102702 half in a microreserve (+ a 0.3 m habitat sliver, dropped);
 BIS: case A twice (duplicate rows) on building 09000360220002; case B by the
   address code 101765287; case C a point 5 m from 13000102702 (nearby); case D
   a building 09000360220099 missing from the cadastre (probable parcel).
-Encumbrances: 09000360220 and its part have current ones; 13000102702 has only a
+Encumbrances: 09000360220 and its part have current ones; 09000050400 has only a
+  technical one (8317010100, not a finding in rules v2); 13000102702 has only a
   frozen-only one; 09000360220 has one frozen row that is also current and one
   frozen-only (code 7399000000) next to its current ones.
 Geometry: building 09000360220012 has none (its parcel has: parcel level);
@@ -196,6 +197,8 @@ def seed_checks(conn) -> None:
     for row_no, obj, otype, code, name in [
         (1, "09000360220", "PARCEL", "7312030100", "aizsargjosla gar ielu"),
         (2, "090003602200001", "PARCEL PART", "7312050500", "aizsargjosla ap apakšstaciju"),
+        # technical (rules v2 not_findings): an assessment area for the cadastral value
+        (3, "09000050400", "PARCEL", "8317010100", "kadastrālās vērtības aprēķinam"),
     ]:
         conn.execute(
             "INSERT INTO ref.encumbrance (dataset_version_id, row_no, object_code, object_type,"

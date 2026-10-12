@@ -289,3 +289,15 @@ def test_address_consistency(conn):
     assert (none.status, none.reason, none.risk) == ("no_data", "adrese nav norādīta", "none")
     assert prop.status == "clear" and prop.subject.type == "property"
     assert res[(4, "address_consistency")]["units"] == {}  # once per target, no units
+
+
+def test_technical_encumbrances_are_listed_but_not_findings(conn):
+    """Rule set v2 not_findings: 8317* codes keep the object clear (risk none),
+    stay in the items with technical: true, and no rule fires on them."""
+    from engine.checks import runner as runner_mod
+    from engine.checks.contract import TargetIn as T
+
+    rid = runner_mod.start_run(conn, [T(type="parcel", designation="09000050400")], origin="test")
+    (enc,) = [r.result for r in runner_mod.stored(conn, rid) if r.result.module == "encumbrances"]
+    assert (enc.status, enc.risk, enc.rule_ids) == ("clear", "none", ["encumbrance_clear"])
+    assert [(i["code"], i["technical"]) for i in enc.items] == [("8317010100", True)]

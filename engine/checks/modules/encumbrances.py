@@ -12,6 +12,10 @@ pašreizējos datos nav – pārbaudīt manuāli".
   "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli", items = the
   frozen-only ones (frozen: true, flags ["frozen"]), never `clear`.
 Risk for both cases comes from rules.yaml (decided 2026-10-11).
+- Technical encumbrances (rules.yaml not_findings, rule set v2: codes 8317*, areas
+  assessed for the cadastral value) are listed with technical: true but are not
+  findings: an object with only those is `clear` (they stay in its items), and
+  frozen-only technical ones give no warning. Every item carries `technical`.
 """
 
 from engine.checks.context import RunContext
@@ -30,6 +34,8 @@ def _num(x):
 
 def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
     c = ctx.conn
+    nf = ctx.rules.not_findings.get(SPEC.id)
+    technical_codes = set(nf.codes) if nf else set()
     t, ev = ctx.v("cadastre_text"), ctx.v("cadastre_encumbrances")
     fv, av = ctx.v("encumbrances_frozen"), ctx.v("atis_classifier")
     found = [u for u in units if u.found and u.obj.in_register]
@@ -68,6 +74,7 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
                 "measure": measure,
                 "row_no": row_no,
                 "frozen": False,
+                "technical": code in technical_codes,
             }
         )
     frozen: dict[str, list[Warning_]] = {}
@@ -81,17 +88,19 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
            ORDER BY s.object_code, s.code, s.file_role, s.row_no""",
         (fv, ev, t, fv, every),
     ):
-        frozen.setdefault(obj, []).append(
-            Warning_(
-                code="frozen_only",
-                message=FROZEN_ONLY,
-                object_code=obj,
-                encumbrance_code=code,
-                description=desc,
-                establish_date=date.isoformat() if date else None,
-                evidence=f"{file_role}:{row_no}",
+        tech = code in technical_codes
+        if not tech:
+            frozen.setdefault(obj, []).append(
+                Warning_(
+                    code="frozen_only",
+                    message=FROZEN_ONLY,
+                    object_code=obj,
+                    encumbrance_code=code,
+                    description=desc,
+                    establish_date=date.isoformat() if date else None,
+                    evidence=f"{file_role}:{row_no}",
+                )
             )
-        )
         frozen_items.setdefault(obj, []).append(
             {
                 "object_code": obj,
@@ -99,6 +108,7 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
                 "description": desc,
                 "establish_date": date.isoformat() if date else None,
                 "frozen": True,
+                "technical": tech,
                 "flags": ["frozen"],
                 "evidence": f"{file_role}:{row_no}",
             }
@@ -114,22 +124,26 @@ def run(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
             continue
         items = [i for o in objects[u.code] for i in current.get(o, [])]
         warns = [w for o in objects[u.code] for w in frozen.get(o, [])]
-        if items:
+        frozen_all = [i for o in objects[u.code] for i in frozen_items.get(o, [])]
+        technical = [i for i in items if i["technical"]] + [i for i in frozen_all if i["technical"]]
+        findings = [i for i in items if not i["technical"]]
+        if findings:
             out[u.key] = make(SPEC, ctx, u, "found", items=items, warnings=warns)
         elif warns:
-            only = [i for o in objects[u.code] for i in frozen_items.get(o, [])]
+            only = [i for i in frozen_all if not i["technical"]]
             out[u.key] = make(
-                SPEC, ctx, u, "found", reason=ONLY_FROZEN_REASON, items=only, warnings=warns
-            )
+                SPEC, ctx, u, "found", reason=ONLY_FROZEN_REASON, items=only + technical,
+                warnings=warns,
+            )  # fmt: skip
         else:
-            out[u.key] = make(SPEC, ctx, u, "clear")
+            out[u.key] = make(SPEC, ctx, u, "clear", items=technical)
     return out
 
 
 SPEC = ModuleSpec(
     id="encumbrances",
     no=6,
-    version="2",
+    version="3",
     name_lv="Apgrūtinājumi",
     selectors=("cadastre_encumbrances",),
     reads=("cadastre_encumbrances", "cadastre_text", "encumbrances_frozen", "atis_classifier"),

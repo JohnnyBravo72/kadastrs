@@ -93,7 +93,7 @@ def test_every_result_names_pinned_versions(conn, first_run):
 def test_run_records_the_rule_set(conn, first_run):
     s = summary.summarize(conn, first_run)
     assert s["status"] == "done"
-    assert s["rule_set"]["version"] == "1" and s["rule_set"]["status"] == "agreed"
+    assert s["rule_set"]["version"] == "2" and s["rule_set"]["status"] == "agreed"
     assert s["rule_set"]["sha256"] == rules_mod.load().sha256
 
 

@@ -47,6 +47,15 @@ class Rule(BaseModel):
         return v
 
 
+class NotFindings(BaseModel):
+    """Records a module lists but does not count as findings (rule set v2+):
+    they never make a result `found` and are shown apart, collapsed."""
+
+    codes: list[str] = Field(min_length=1)
+    label_lv: str
+    reason: str
+
+
 class RuleSet(BaseModel):
     version: str
     status: Literal["draft", "agreed"]
@@ -54,6 +63,8 @@ class RuleSet(BaseModel):
     risk_order: list[Risk]
     defaults: dict[str, Risk]
     rules: list[Rule]
+    # module id -> records that are not findings (v1 has none)
+    not_findings: dict[str, NotFindings] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _complete(self) -> RuleSet:
@@ -69,7 +80,10 @@ class RuleSet(BaseModel):
     # --- identity ------------------------------------------------------------------
 
     def as_json(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        data = self.model_dump(mode="json")
+        if not data["not_findings"]:  # v1 snapshots (and their checksum) stay as stored
+            del data["not_findings"]
+        return data
 
     @property
     def sha256(self) -> str:

@@ -28,9 +28,11 @@ def result(module="flood_10y", status="found", items=(), warnings=(), reason=Non
     )
 
 
-def test_rule_set_v1_is_agreed_with_a_reason_per_rule():
+def test_rule_set_v2_is_agreed_with_a_reason_per_rule():
     rs = rules_mod.load()
-    assert (rs.version, rs.status) == ("1", "agreed")
+    assert (rs.version, rs.status) == ("2", "agreed")  # v2 agreed 2026-10-12 (D4)
+    nf = rs.not_findings["encumbrances"]
+    assert nf.codes == ["8317010100", "8317020100", "8317030100"] and nf.reason.strip()
     assert all(r.reason.strip() and r.text_lv.strip() for r in rs.rules)
     assert rs.modules() <= set(BY_ID)
     assert rs.modules() == set(BY_ID)  # every module has rules
@@ -125,10 +127,24 @@ def test_bis_stage_and_age():
 def test_encumbrance_codes():
     rs = rules_mod.load()
 
-    def enc(code, frozen=False):
-        return rs.evaluate(result(module="encumbrances", items=[{"code": code, "frozen": frozen}]))
+    def enc(code, frozen=False, technical=False):
+        item = {"code": code, "frozen": frozen, "technical": technical}
+        return rs.evaluate(result(module="encumbrances", items=[item]))
 
     assert enc("7311020400")[0] == "medium"  # applūstošā teritorija
     assert enc("7314020102")[0] == "medium"  # kultūras pieminekļa aizsardzības zona
     assert enc("7312050201") == ("low", ["encumbrance_registered"])  # cable line belt
     assert enc("7311020400", frozen=True)[0] == "low"  # default_found: frozen items rate via reason
+    # technical (not_findings) items: no rule fires on them
+    assert enc("8317010100", technical=True)[1] == ["default_found"]
+
+
+def test_a_v1_snapshot_keeps_its_shape_and_checksum():
+    """Old runs store rule set v1 without not_findings: loading it back adds no key,
+    so its JSON and checksum are unchanged and replay uses no technical list."""
+    v1 = rules_mod.load().as_json()
+    v1.pop("not_findings")
+    v1["version"] = "1"
+    rs = rules_mod.from_json(v1)
+    assert rs.not_findings == {} and "not_findings" not in rs.as_json()
+    assert rs.as_json() == v1

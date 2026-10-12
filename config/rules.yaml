@@ -1,12 +1,22 @@
 # Risk rules (PLAN.md §6.4). The only place risk levels come from (CLAUDE.md rule 4).
 # Rule set v1 is decision D4: agreed by Janis Bardavskis 2026-10-11, to be revised
-# after the test-set comparison. Every run and report shows version and status.
+# after the test-set comparison. v2 (agreed by Janis Bardavskis 2026-10-12): the
+# encumbrance codes 8317* (areas assessed for the cadastral value) are not findings
+# (not_findings below). Every run and report shows version and status.
 # A changed rule set gets a new version (back to status: draft until agreed).
 # The engine stores this whole file with each run, so an old run is replayed with
 # the rules it was made with.
 
-version: "1"
+version: "2"
 status: agreed         # draft | agreed
+
+# Records a module lists apart (collapsed) and never counts as findings: they do
+# not make a result `found` and no rule fires on them (items carry technical: true).
+not_findings:
+  encumbrances:
+    codes: ["8317010100", "8317020100", "8317030100"]
+    label_lv: "Tehniskie apgrūtinājumi (kadastrālās vērtības aprēķinam)"
+    reason: "Areas assessed for calculating the cadastral value (dzīvojamās apbūves, pārējās apbūves, lauku zeme), on about 54,000 pilot parcels: a valuation layer, not a restriction on the planned works (decided 2026-10-12)."
 
 # Spatial thresholds (PLAN.md §6.3), listed on the report's "Avoti" sheet.
 thresholds:
@@ -263,7 +273,8 @@ rules:
 
   # --- 6 Apgrūtinājumi -----------------------------------------------------------------------
   # Items are current encumbrances (frozen: false), or, when ALL of an object's
-  # encumbrances are frozen-only, those frozen-only ones (frozen: true).
+  # encumbrances are frozen-only, those frozen-only ones (frozen: true). Technical
+  # ones (not_findings, technical: true) are listed too but no rule fires on them.
   # code = ATIS / cadastre classifier code. Medium: the codes below, chosen from the
   # 123 codes in the pilot data (version 2026-09-26); every other code is low.
   - id: encumbrance_medium
@@ -333,13 +344,13 @@ rules:
   - id: encumbrance_registered
     module: encumbrances
     level: low
-    when: {item: {frozen: false}}
+    when: {item: {frozen: false, technical: false}}
     reason: "Encumbrances are registered on the object (utility and road belts, servitudes, other); the evaluator checks whether they limit the planned works."
     text_lv: "Objektam reģistrēti apgrūtinājumi."
   - id: encumbrance_frozen_alongside_current
     module: encumbrances
     level: none
-    when: {warning: frozen_only, item: {frozen: false}}
+    when: {warning: frozen_only, item: {frozen: false, technical: false}}
     reason: "Frozen-only encumbrances next to current ones: shown as warning lines for a manual look, no risk increase (decided 2026-10-11)."
     text_lv: "Papildus pašreizējiem – apgrūtinājumi tikai 2025-01-31 sarakstā (pārbaudīt manuāli)."
   - id: encumbrance_frozen_only
