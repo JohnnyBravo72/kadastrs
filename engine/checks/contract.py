@@ -44,7 +44,7 @@ class CheckResult(BaseModel):
     module_no: int
     module_version: str
     subject: Subject
-    scope: Literal["target", "unit"] = "target"
+    scope: Literal["target", "unit", "applicant"] = "target"
     status: Status
     reason: str | None = None
     risk: Risk = "unknown"

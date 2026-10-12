@@ -21,7 +21,7 @@ from tests.batch.conftest import STORED_NAME, TE4_BUILDING
 pytestmark = pytest.mark.stack
 
 TEMPLATE = Path(__file__).resolve().parents[1] / "data" / "test_set_template.xlsx"
-SHEETS = ["Kopsavilkums", "Detaļas", "Avoti", "Neatrasts"]
+SHEETS = ["Kopsavilkums", "Pieteicēji", "Detaļas", "Avoti", "Neatrasts"]
 HEADERS = {
     "Kopsavilkums": [
         "Nr.",
@@ -34,7 +34,8 @@ HEADERS = {
         "Adrese (kadastrā)",
         "Norādītā adrese",
         "Pieteicēja reģ. nr.",
-        *[f"{m.no}. {m.name_lv}" for m in MODULES],
+        # object modules only; the applicant modules have their own sheet
+        *[f"{m.no}. {m.name_lv}" for m in MODULES if m.subject == "object"],
         "Kopējais risks",
         "Brīdinājumi",
     ],
@@ -55,6 +56,20 @@ HEADERS = {
         "Datu datums",
         "data.gov.lv saite",
         "Avots sistēmā",
+    ],
+    "Pieteicēji": [
+        "Pieteicēja reģ. nr.",
+        "Nosaukums",
+        "Forma",
+        "Statuss UR",
+        "Reģistrēts",
+        "Darbību beidzis",
+        "Juridiskā adrese",
+        "Atvērti procesi",
+        "Objekti (Nr.)",
+        *[f"{m.no}. {m.name_lv}" for m in MODULES if m.subject == "applicant"],
+        "Kopējais risks",
+        "Brīdinājumi",
     ],
     "Avoti": [
         "Avots",
@@ -227,7 +242,7 @@ def test_sources_sheet_has_versions_rule_set_and_thresholds(wb, batch_db, run):
     cells = [c.value for row in ws.iter_rows() for c in row if c.value is not None]
     with batch_db() as c:
         sha = c.execute("SELECT rule_set_sha256 FROM work.run WHERE id = %s", (run,)).fetchone()[0]
-    assert sha in cells and "saskaņoti" in cells
+    assert sha in cells and "melnraksts" in cells  # rule set v3 is a draft
     assert any(isinstance(v, str) and "1 cm" in v for v in cells)  # flood processing note
     assert "Visa valsts (tikai kartētie biotopi)" in cells  # coverage in Latvian
     assert not any(isinstance(v, str) and v.startswith("Whole country") for v in cells)

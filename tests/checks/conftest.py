@@ -25,6 +25,10 @@ Encumbrances: 09000360220 and its part have current ones; 09000050400 has only a
 Geometry: building 09000360220012 has none (its parcel has: parcel level);
   parcel 05000040099 and its building 05000040099001 have none (no_data).
 Address: 09000050405 has VARIS 101000005, the successor of deleted 101154013.
+Applicant (Phase 8a, synthetic; no person data): see APPLICANTS and seed_applicants.
+  09000050406 (Druvu iela 27, VARIS 101000006) with house 09000050406001 (use 1110,
+  180 m2): 12 active companies + 1 liquidated at its address -> module 14 medium;
+  2 active at Institūta iela 4 (101765287, 09000360220 and its school) -> low.
 """
 
 from functools import partial
@@ -47,6 +51,10 @@ V = RESOLVE_V | {
     "cadastre_encumbrances": 11,
     "encumbrances_frozen": 12,
     "atis_classifier": 13,
+    "ur_companies": 14,
+    "ur_insolvency": 15,
+    "ur_sanctions": 16,
+    "fid_sanctions": 17,
 }
 CHECK_SOURCES = [s for s in V if s not in RESOLVE_V]
 
@@ -66,6 +74,7 @@ PARCELS = [
     ("09000050404", "0003000", None, (474300, 274000, 474400, 274100)),
     ("09000050405", "0003000", "101000005", (477000, 277000, 477010, 277010)),
     ("05000040099", "0002000", None, None),
+    ("09000050406", "0003000", "101000006", (478000, 278000, 478020, 278020)),
 ]
 BUILDINGS = [("05000040099001", "0002000", "05000040099")]
 
@@ -223,6 +232,97 @@ def seed_checks(conn) -> None:
             " '2010-01-01', '2025-01-31', '{frozen}')",
             (V["encumbrances_frozen"], row_no, obj, code),
         )
+    seed_applicants(conn)
+
+
+# reg_no -> what it tests (Phase 8a modules 9 and 17)
+APPLICANTS = {
+    "40003100001": "active, registered 2010",
+    "40003100002": "liquidated (L)",
+    "40003100003": "active, registered 30 days ago",
+    "40003100004": "open insolvency",
+    "40003100005": "UR sanctions LEGAL_ENTITY reg. no.",
+    "40003100006": "FID frozen-asset subject",
+    "40003100007": "linked to a sanctioned foreign entity",
+    "40003100008": "name equals a foreign entity on the list (name only)",
+    "40003100009": "individual merchant (no name stored)",
+}
+NOT_IN_UR = "40009999999"
+MASS_ADDRESS = "101000006"  # Druvu iela 27: 12 active companies in a 180 m2 house
+
+
+def seed_applicants(conn) -> None:
+    """Synthetic applicant data (legal entities only; IK without a name, D10)."""
+    t = V["cadastre_text"]
+    conn.execute(
+        "INSERT INTO ref.building (dataset_version_id, code, file_atvk, name, use_kind_id,"
+        " use_kind_name, area_m2, varis_code, not_exist, prereg)"
+        " VALUES (%s, '09000050406001', '0003000', 'Dzīvojamā māja', '1110',"
+        " 'Viena dzīvokļa mājas', 180, %s, false, false)",
+        (t, MASS_ADDRESS),
+    )
+    conn.execute(
+        "INSERT INTO ref.building_parcel VALUES (%s, '09000050406001', '09000050406',"
+        " 'object_relation')",
+        (t,),
+    )
+    c = V["ur_companies"]
+    rows = [
+        ("40003100001", 'SIA "Alfa"', "SIA", "2010-01-01", None, None, MASS_ADDRESS),
+        ("40003100002", 'SIA "Beta"', "SIA", "2005-01-01", "2020-01-01", "L", "101765287"),
+        ("40003100003", 'SIA "Gamma"', "SIA", None, None, None, MASS_ADDRESS),
+        ("40003100004", 'SIA "Delta"', "SIA", "2012-01-01", None, None, MASS_ADDRESS),
+        ("40003100005", 'SIA "Epsilon"', "SIA", "2011-01-01", None, None, MASS_ADDRESS),
+        ("40003100006", 'SIA "Zeta"', "SIA", "2013-01-01", None, None, MASS_ADDRESS),
+        ("40003100007", 'SIA "Eta"', "SIA", "2014-01-01", None, None, MASS_ADDRESS),
+        ("40003100008", "SIA Omega", "SIA", "2015-01-01", None, None, "101765287"),
+        ("40003100009", None, "IK", "2016-01-01", None, None, "101765287"),
+    ]
+    rows += [
+        (f"4000320{n:04d}", f'SIA "Masa {n}"', "SIA", "2020-01-01", None, None, MASS_ADDRESS)
+        for n in range(1, 7)
+    ]
+    for reg, name, form, registered, terminated, closed, varis in rows:
+        conn.execute(
+            "INSERT INTO ref.ur_company (dataset_version_id, reg_no, name, form, form_text,"
+            " registered, terminated, closed, address, varis_code)"
+            " VALUES (%s, %s, %s, %s, %s, coalesce(%s::date, current_date - 30), %s, %s,"
+            " 'Druvu iela 27, Jelgava', %s)",
+            (c, reg, name, form, "Sabiedrība ar ierobežotu atbildību" if form == "SIA"
+             else "Individuālais komersants", registered, terminated, closed, varis),
+        )  # fmt: skip
+    conn.execute(
+        "INSERT INTO ref.ur_insolvency (dataset_version_id, proceeding_id, reg_no, started_on,"
+        " ended_on, form, type) VALUES (%s, '1', '40003100004', '2026-01-10', NULL,"
+        " 'INSOLVENCY', 'NATIONAL'), (%s, '2', '40003100001', '2015-01-01', '2016-01-01',"
+        " 'LEGAL_PROTECTION', 'NATIONAL')",
+        (V["ur_insolvency"], V["ur_insolvency"]),
+    )
+    s = V["ur_sanctions"]
+    conn.execute(
+        "INSERT INTO ref.ur_sanction (dataset_version_id, entry_id, entity_type, reg_no,"
+        " entity_name, entity_country, list, list_text, program, entry_date, legal_base)"
+        " VALUES (%s, '1', 'LEGAL_ENTITY', '40003100005', 'SIA \"Epsilon\"', 'LV',"
+        " 'ES_SANCTIONS', 'ES sankciju saraksts', 'UKR', '2022-04-01', '269/2014')",
+        (s,),
+    )
+    conn.execute(
+        "INSERT INTO ref.ur_sanction (dataset_version_id, entry_id, entity_type, foreign_reg_no,"
+        " entity_name, entity_country, position_text_lv, subject_reg_no, subject_name, list,"
+        " program, entry_date) VALUES (%s, '2', 'FOREIGN_ENTITY', '1027700000', 'OOO Theta',"
+        " 'RU', 'Dalībnieks', '40003100007', 'SIA \"Eta\"', 'SDN_OFAC_SANCTIONS',"
+        " 'RUSSIA-EO14024', '2023-05-01'),"
+        " (%s, '3', 'FOREIGN_ENTITY', NULL, 'SIA OMEGA', 'RU', NULL, NULL, NULL, 'ES_SANCTIONS',"
+        " 'UKR', '2022-02-28')",
+        (s, s),
+    )
+    conn.execute(
+        "INSERT INTO ref.fid_sanction (dataset_version_id, row_no, reg_no, entity_name, country,"
+        " asset_kind, basis, sanctions_from, legal_act) VALUES (%s, 1, '40003100006',"
+        " 'SIA \"Zeta\"', 'Latvija', 'Kapitāldaļas', 'Sankciju sarakstā iekļautas personas"
+        " kontrole', '21.07.2022.', '269/2014')",
+        (V["fid_sanctions"],),
+    )
 
 
 @pytest.fixture(scope="module")

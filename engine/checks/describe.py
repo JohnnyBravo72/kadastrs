@@ -51,4 +51,40 @@ def describe(module: str, item: dict[str, Any]) -> str:
         if item.get("frozen"):
             text += "; tikai 2025-01-31 sarakstā – pārbaudīt manuāli"
         return text
+    if module == "applicant_company":
+        name = item.get("name") or item.get("name_note") or ""
+        text = f"{item.get('reg_no')} {name}".strip()
+        text += f"; {item.get('form_text') or item.get('form')}; {item.get('status_lv')}"
+        if item.get("registered"):
+            text += f"; reģistrēts {item['registered']}"
+        if item.get("terminated"):
+            text += f"; darbību beidzis {item['terminated']}"
+        for p in item.get("proceedings") or []:
+            if p.get("open"):
+                text += f"; atvērts {p.get('form_lv')} (no {p.get('started_on')})"
+        return text
+    if module == "companies_at_address":
+        text = f"{item.get('address') or item.get('varis_code')}: {item.get('active_count')} aktīvi"
+        if item.get("ended_count"):
+            text += f", {item['ended_count']} likvidēti"
+        if item.get("building_area_m2") is not None:
+            kind = "dzīvojamā ēka" if item.get("residential") else "ēka"
+            text += f"; {kind} {item['building_area_m2']:.0f} m²"
+        return text + " (juridiskā adrese, nav darbības pierādījums)"
+    if module == "sanctions":
+        label = {
+            "reg_no": "reģistrācijas numurs sarakstā",
+            "linked_entity": "saistīta sankcionēta juridiskā persona",
+            "name_only": "tikai nosaukums sakrīt – pārbaudīt manuāli",
+        }.get(item.get("match"), item.get("match"))
+        bits = [
+            item.get("entity_name"),
+            item.get("relationship"),
+            item.get("list_text") or item.get("list"),
+            item.get("program"),
+            item.get("entry_date") or item.get("sanctions_from"),
+            item.get("basis"),
+        ]
+        src = "FID iesaldētie aktīvi" if item.get("source") == "fid_sanctions" else "UR sankcijas"
+        return f"{label} ({src}): " + ", ".join(str(b) for b in bits if b)
     return json.dumps(item, ensure_ascii=False, sort_keys=True)

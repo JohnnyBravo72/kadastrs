@@ -179,8 +179,25 @@ def compute(
             units.setdefault(u.key, Unit(u.type, u.code, u.obj))
     build_geometry(ctx, list(units.values()))
 
+    # applicants (Phase 8a): each reg. no. once, its results stored on the first
+    # target that names it
+    applicants: dict[str, int] = {}
+    for t in targets:
+        reg = t.given.applicant_reg_no
+        if reg and reg not in applicants:
+            applicants[reg] = t.no
+
     rows: list[Row] = []
     for spec in modules:
+        if spec.subject == "applicant":
+            subjects = [Unit("applicant", reg, None) for reg in applicants]
+            if not subjects:
+                continue
+            results = _run_module(spec, ctx, subjects)
+            for u in subjects:
+                r = rules.apply(results[u.key]).model_copy(update={"scope": "applicant"})
+                rows.append(Row(applicants[u.code], "applicant", "applicant", u.code, r))
+            continue
         if spec.id in PER_TARGET:
             for t in targets:
                 lead = t.units[0] if not t.property_units else None

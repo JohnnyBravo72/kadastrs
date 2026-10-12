@@ -138,7 +138,7 @@ def _journal(
     risks: dict[int, set[str]] = {}
     for run_id, risk in conn.execute(
         """SELECT DISTINCT run_id, risk FROM work.check_result
-           WHERE run_id = ANY(%s) AND scope = 'target'
+           WHERE run_id = ANY(%s) AND scope IN ('target', 'applicant')
              AND NOT (module = 'address_consistency' AND reason IS NOT DISTINCT FROM %s)""",
         (ids, summary.NOT_GIVEN),
     ):
@@ -236,6 +236,54 @@ def save_groups(request: Request, run_id: int, body: GroupingRequest) -> dict[st
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+def _result_json(r, rule_by_id: dict, unit_type: str, unit_code: str, point=None) -> dict[str, Any]:
+    return r.model_dump(mode="json") | {
+        "summary_status": summary.bucket(r.module, r.status, r.reason),
+        "module_name": BY_ID[r.module].name_lv,
+        "items_text": [describe(r.module, i) for i in r.items],
+        "item_links": [
+            [lk.as_json() for lk in links.item_links(r.module, i, unit_type, unit_code, point)]
+            for i in r.items
+        ],
+        "rules": [
+            {"id": i, "level": rule_by_id[i].level, "text_lv": rule_by_id[i].text_lv}
+            for i in r.rule_ids
+            if i in rule_by_id
+        ],
+    }
+
+
+@router.get("/runs/{run_id}/applicants")
+def get_applicants(request: Request, run_id: int) -> list[dict[str, Any]]:
+    """The applicant section (Phase 8a): per applicant reg. no. the targets that
+    name it, the results of modules 9 and 17, and the links "Skatīt UR" and
+    "Skatīt sankciju sarakstā" (nothing is fetched from those systems)."""
+    with request.app.state.pool.connection() as conn:
+        _summary(conn, run_id)
+        rule_set = conn.execute(
+            "SELECT rule_set FROM work.run WHERE id = %s", (run_id,)
+        ).fetchone()[0]
+        by_id = {r.id: r for r in rules_mod.from_json(rule_set).rules}
+        rows = [r for r in runner.stored(conn, run_id) if r.scope == "applicant"]
+        out = []
+        for entry in summary.applicants(conn, run_id):
+            mine = [r for r in rows if r.unit_code == entry["reg_no"]]
+            company = next((r.result for r in mine if r.result.module == "applicant_company"), None)
+            name = company.items[0].get("name") if company and company.items else None
+            out.append(
+                entry
+                | {
+                    "name": name,
+                    "results": [
+                        _result_json(r.result, by_id, "applicant", r.unit_code)
+                        for r in sorted(mine, key=lambda x: x.result.module_no)
+                    ],
+                    "links": [lk.as_json() for lk in links.applicant_links(entry["reg_no"], name)],
+                }
+            )
+        return out
+
+
 @router.get("/runs/{run_id}")
 def get_run(request: Request, run_id: int) -> dict[str, Any]:
     """Run summary: rule set (version and status), dataset versions, counts per
@@ -276,7 +324,11 @@ def get_target_results(request: Request, run_id: int, target_no: int) -> dict[st
             "SELECT rule_set FROM work.run WHERE id = %s", (run_id,)
         ).fetchone()[0]
         by_id = {r.id: r for r in rules_mod.from_json(rule_set).rules}
-        rows = [r for r in runner.stored(conn, run_id) if r.target_no == target_no]
+        rows = [
+            r
+            for r in runner.stored(conn, run_id)
+            if r.target_no == target_no and r.scope != "applicant"
+        ]
         points = geo.centres(conn, run_id, [r.unit_code for r in rows])
         modules: dict[str, dict[str, Any]] = {}
         for row in rows:

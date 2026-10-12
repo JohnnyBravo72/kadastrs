@@ -88,6 +88,32 @@ def run_header(conn, run_id: int) -> dict[str, Any] | None:
     }
 
 
+def applicants(conn, run_id: int) -> list[dict[str, Any]]:
+    """One entry per applicant reg. no. (Phase 8a): the targets naming it and per
+    applicant module its status and risk (results with scope "applicant")."""
+    out: dict[str, dict[str, Any]] = {}
+    for tno, reg in conn.execute(
+        """SELECT target_no, applicant_reg_no FROM work.run_target
+           WHERE run_id = %s AND applicant_reg_no IS NOT NULL ORDER BY target_no""",
+        (run_id,),
+    ):
+        out.setdefault(reg, {"reg_no": reg, "target_nos": [], "modules": {}})
+        out[reg]["target_nos"].append(tno)
+    for reg, module, status, reason, risk in conn.execute(
+        """SELECT unit_code, module, status, reason, risk FROM work.check_result
+           WHERE run_id = %s AND scope = 'applicant' ORDER BY unit_code, module_no""",
+        (run_id,),
+    ):
+        entry = out.setdefault(reg, {"reg_no": reg, "target_nos": [], "modules": {}})
+        entry["modules"][module] = {
+            "status": status,
+            "summary_status": bucket(module, status, reason),
+            "reason": reason,
+            "risk": risk,
+        }
+    return list(out.values())
+
+
 def summarize(conn, run_id: int) -> dict[str, Any] | None:
     head = run_header(conn, run_id)
     if head is None:
@@ -97,7 +123,8 @@ def summarize(conn, run_id: int) -> dict[str, Any] | None:
     worst: dict[int, str] = {}
     for tno, module, mno, status, reason, risk in conn.execute(
         """SELECT target_no, module, module_no, status, reason, risk FROM work.check_result
-           WHERE run_id = %s AND scope = 'target' ORDER BY module_no, target_no""",
+           WHERE run_id = %s AND scope IN ('target', 'applicant')
+           ORDER BY module_no, target_no""",
         (run_id,),
     ):
         m = per_module.setdefault(
@@ -126,9 +153,9 @@ def summarize(conn, run_id: int) -> dict[str, Any] | None:
 def targets(conn, run_id: int) -> list[dict[str, Any]]:
     """One line per target: input, designation and per module status and risk."""
     out: dict[int, dict[str, Any]] = {}
-    for tno, inp, typ, des, addr, pno, warns, units, label, ino in conn.execute(
+    for tno, inp, typ, des, addr, pno, warns, units, label, ino, reg in conn.execute(
         """SELECT target_no, input, type, designation, given_address, project_no, warnings, units,
-                  label, input_no
+                  label, input_no, applicant_reg_no
            FROM work.run_target WHERE run_id = %s ORDER BY target_no""",
         (run_id,),
     ):
@@ -143,6 +170,7 @@ def targets(conn, run_id: int) -> list[dict[str, Any]]:
             "units": units,
             "label": label,  # e.g. "divdomīgs: zemes vienība" (batch input)
             "input_no": ino,
+            "applicant_reg_no": reg,  # legal-entity pattern only (CLAUDE.md rule 5)
             "modules": {},
         }
     for tno, module, status, reason, risk in conn.execute(

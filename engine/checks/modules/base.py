@@ -24,6 +24,9 @@ class ModuleSpec:
     optional: tuple[str, ...]  # sources it reads only when selected (nature layers)
     display: Display
     run: Runner
+    # object: checked per target and unit; applicant: once per applicant reg. no.
+    # in the run (Phase 8a), stored with scope "applicant"
+    subject: str = "object"
 
     def used_sources(self, ctx: RunContext) -> list[str]:
         opt = [s for s in self.optional if s in ctx.selected and s in ctx.pinned]

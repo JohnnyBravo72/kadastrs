@@ -26,6 +26,8 @@ OZOLS = "https://ozols.gov.lv/pub"
 LVGMC_VIEWER = "https://geodata.lvgmc.lv/portal/apps/webappviewer/index.html"
 LVGMC_APP_ID = "45020161703b4e1b936b5d8d65e144c2"  # 3. cikla … plūdu riska kartes
 LVGMC_LEVEL = 17
+UR_SEARCH = "https://info.ur.gov.lv/#/data-search"
+FID_SEARCH = "https://sankcijas.fid.gov.lv/lv/meklet-sankciju-sarakstos/1/0"
 
 
 @dataclass(frozen=True)
@@ -87,6 +89,28 @@ def nature_link(code: str) -> Link:
     return Link("Ozols (DAP)", OZOLS, copy=code, note="meklēt pēc kadastra numura")
 
 
+def ur_link(reg_no: str) -> Link:
+    # the UR portal runs a search only from its own box; no URL opens a company
+    # (tested 2026-10-12, docs/data-sources.md §8)
+    return Link("UR", UR_SEARCH, copy=reg_no, note="meklēt pēc reģistrācijas numura")
+
+
+def sanctions_link(reg_no: str, name: str | None) -> Link:
+    """FID's public search of the sanctions lists (EU, UN, OFAC, LV), by the
+    company name; by the reg. no. when the name is not stored (IK, IND)."""
+    query = name or reg_no
+    return Link(
+        "FID sankciju saraksti",
+        f"{FID_SEARCH}?{urlencode({'searchText': query, 'exactSearch': '0'})}",
+        note=None if name else "meklēts pēc reģistrācijas numura",
+    )
+
+
+def applicant_links(reg_no: str, name: str | None) -> list[Link]:
+    """ "Skatīt UR" and "Skatīt sankciju sarakstā" for one applicant."""
+    return [ur_link(reg_no), sanctions_link(reg_no, name)]
+
+
 def kind_of(code: str, known: str | None = None) -> str:
     """Object type from a designation's length (11 parcel or property, 14 building,
     15 parcel part, 17 premise group); `known` wins when given."""
@@ -122,6 +146,14 @@ def item_links(
         return [nature_link(unit_code)]
     if module == "flood_10y":
         return [flood_link(centre)]
+    if module == "applicant_company":
+        return [ur_link(str(item.get("reg_no") or unit_code))]
+    if module == "sanctions":
+        if (item.get("legal_base_url") or "").startswith("https://"):
+            return [Link("Izpildrīkojums", item["legal_base_url"])]
+        return []
+    if module == "companies_at_address" and item.get("varis_code"):
+        return [address_link(str(item["varis_code"]))]
     if module == "encumbrances":
         obj = str(item.get("object_code") or unit_code)
         link = object_link(kind_of(obj), obj)

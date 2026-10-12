@@ -2,13 +2,15 @@
 # Rule set v1 is decision D4: agreed by Janis Bardavskis 2026-10-11, to be revised
 # after the test-set comparison. v2 (agreed by Janis Bardavskis 2026-10-12): the
 # encumbrance codes 8317* (areas assessed for the cadastral value) are not findings
-# (not_findings below). Every run and report shows version and status.
+# (not_findings below). v3 (DRAFT, 2026-10-12, for review by Janis Bardavskis):
+# rules for the applicant modules 9 and 17 and for module 14 (Phase 8a); the rules
+# of modules 1-6 are unchanged from v2. Every run and report shows version and status.
 # A changed rule set gets a new version (back to status: draft until agreed).
 # The engine stores this whole file with each run, so an old run is replayed with
 # the rules it was made with.
 
-version: "2"
-status: agreed         # draft | agreed
+version: "3"
+status: draft          # draft | agreed
 
 # Records a module lists apart (collapsed) and never counts as findings: they do
 # not make a result `found` and no rule fires on them (items carry technical: true).
@@ -365,3 +367,91 @@ rules:
     when: {status: clear}
     reason: "No encumbrance registered on the object."
     text_lv: "Apgrūtinājumi nav reģistrēti."
+
+  # --- 9 Pieteicējs (UR) -- v3 draft ---------------------------------------------
+  - id: applicant_active
+    module: applicant_company
+    level: none
+    when: {item: {status: active}}
+    reason: "An active legal entity in the Register of Enterprises: the expected state of an applicant."
+    text_lv: "Pieteicējs ir aktīvs Uzņēmumu reģistrā."
+  - id: applicant_liquidated
+    module: applicant_company
+    level: high
+    when: {item: {status: liquidated}}
+    reason: "The entity has been liquidated or struck off (UR `closed` L); it cannot carry out a project."
+    text_lv: "Pieteicējs ir likvidēts vai izslēgts no reģistra."
+  - id: applicant_reorganized
+    module: applicant_company
+    level: high
+    when: {item: {status: reorganized}}
+    reason: "The entity ended by reorganisation (UR `closed` R); the applicant's legal successor must be established."
+    text_lv: "Pieteicējs ir reorganizēts (darbību beidzis): jānoskaidro tiesību pārņēmējs."
+  - id: applicant_insolvency_open
+    module: applicant_company
+    level: high
+    when: {item: {open_proceeding: INSOLVENCY}}
+    reason: "An open insolvency proceeding: the applicant may be unable to co-finance or complete the project."
+    text_lv: "Pieteicējam ir atvērts maksātnespējas process."
+  - id: applicant_legal_protection_open
+    module: applicant_company
+    level: medium
+    when: {item: {open_proceeding: [LEGAL_PROTECTION, OUT_OF_COURT_LEGAL_PROTECTION]}}
+    reason: "An open (out-of-court) legal protection proceeding: financial difficulty, but the entity keeps operating under a plan; weaker than insolvency."
+    text_lv: "Pieteicējam ir atvērts tiesiskās aizsardzības process."
+  - id: applicant_recently_registered
+    module: applicant_company
+    level: medium
+    when: {item: {age_days_lt: 183}}
+    reason: "Registered less than 6 months before the check: no track record; a typical sign of an entity set up for one application."
+    text_lv: "Pieteicējs reģistrēts mazāk nekā pirms 6 mēnešiem."
+  - id: applicant_not_in_ur
+    module: applicant_company
+    level: unknown
+    when: {status: no_data}
+    reason: "The reg. no. is not in the Register of Enterprises open data: a typing error, or an entity not registered with UR; check manually."
+    text_lv: "Pieteicēja reģistrācijas numurs nav atrasts Uzņēmumu reģistrā."
+
+  # --- 14 Uzņēmumi adresē -- v3 draft ---------------------------------------------
+  # Pilot data (2026-10-12): of 4,428 addresses with a building and an active company,
+  # 36 have >= 10 active companies; 31 are non-residential office buildings (median
+  # 3,422 m2), 5 are residential houses (use 1110 / 1121, 150-1,000 m2), 3 of them
+  # under 300 m2; no non-residential building under 150 m2 has 10.
+  - id: companies_at_address
+    module: companies_at_address
+    level: low
+    when: {item: {active_count_gte: 1}}
+    reason: "Companies have their legal address at the object: context only, a legal address is not proof of activity."
+    text_lv: "Objekta adresē reģistrēti uzņēmumi (juridiskā adrese, nav darbības pierādījums)."
+  - id: companies_mass_address_residential
+    module: companies_at_address
+    level: medium
+    when: {item: {active_count_gte: 10, residential: true}}
+    reason: "10 or more active companies registered in a residential building (use 11xx): a typical mass-registration address; in the pilot 5 of 4,428 addresses."
+    text_lv: "Dzīvojamā ēkā reģistrēti 10 vai vairāk aktīvi uzņēmumi (iespējama masveida reģistrācijas adrese)."
+  - id: companies_mass_address_small_building
+    module: companies_at_address
+    level: medium
+    when: {item: {active_count_gte: 10, building_area_m2_lt: 300}}
+    reason: "10 or more active companies in a building under 300 m2: too small to house them; in the pilot 3 such addresses, all residential houses."
+    text_lv: "Ēkā, kas mazāka par 300 m², reģistrēti 10 vai vairāk aktīvi uzņēmumi."
+
+  # --- 17 Sankcijas -- v3 draft (D10 option A) -----------------------------------
+  - id: sanctions_reg_no
+    module: sanctions
+    level: high
+    when: {item: {match: reg_no}}
+    reason: "The applicant's reg. no. is a legal-entity entry of the UR sanctions file or a subject of FID's frozen-asset list: funding it may breach the sanctions law."
+    text_lv: "Pieteicēja reģistrācijas numurs ir sankciju sarakstā vai iesaldēto aktīvu subjektu sarakstā."
+  - id: sanctions_linked_entity
+    module: sanctions
+    level: high
+    when: {item: {match: linked_entity}}
+    reason: "A sanctioned legal entity is linked to the applicant in the UR sanctions file (entity rows only, D10): possible control by a sanctioned entity."
+    text_lv: "Ar pieteicēju saistīta juridiskā persona ir sankciju sarakstā."
+  - id: sanctions_name_only
+    module: sanctions
+    level: none
+    when: {warning: sanctions_name_only}
+    reason: "The applicant's name equals a sanctioned entity's name without a Latvian reg. no.: never a finding by itself (D6, D10), only a flag for manual review."
+    text_lv: "Nosaukums sakrīt ar sankciju saraksta ierakstu: pārbaudīt manuāli."

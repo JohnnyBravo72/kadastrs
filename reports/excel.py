@@ -208,6 +208,12 @@ def _num(value: Any) -> float | None:
 
 
 def _modules(data: ReportData) -> list[str]:
+    """The run's object modules (Kopsavilkums columns); applicant modules have
+    their own sheet "Pieteicēji"."""
+    return [m for m in _all_modules(data) if BY_ID[m].subject == "object"]
+
+
+def _all_modules(data: ReportData) -> list[str]:
     return sorted(data.head["modules"], key=lambda m: BY_ID[m].no)
 
 
@@ -358,6 +364,89 @@ def _summary_sheet(wb: Workbook, data: ReportData) -> None:
     _finish(ws, len(columns), row)
 
 
+# --- Pieteicēji -----------------------------------------------------------------------------
+
+
+def _applicant_rows(data: ReportData) -> dict[str, dict[str, CheckResult]]:
+    out: dict[str, dict[str, CheckResult]] = {}
+    for row in data.rows:
+        if row.scope == "applicant":
+            out.setdefault(row.unit_code, {})[row.result.module] = row.result
+    return out
+
+
+def _applicants_sheet(wb: Workbook, data: ReportData) -> None:
+    """One row per applicant reg. no. (modules 9 and 17, Phase 8a): UR status,
+    form, dates, legal address, open proceedings, module cells and overall risk."""
+    modules = [m for m in _all_modules(data) if BY_ID[m].subject == "applicant"]
+    columns = [
+        ("Pieteicēja reģ. nr.", 14),
+        ("Nosaukums", 32),
+        ("Forma", 22),
+        ("Statuss UR", 16),
+        ("Reģistrēts", 12),
+        ("Darbību beidzis", 12),
+        ("Juridiskā adrese", 36),
+        ("Atvērti procesi", 30),
+        ("Objekti (Nr.)", 14),
+        *[(f"{BY_ID[m].no}. {BY_ID[m].name_lv}", 18) for m in modules],
+        ("Kopējais risks", 12),
+        ("Brīdinājumi", 50),
+    ]
+    ws = _sheet(wb, "Pieteicēji", columns)
+    results = _applicant_rows(data)
+    targets_of: dict[str, list[int]] = {}
+    for t in data.targets:
+        if t["applicant_reg_no"]:
+            targets_of.setdefault(t["applicant_reg_no"], []).append(t["target_no"] + 1)
+    row = 1
+    for reg in sorted(set(targets_of) | set(results)):
+        row += 1
+        res = results.get(reg, {})
+        company = res.get("applicant_company")
+        item = company.items[0] if company and company.items else {}
+        procs = ", ".join(
+            f"{p.get('form_lv')} no {p.get('started_on')}"
+            for p in item.get("proceedings", [])
+            if p.get("open")
+        )
+        values = [
+            (reg, True),
+            (item.get("name") or item.get("name_note"), False),
+            (item.get("form_text") or item.get("form"), False),
+            (item.get("status_lv") or (company.reason if company else None), False),
+            (item.get("registered"), True),
+            (item.get("terminated"), True),
+            (item.get("address"), False),
+            (procs or None, False),
+            (", ".join(str(n) for n in targets_of.get(reg, [])), True),
+        ]
+        for c, (v, text) in enumerate(values, 1):
+            _put(ws, row, c, v, text=text)
+        c = len(values)
+        risks = []
+        for m in modules:
+            c += 1
+            r = res.get(m)
+            text, color = _cell(m, r, {"warnings": []})
+            _fill(_put(ws, row, c, text), color)
+            if r is not None:
+                risks.append(r.risk)
+        worst = data.rules.worst(risks)
+        cell = _put(ws, row, c + 1, RISK_LV[worst] if worst else None)
+        if worst:
+            _fill(cell, RISK_FILL[worst])
+            cell.font = Font(bold=True)
+        warnings = []
+        for r in res.values():
+            warnings += [w.message for w in r.warnings if w.message not in warnings]
+        _put(ws, row, c + 2, "\n".join(warnings) or None)
+    if row == 1:
+        _put(ws, 2, 1, "Pieteicēja reģistrācijas numurs šajā pārbaudē nav norādīts.")
+        row = 2
+    _finish(ws, len(columns), row)
+
+
 # --- Detaļas --------------------------------------------------------------------------------
 
 
@@ -388,8 +477,18 @@ def _detail_lines(r: CheckResult, designation: str, rules: RuleSet) -> list[dict
     (RuleSet.explain: item or warning); "item": the item its source link is for."""
     b = summary.bucket(r.module, r.status, r.reason)
     technical = _technical_line(r, rules, designation)
+    review = [i for i in r.items if i.get("review")]  # module 17 name-only: manual review
     if b in ("clear", "not_applicable"):
-        return technical
+        return technical + [
+            {
+                "text": describe(r.module, item),
+                "unit": designation,
+                "match": "tikai nosaukums",
+                "rules": {"warning": "sanctions_name_only"},
+                "item": item,
+            }
+            for item in review
+        ]
     lines = []
     if b != "found":
         lines.append({"text": r.reason or STATUS_LV[b], "unit": designation, "rules": None})
@@ -463,6 +562,7 @@ def _details_sheet(wb: Workbook, data: ReportData) -> None:
             continue
         r = res.result
         t = targets[res.target_no]
+        applicant = res.scope == "applicant"
         for line in _detail_lines(r, r.subject.id, data.rules):
             if "fixed" in line:
                 ids, texts, risk = (
@@ -481,8 +581,8 @@ def _details_sheet(wb: Workbook, data: ReportData) -> None:
             src = r.source
             row += 1
             values = [
-                (res.target_no + 1, None),
-                (t["designation"], TEXT),
+                (None if applicant else res.target_no + 1, None),
+                (f"pieteicējs {res.unit_code}" if applicant else t["designation"], TEXT),
                 (line["unit"], TEXT),
                 (f"{r.module_no}. {BY_ID[r.module].name_lv}", None),
                 (STATUS_LV[summary.bucket(r.module, r.status, r.reason)], None),
@@ -649,7 +749,7 @@ def _sources_sheet(wb: Workbook, data: ReportData) -> None:
             if data.grouping is not None
             else []
         ),
-        ("Moduļi", ", ".join(f"{BY_ID[m].no}. {BY_ID[m].name_lv}" for m in _modules(data))),
+        ("Moduļi", ", ".join(f"{BY_ID[m].no}. {BY_ID[m].name_lv}" for m in _all_modules(data))),
         ("Dzinēja versija", data.head["engine_version"]),
         ("", None),
         ("Riska krāsas", None),
@@ -720,6 +820,7 @@ def _not_found_sheet(wb: Workbook, data: ReportData) -> None:
 def build(data: ReportData) -> Workbook:
     wb = Workbook()
     _summary_sheet(wb, data)
+    _applicants_sheet(wb, data)
     _details_sheet(wb, data)
     _sources_sheet(wb, data)
     _not_found_sheet(wb, data)
