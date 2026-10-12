@@ -9,11 +9,13 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from engine import links
 from engine.checks import rules as rules_mod
 from engine.checks import runner, summary
 from engine.checks.contract import TargetIn
 from engine.checks.describe import describe
 from engine.checks.modules import BY_ID
+from engine.map import geo
 from engine.resolve.context import SourceUnavailable, resolve_config
 
 router = APIRouter(prefix="/api", tags=["runs"])
@@ -90,10 +92,10 @@ def get_target_results(request: Request, run_id: int, target_no: int) -> dict[st
             "SELECT rule_set FROM work.run WHERE id = %s", (run_id,)
         ).fetchone()[0]
         by_id = {r.id: r for r in rules_mod.from_json(rule_set).rules}
+        rows = [r for r in runner.stored(conn, run_id) if r.target_no == target_no]
+        points = geo.centres(conn, run_id, [r.unit_code for r in rows])
         modules: dict[str, dict[str, Any]] = {}
-        for row in runner.stored(conn, run_id):
-            if row.target_no != target_no:
-                continue
+        for row in rows:
             r = row.result
             entry = modules.setdefault(
                 r.module,
@@ -103,6 +105,16 @@ def get_target_results(request: Request, run_id: int, target_no: int) -> dict[st
                 "summary_status": summary.bucket(r.module, r.status, r.reason),
                 "module_name": BY_ID[r.module].name_lv,
                 "items_text": [describe(r.module, i) for i in r.items],
+                # "Skatīt avotā": opens the item in the publisher's system (engine/links.py)
+                "item_links": [
+                    [
+                        lk.as_json()
+                        for lk in links.item_links(
+                            r.module, i, row.unit_type, row.unit_code, points.get(row.unit_code)
+                        )
+                    ]
+                    for i in r.items
+                ],
                 # the fired rules with their report text (the run's stored rule set)
                 "rules": [
                     {"id": i, "level": by_id[i].level, "text_lv": by_id[i].text_lv}
@@ -114,4 +126,8 @@ def get_target_results(request: Request, run_id: int, target_no: int) -> dict[st
                 entry["result"] = data
             else:
                 entry["units"].append(data)
-        return target | {"results": sorted(modules.values(), key=lambda m: m["module_no"])}
+        own = links.object_link(target["type"], target["designation"])
+        return target | {
+            "results": sorted(modules.values(), key=lambda m: m["module_no"]),
+            "links": [own.as_json()] if own else [],
+        }

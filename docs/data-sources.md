@@ -629,3 +629,23 @@ Checked before coding (CLAUDE.md rule 2) with [`etl/discovery/verify_2c.py`](../
 
 ### 7.5 Colleagues' BIS example
 PLAN §6.1 cites "13 cases, only 3 exact". No document in the repo (PLAN history, test-set templates) names the object or the case numbers, so it is **not** a regression case yet. Add it to `tests/data/` when the object is known.
+
+## 8. Source deep links ("Skatīt avotā"), verified 2026-10-12
+
+Links that only **open** an object in the publisher's own public system, next to the data.gov.lv dataset link (decision "Source deep links" in `docs/decisions.md`; code `engine/links.py`). Nothing is fetched from these systems; they are not data sources (rule 1 unchanged). Each pattern was checked on **2026-10-12** in a real browser (Playwright, logged out) on the seed objects; "opens" means the page shows that object without a login.
+
+| System | Object | Pattern | Result on 2026-10-12 | Limitation |
+|---|---|---|---|---|
+| kadastrs.lv (VZD) | parcel | `https://www.kadastrs.lv/parcels/search?cad_num={11 digits}` | opens the parcel's row (09000050400, 09000360220), with "skatīt dokumentus" | search result row, not a detail page |
+| kadastrs.lv | building, premise group | `https://www.kadastrs.lv/buildings/search?cad_num={14 digits}` | opens (09000360220002, with address) | a premise group is linked as its building |
+| kadastrs.lv | property | `https://www.kadastrs.lv/properties/search?cad_num={11 digits}` | opens (09000360220: name, area, land-book no.) | |
+| kadastrs.lv | parcel part | `…/parcels/search?parp_cad_num={15}` | **not found** ("Netika atrasts neviens ieraksts") | fallback: `https://www.kadastrs.lv/parcels` + copy the designation (field "Zemes vienības daļa") |
+| kadastrs.lv | spatial view `…/parcels/graphical_data/show` | — | "Jums nav pietiekošu tiesību" | not used |
+| kadastrs.lv (VARIS) | current address (EKS) | `https://www.kadastrs.lv/varis/search?add_id={9 digits}` | opens (101765287 Institūta iela 4, Jelgava) | |
+| kadastrs.lv (VARIS) | deleted address (DEL) | same, also with `&add_historical=1` | **not found** (101093868) | fallback: `https://www.kadastrs.lv/varis` + copy the code |
+| kadastrs.lv | encumbrance | — | no public page per encumbrance | link to the object's kadastrs.lv row + copy the encumbrance code |
+| BIS (BVKB) | construction case | `https://bis.gov.lv/bisp/lv/planned_constructions?search[case_number]={case}&search_type=simple` | shows the case (BIS-BL-895076-16218 "Žogs", BIS-20076-697 "Skola", Institūta iela 4) | public list "Plānotie būvdarbi"; the case portal itself (`/bisp/`) needs login; search by kadastra apzīmējums found nothing |
+| Ozols (DAP) | nature overlap | `https://ozols.gov.lv/pub` | public map opens | the app reads **no URL parameters** (checked in its scripts): link to the map + copy the kadastra numurs (Ozols searches by it) |
+| LVĢMC | flood (3rd cycle) | `https://geodata.lvgmc.lv/portal/apps/webappviewer/index.html?id=45020161703b4e1b936b5d8d65e144c2&center={lon},{lat},4326&level=17` | opens "3. cikla iespējamo plūdu postījuma vietu un plūdu riska kartes" centred on the object (09000050400, Uzvaras iela) | a notice dialog on opening; `marker` is not drawn; the point is on the object's geometry of the run's pinned map version. The 2nd-cycle viewer (`id=8cee7f5e…`) is not used |
+
+`varis.vzd.gov.lv` and `atis.vzd.gov.lv` do not resolve (2026-10-12). Re-check the table when a link stops opening its object (a system redesign changes these patterns without notice).

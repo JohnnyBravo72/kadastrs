@@ -18,7 +18,7 @@ Codes are written as text (leading zeros kept, CLAUDE.md rule 8).
 
 import io
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -33,6 +33,8 @@ from engine.checks.contract import CheckResult
 from engine.checks.describe import describe
 from engine.checks.modules import BY_ID
 from engine.checks.rules import RuleSet
+from engine.links import item_links
+from engine.map import geo
 
 FOOTER = "Informatīvs pārskats, balstīts uz atvērtajiem datiem; nav oficiāls reģistra izraksts"
 
@@ -110,6 +112,7 @@ class ReportData:
     inputs: list[dict[str, Any]]
     rows: list[runner.Row]
     rules: RuleSet
+    centres: dict[str, tuple[float, float]] = field(default_factory=dict)  # flood viewer links
 
 
 def load(conn, run_id: int, rows: list[runner.Row] | None = None) -> ReportData | None:
@@ -139,12 +142,14 @@ def load(conn, run_id: int, rows: list[runner.Row] | None = None) -> ReportData 
             (run_id,),
         )
     ]
+    rows = runner.sort_rows(rows if rows is not None else runner.stored(conn, run_id))
     return ReportData(
         head=head,
         targets=targets,
         inputs=runner.stored_inputs(conn, run_id),
-        rows=runner.sort_rows(rows if rows is not None else runner.stored(conn, run_id)),
+        rows=rows,
         rules=rules_mod.from_json(rule_set),
+        centres=geo.centres(conn, run_id, [r.unit_code for r in rows]),
     )
 
 
@@ -349,20 +354,38 @@ def _address_line(r: CheckResult) -> str:
     return text + (f"; objekta adreses kadastrā: {', '.join(linked)}" if linked else "")
 
 
-def _detail_lines(r: CheckResult, designation: str) -> list[dict[str, Any]]:
-    """Lines of one target-level result: one per item (findings), one per data gap.
-    "rules": what to explain the line by (RuleSet.explain: item or warning)."""
-    b = summary.bucket(r.module, r.status, r.reason)
-    if b in ("clear", "not_applicable"):
+def _technical_line(r: CheckResult, rules: RuleSet, designation: str) -> list[dict[str, Any]]:
+    """Technical records (rules.yaml not_findings, rule set v2) as one line: listed,
+    never a finding, risk none."""
+    items = [i for i in r.items if i.get("technical")]
+    nf = rules.not_findings.get(r.module)
+    if not items or nf is None:
         return []
+    codes = sorted({str(i.get("code")) for i in items})
+    fixed = {"risk": "none", "ids": [], "texts": ["Nav atradne (riska noteikumi: not_findings)."]}
+    text = f"{nf.label_lv}: {len(items)} ({', '.join(codes)}) – nav atradne"
+    return [{"text": text, "unit": designation, "fixed": fixed, "item": items[0]}]
+
+
+def _detail_lines(r: CheckResult, designation: str, rules: RuleSet) -> list[dict[str, Any]]:
+    """Lines of one target-level result: one per item (findings), one per data gap,
+    one for technical records. "rules": what to explain the line by
+    (RuleSet.explain: item or warning); "item": the item its source link is for."""
+    b = summary.bucket(r.module, r.status, r.reason)
+    technical = _technical_line(r, rules, designation)
+    if b in ("clear", "not_applicable"):
+        return technical
     lines = []
     if b != "found":
         lines.append({"text": r.reason or STATUS_LV[b], "unit": designation, "rules": None})
         return lines
     if r.module == "address_consistency":
-        return [{"text": _address_line(r), "unit": designation, "rules": None}]
+        given = next((i for i in r.items if "given_address" in i), None)
+        return [{"text": _address_line(r), "unit": designation, "rules": None, "item": given}]
     frozen_items = set()
     for item in r.items:
+        if item.get("technical"):
+            continue
         if item.get("frozen"):
             frozen_items.add((item.get("object_code"), item.get("code")))
         lines.append(
@@ -373,6 +396,7 @@ def _detail_lines(r: CheckResult, designation: str) -> list[dict[str, Any]]:
                 "share": _num(item.get("share")),
                 "match": item.get("match_label") or item.get("match_type") or r.match_type,
                 "rules": {"item": item},
+                "item": item,
             }
         )
     for w in r.warnings:
@@ -388,9 +412,10 @@ def _detail_lines(r: CheckResult, designation: str) -> list[dict[str, Any]]:
                 + f" – {w.message}",
                 "unit": getattr(w, "unit", None) or key[0] or designation,
                 "rules": {"warning": FROZEN},
+                "item": {"object_code": key[0], "code": key[1]},
             }
         )
-    return lines
+    return lines + technical
 
 
 def _details_sheet(wb: Workbook, data: ReportData) -> None:
@@ -410,6 +435,7 @@ def _details_sheet(wb: Workbook, data: ReportData) -> None:
         ("Avots", 30),
         ("Datu datums", 12),
         ("data.gov.lv saite", 40),
+        ("Avots sistēmā", 34),
     ]
     ws = _sheet(wb, "Detaļas", columns)
     targets = {t["target_no"]: t for t in data.targets}
@@ -422,13 +448,21 @@ def _details_sheet(wb: Workbook, data: ReportData) -> None:
             continue
         r = res.result
         t = targets[res.target_no]
-        for line in _detail_lines(r, r.subject.id):
-            fired = data.rules.explain(r, **(line.get("rules") or {}))
-            ids = [f.id for f in fired] or list(r.rule_ids)
-            texts = [f.text_lv for f in fired] or [
-                f"Noklusējuma līmenis statusam „{STATUS_LV.get(r.status, r.status)}”"
-            ]
-            risk = data.rules.worst([f.level for f in fired]) if fired else r.risk
+        for line in _detail_lines(r, r.subject.id, data.rules):
+            if "fixed" in line:
+                ids, texts, risk = (
+                    line["fixed"]["ids"],
+                    line["fixed"]["texts"],
+                    line["fixed"]["risk"],
+                )
+            else:
+                fired = data.rules.explain(r, **(line.get("rules") or {}))
+                ids = [f.id for f in fired] or list(r.rule_ids)
+                texts = [f.text_lv for f in fired] or [
+                    f"Noklusējuma līmenis statusam „{STATUS_LV.get(r.status, r.status)}”"
+                ]
+                risk = data.rules.worst([f.level for f in fired]) if fired else r.risk
+            link = _source_link(r, line, data.centres)
             src = r.source
             row += 1
             values = [
@@ -447,15 +481,33 @@ def _details_sheet(wb: Workbook, data: ReportData) -> None:
                 (src.name if src else None, None),
                 (src.dataset_date if src else None, TEXT),
                 (src.datagov_url if src else None, None),
+                (_link_text(link), None),
             ]
             for c, (v, fmt) in enumerate(values, 1):
                 cell = _put(ws, row, c, v, text=fmt == TEXT, fmt=fmt if fmt != TEXT else None)
                 if c == 10:
                     _fill(cell, RISK_FILL[risk])
-                if c == 15 and v:
-                    cell.hyperlink = v
+                url = v if c == 15 else (link.url if c == 16 and link else None)
+                if url:
+                    cell.hyperlink = url
                     cell.font = Font(color="0563C1", underline="single")
     _finish(ws, len(columns), row)
+
+
+def _source_link(r: CheckResult, line: dict[str, Any], centres: dict) -> Any:
+    """The line's "Skatīt avotā" link (engine/links.py), or None for a data gap."""
+    item = line.get("item")
+    if item is None:
+        return None
+    unit = line["unit"]
+    found = item_links(r.module, item, r.subject.type, unit, centres.get(unit))
+    return found[0] if found else None
+
+
+def _link_text(link: Any) -> str | None:
+    if link is None:
+        return None
+    return f"{link.system} (meklēt: {link.copy})" if link.copy else link.system
 
 
 # --- Avoti ----------------------------------------------------------------------------------

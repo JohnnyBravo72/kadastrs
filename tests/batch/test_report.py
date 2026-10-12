@@ -53,6 +53,7 @@ HEADERS = {
         "Avots",
         "Datu datums",
         "data.gov.lv saite",
+        "Avots sistēmā",
     ],
     "Avoti": [
         "Avots",
@@ -200,6 +201,18 @@ def test_details_name_rules_sources_and_links(wb):
     assert any("BIS-A" in r[5] for r in bis)
     frozen = [r for r in rows if r[1] == "09000360220" and "2025-01-31" in (r[5] or "")]
     assert frozen and all("7399000000" in r[5] for r in frozen)
+    # "Avots sistēmā": the item in the publisher's system (engine/links.py)
+    assert any("BIS-A" in r[5] and r[15] == "BIS" for r in bis)
+    case_cell = next(
+        d.cell(i, 16) for i in range(2, d.max_row + 1)
+        if "BIS-A" in str(d.cell(i, 6).value) and d.cell(i, 2).value == "09000360220"
+    )  # fmt: skip
+    assert "planned_constructions?search%5Bcase_number%5D=BIS-A" in case_cell.hyperlink.target
+    nature = next(r for r in rows if r[1] == "09000360220" and r[3].startswith("3."))
+    assert nature[15] == f"Ozols (DAP) (meklēt: {nature[2]})"  # no deep link: search + number
+    technical = [r for r in rows if r[1] == "09000050400" and r[3].startswith("6.")]
+    assert len(technical) == 1 and "Tehniskie apgrūtinājumi" in technical[0][5]
+    assert technical[0][9] == "nav" and "meklēt: 8317010100" in technical[0][15]
     # a property's lines come from its units' own results: own rules, own risk
     facts = {r[2]: r for r in rows if r[1] == "09000360220" and r[3].startswith("1.")}
     assert facts["09000360220"][10] == "cadastre_facts_found"

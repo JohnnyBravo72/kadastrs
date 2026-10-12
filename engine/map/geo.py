@@ -17,6 +17,7 @@ Output in EPSG:4326 (CLAUDE.md CRS).
 from dataclasses import dataclass
 from typing import Any
 
+from engine import links
 from engine.checks import rules as rules_mod
 from engine.checks import runner, summary
 from engine.checks.context import RunContext, load_pinned
@@ -198,7 +199,9 @@ def attention(conn, run_id: int, target_no: int) -> dict[str, Any]:
         if not state.targets:
             raise NotFound(f"objekts {target_no} nav šajā pārbaudē")
         ctx, rules = state.ctx, state.rules
-        for row in _results_for(conn, run_id, target_no):
+        rows = _results_for(conn, run_id, target_no)
+        points = centres(conn, run_id, [row.unit_code for row in rows])
+        for row in rows:
             r = row.result
             unit = row.unit_code
             base = {
@@ -217,6 +220,12 @@ def attention(conn, run_id: int, target_no: int) -> dict[str, Any]:
                     "risk_lv": RISK_LV.get(risk),
                     "overlap_m2": item.get("overlap_m2"),
                     "share": item.get("share"),
+                    "links": [
+                        lk.as_json()
+                        for lk in links.item_links(
+                            r.module, item, row.unit_type, unit, points.get(unit)
+                        )
+                    ],
                 }
                 features += _item_geometry(ctx, unit, r.module, item, props)
     return collection(features)
@@ -431,3 +440,46 @@ def layer(conn, run_id: int, name: str, bbox: tuple[float, float, float, float])
             },
         )
     return collection(feats, sources=[s for s in sources if s], truncated=truncated)
+
+
+# --- object points (flood viewer links) ---------------------------------------------------
+
+_CENTRES = """
+WITH c AS (SELECT unnest(%(codes)s::text[]) AS code),
+own AS (
+    SELECT code, geom FROM ref.kk_parcel
+    WHERE dataset_version_id = %(s)s AND code = ANY(%(codes)s)
+    UNION ALL
+    SELECT code, geom FROM ref.kk_building
+    WHERE dataset_version_id = %(s)s AND code = ANY(%(codes)s)
+    UNION ALL
+    SELECT code, geom FROM ref.kk_parcel_part
+    WHERE dataset_version_id = %(s)s AND code = ANY(%(codes)s)
+),
+via AS (  -- a building without geometry: its parcel(s), as the engine checks it
+    SELECT bp.building_code AS code, ST_Union(p.geom) AS geom
+    FROM ref.building_parcel bp
+    JOIN ref.kk_parcel p ON p.dataset_version_id = %(s)s AND p.code = bp.parcel_code
+    WHERE bp.dataset_version_id = %(t)s AND bp.building_code = ANY(%(codes)s)
+    GROUP BY bp.building_code
+)
+SELECT c.code, ST_X(x.pt), ST_Y(x.pt)
+FROM c
+CROSS JOIN LATERAL (
+    SELECT ST_Transform(ST_PointOnSurface(coalesce(
+        (SELECT geom FROM own WHERE own.code = c.code LIMIT 1),
+        (SELECT geom FROM via WHERE via.code = c.code))), 4326) AS pt) x
+WHERE x.pt IS NOT NULL
+"""
+
+
+def centres(conn, run_id: int, codes: list[str]) -> dict[str, tuple[float, float]]:
+    """A point on each object (lon, lat), from the run's pinned map version."""
+    if not codes:
+        return {}
+    pinned = load_pinned(conn, run_id)
+    s, t = pinned.get("cadastre_spatial"), pinned.get("cadastre_text")
+    if s is None or t is None:
+        return {}
+    params = {"codes": sorted(set(codes)), "s": s.version_id, "t": t.version_id}
+    return {code: (x, y) for code, x, y in conn.execute(_CENTRES, params)}

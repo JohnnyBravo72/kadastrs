@@ -23,6 +23,13 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 - **No names of natural persons are stored** (nor personal codes or birth dates).
 - Data that is not open (e.g. ATIS geometries, land book) is not used, and the affected check shows as *unavailable*.
 
+## Source deep links, "Skatīt avotā" (decided 2026-10-12, Janis)
+
+Each finding and object can be opened in the publisher's own public system, next to the data.gov.lv dataset link: kadastrs.lv (parcels, buildings, properties, VARIS addresses), BIS (cases), Ozols (nature), the LVĢMC flood map viewer (centred on the object). Shown in the results view (cards, header, map popups) and in the Excel sheet "Detaļas" (column "Avots sistēmā").
+- **Links only open the source; no data is fetched** from those systems, and nothing they show is stored or used for checks. Rule 1 (data only from data.gov.lv) is unchanged.
+- Only patterns verified with real requests on the seed objects, logged out, are used; each with its test date and limitation in `docs/data-sources.md` §8. Where no pattern opens the right object without login, the link goes to the system's public search page and the number is shown with a copy button.
+- A link may break when a system is redesigned; links are re-checked when that happens, never guessed.
+
 ## D2: basemap, OpenStreetMap tiles (decided 2026-10-11, Janis)
 
 The results view (Phase 6) uses **OpenStreetMap standard tiles** (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`) as the background, with the attribution "© OpenStreetMap līdzautori" on the map and in the page footer.
