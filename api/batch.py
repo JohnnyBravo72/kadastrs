@@ -17,10 +17,8 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
-from openpyxl import Workbook
-from openpyxl.styles import Font
 
-from engine.batch import reader
+from engine.batch import reader, template
 from engine.batch.plan import run_batch
 from engine.checks import runner, summary
 from engine.resolve.context import SourceUnavailable, resolve_config
@@ -115,22 +113,7 @@ def run_report(request: Request, run_id: int) -> Response:
 
 @router.get("/api/batch/template.xlsx")
 def input_template() -> Response:
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Saraksts"
-    columns = [
-        ("vertiba", 30),
-        ("projekta_nr", 16),
-        ("pieteicejs_reg_nr", 18),
-        ("adrese", 40),
-        ("veids", 16),
-    ]
-    for c, (name, width) in enumerate(columns, 1):
-        ws.cell(row=1, column=c, value=name).font = Font(bold=True)
-        ws.column_dimensions[chr(64 + c)].width = width
-        for r in range(2, 1002):  # codes are text: keep leading zeros
-            ws.cell(row=r, column=c).number_format = "@"
-    ws.freeze_panes = "A2"
+    """The list template with readable Latvian headers (engine/batch/template.py)."""
     buf = io.BytesIO()
-    wb.save(buf)
+    template.input_template().save(buf)
     return _xlsx_response(buf.getvalue(), "saraksta_veidne.xlsx")

@@ -107,7 +107,8 @@ export function InputPage({ onRun }: { onRun: (run: number) => void }) {
       // A pasted table keeps its header first; chosen values are added as rows.
       const pasted = text.trim();
       const values = chosen.map((c) => c.value);
-      const hasHeader = /^\s*v[eē]rt[iī]ba/i.test(pasted);
+      // a header row (new Latvian or old names, engine/batch/headers.py)
+      const hasHeader = /^\s*(v[eē]rt[iī]ba|kadastra nr)/i.test(pasted);
       const rows = hasHeader ? [pasted, ...values] : [...values, pasted];
       form.set("text", rows.filter(Boolean).join("\n"));
     }
@@ -207,8 +208,8 @@ export function InputPage({ onRun }: { onRun: (run: number) => void }) {
               disabled={file !== null}
             />
             <p className="hint">
-              Viena vērtība rindā, vai tabula no Excel ar virsrakstu (<code>vertiba</code>, <code>projekta_nr</code>,{" "}
-              <code>adrese</code>, <code>veids</code>, <code>pieteicejs_reg_nr</code>). Ne vairāk kā 1000 rindu.
+              Viena vērtība rindā, vai tabula no Excel kopā ar virsrakstu rindu: <b>Kadastra Nr., apzīmējums vai adrese</b>{" "}
+              (obligāta), Projekta Nr., Pieteicēja reģ. Nr., Adrese pieteikumā, Objekta veids. Ne vairāk kā 1000 rindu.
             </p>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <input
@@ -236,8 +237,8 @@ export function InputPage({ onRun }: { onRun: (run: number) => void }) {
                   </button>
                 </span>
               )}
-              <a className="hint" href="/api/batch/template.xlsx">
-                Lejupielādēt veidni
+              <a className="btn" href="/api/batch/template.xlsx" download data-testid="template">
+                ⤓ Lejupielādēt Excel veidni
               </a>
             </div>
             <p className="hint">Augšupielādētais fails netiek saglabāts; tiek saglabāts tikai sakārtotais saraksts un rezultāti.</p>

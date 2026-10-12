@@ -6,6 +6,7 @@ import re
 import pytest
 from openpyxl import load_workbook
 
+from engine.batch.headers import INPUT_COLUMNS
 from engine.checks.__main__ import main
 from tests.batch.test_report import SHEETS, values, xlsx
 from tests.etl.conftest import ETL_DB
@@ -65,15 +66,16 @@ def test_input_page_and_template(client):
     script = re.search(r'src="(/assets/[^"]+\.js)"', page.text).group(1)
     assert client.get(script).status_code == 200
     t = client.get("/api/batch/template.xlsx")
-    ws = load_workbook(io.BytesIO(t.content)).active
-    assert [c.value for c in ws[1]] == [
-        "vertiba",
-        "projekta_nr",
-        "pieteicejs_reg_nr",
-        "adrese",
-        "veids",
-    ]
-    assert ws["A2"].number_format == "@"
+    wb = load_workbook(io.BytesIO(t.content))
+    assert wb.sheetnames == ["Saraksts", "Instrukcija"]
+    ws = wb["Saraksts"]
+    assert [c.value for c in ws[1]] == [c.header for c in INPUT_COLUMNS]
+    assert ws["A1"].fill.fgColor.rgb.endswith("1F3A5F")  # required: dark
+    assert ws["B1"].fill.fgColor.rgb.endswith("D9E2EF")  # optional: light
+    assert ws["A1"].comment.text.startswith("Obligāta")
+    assert ws["A2"].number_format == "@" and ws["C2"].number_format == "@"
+    (kinds,) = ws.data_validations.dataValidation
+    assert str(kinds.sqref).startswith("E2") and "zemes vienība" in kinds.formula1
 
 
 def test_cli_batch_and_report_replay(batch_db, tmp_path, monkeypatch, capsys):

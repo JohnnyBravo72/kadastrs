@@ -20,6 +20,7 @@ test("search, chips, layer, Excel", async ({ page }) => {
   await noTiles(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Meklēt objektu" })).toBeVisible();
+  await expect(page.getByTestId("template")).toHaveAttribute("href", "/api/batch/template.xlsx");
 
   await page.getByLabel("Meklēt").fill("090000504");
   await page.getByRole("listbox").getByText("09000050400", { exact: true }).click();

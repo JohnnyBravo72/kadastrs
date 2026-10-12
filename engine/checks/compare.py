@@ -26,8 +26,8 @@ from typing import Any
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
+from engine.batch.headers import canonical, fold
 from engine.batch.plan import ACCEPTS, KINDS
-from engine.batch.reader import fold
 from engine.checks import runner, summary
 from engine.checks.contract import TargetIn, Warning_
 from engine.resolve import service
@@ -110,8 +110,12 @@ def read_template(path: Path) -> list[ManualRow]:
     wb = load_workbook(path, data_only=True, read_only=True)
     ws = wb[SHEET]
     rows = ws.iter_rows(values_only=True)
-    header = [str(h).strip() if h is not None else "" for h in next(rows)]
-    col = {name: i for i, name in enumerate(header)}
+    # new Latvian headers or the old technical names (engine/batch/headers.py)
+    col = {}
+    for i, h in enumerate(next(rows)):
+        name = canonical(h)
+        if name and name not in col:
+            col[name] = i
     missing = [c for c in ["projekta_nr", "vertiba", *MODULE_COLUMNS] if c not in col]
     if missing:
         raise ValueError(f"{path.name}: sheet {SHEET} lacks columns {missing}")

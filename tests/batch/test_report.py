@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from openpyxl import Workbook, load_workbook
 
+from engine.batch.headers import canonical
 from engine.batch.plan import run_batch
 from engine.batch.reader import read_upload
 from engine.checks import runner
@@ -259,7 +260,7 @@ def test_report_from_replay_equals_report_from_run(batch_db, run):
 def test_test_set_template_as_input(conn, tmp_path):
     wb = load_workbook(TEMPLATE)
     ws = wb["Testa_kopa"]
-    col = {c.value: c.column for c in ws[1]}
+    col = {canonical(c.value): c.column for c in ws[1]}
     for r, (value, kind) in enumerate(
         [("05000040014", "zemes vienība"), (9000050400, None), ("123", None)], start=4
     ):

@@ -2,28 +2,31 @@
 in, one InputRow per row out. Nothing is written to disk; the caller keeps only
 the cleaned rows (CLAUDE.md rule 5, PLAN.md §1 "uploads are not stored").
 
-Columns (header names compared without case and diacritics): `vertiba`, and
-optionally `projekta_nr`, `pieteicejs_reg_nr`, `adrese`, `veids` (īpašums |
-zemes vienība | būve). Without a `vertiba` header the first column is the value;
-a pasted list without a header has one value per line.
+Columns: "Kadastra Nr., apzīmējums vai adrese" (required), and optionally
+"Projekta Nr.", "Pieteicēja reģ. Nr.", "Adrese pieteikumā", "Objekta veids"
+(īpašums | zemes vienība | būve); the old names `vertiba`, `projekta_nr`,
+`pieteicejs_reg_nr`, `adrese`, `veids` work too (engine/batch/headers.py).
+Without a value header the first column is the value; a pasted list without a
+header has one value per line.
 
 CSV: UTF-8 (with or without BOM), else Windows-1257; delimiter `;` or `,`.
-XLSX: the sheet "Testa_kopa" (the test-set template) if present, else the first
-sheet. Value cells keep their Excel type (a number that lost its leading zero is
-repaired and flagged by the classifier, §5.1); other code columns are read as
+XLSX: the sheet "Testa_kopa" (test-set template) or "Saraksts" (input template)
+if present, else the first sheet. Value cells keep their Excel type (a number
+that lost its leading zero is repaired and flagged by the classifier, §5.1);
+other code columns are read as
 text (CLAUDE.md rule 8). Rows whose projekta_nr starts with "PIEMĒRS" are the
 template's examples and are skipped.
 """
 
 import csv
 import io
-import re
-import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
 from openpyxl import load_workbook
+
+from engine.batch.headers import canonical
 
 COLUMNS = {
     "vertiba": "value",
@@ -32,7 +35,7 @@ COLUMNS = {
     "adrese": "address",
     "veids": "kind",
 }
-TEMPLATE_SHEET = "Testa_kopa"
+TEMPLATE_SHEETS = ("Testa_kopa", "Saraksts")  # test-set template, input template
 EXAMPLE_PREFIX = "PIEMĒRS"
 
 
@@ -48,12 +51,6 @@ class InputRow:
     project_no: str | None = None
     address: str | None = None
     applicant: str | None = None
-
-
-def fold(text: str) -> str:
-    text = unicodedata.normalize("NFKD", text)
-    text = "".join(c for c in text if not unicodedata.combining(c)).lower().strip()
-    return re.sub(r"[\s.\-]+", "_", text).strip("_")
 
 
 def text_of(value: Any) -> str | None:
@@ -74,8 +71,9 @@ def _blank(cells: list[Any]) -> bool:
 
 
 def _header(cells: list[Any]) -> dict[str, int] | None:
-    """Column positions if the row is a header with a `vertiba` column."""
-    names = [fold(str(c)) if c is not None else "" for c in cells]
+    """Column positions if the row is a header with a value column (new Latvian
+    or old technical names)."""
+    names = [canonical(c) for c in cells]
     if "vertiba" not in names:
         return None
     return {COLUMNS[n]: i for i, n in reversed(list(enumerate(names))) if n in COLUMNS}
@@ -138,10 +136,16 @@ def _delimiter(lines: list[str]) -> str | None:
     """Delimiter of a table with a `vertiba` header, or of a headerless file
     (`;` or tab only: an address contains commas)."""
     first = next((ln for ln in lines if ln.strip()), "")
-    if "vertiba" in fold(first):
-        counts = {d: first.count(d) for d in ("\t", ";", ",")}
-        best = max(counts, key=lambda d: counts[d])
-        return best if counts[best] else None
+    # a header row: the delimiter that splits it into the most known columns
+    # (the new value header itself contains a comma)
+    known = {}
+    for d in ("\t", ";", ","):
+        names = [canonical(c) for c in next(csv.reader([first], delimiter=d))]
+        if "vertiba" in names:
+            known[d] = sum(1 for n in names if n)
+    if known:
+        best = max(known, key=lambda d: known[d])
+        return best if any(d in first for d in ("\t", ";", ",")) else None
     for d in ("\t", ";"):
         if d in first:
             return d
@@ -173,7 +177,8 @@ def read_xlsx(data: bytes, max_rows: int) -> list[InputRow]:
     except Exception as exc:  # noqa: BLE001  (any unreadable file is the same error)
         raise InputError(f"Excel failu nevar nolasīt: {type(exc).__name__}") from exc
     try:
-        ws = wb[TEMPLATE_SHEET] if TEMPLATE_SHEET in wb.sheetnames else wb.worksheets[0]
+        named = [n for n in TEMPLATE_SHEETS if n in wb.sheetnames]
+        ws = wb[named[0]] if named else wb.worksheets[0]
         table = []
         for n, cells in enumerate(ws.iter_rows(values_only=True), 1):
             cells = list(cells)

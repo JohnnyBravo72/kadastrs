@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
+from engine.batch.headers import canonical
 from engine.checks import compare
 
 pytestmark = pytest.mark.stack
@@ -48,7 +49,7 @@ KIND = {8: "zemes vienība"}  # row -> veids
 def filled(tmp_path):
     wb = load_workbook(TEMPLATE)
     ws = wb[compare.SHEET]
-    col = {c.value: c.column for c in ws[1]}  # by header name, not position
+    col = {canonical(c.value): c.column for c in ws[1]}  # by column, not position or header text
     for r, (project, value, *answers, checked) in enumerate(ROWS, start=4):
         ws.cell(row=r, column=col["projekta_nr"], value=project)
         ws.cell(row=r, column=col["vertiba"], value=value)  # 9000050400 as a number: zero lost

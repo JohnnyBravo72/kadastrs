@@ -24,7 +24,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from engine.batch.reader import InputRow, fold
+from engine.batch.headers import fold
+from engine.batch.reader import InputRow
 from engine.checks import runner
 from engine.checks.contract import TargetIn, Warning_
 from engine.resolve import service

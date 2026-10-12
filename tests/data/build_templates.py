@@ -5,6 +5,7 @@
 Writes tests/data/test_set_template.xlsx and tests/data/laika_uzskaite.xlsx.
 """
 
+import sys
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -13,6 +14,10 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parents[1]))  # the repo root, for engine.batch (run with -I)
+
+from engine.batch.headers import INPUT_COLUMNS, TEST_SET_COLUMNS  # noqa: E402
+from engine.batch.template import LEGEND, style_headers  # noqa: E402
 HEAD = Font(bold=True, color="FFFFFF")
 HEAD_FILL = PatternFill("solid", fgColor="305496")
 EXAMPLE_FILL = PatternFill("solid", fgColor="FFF2CC")
@@ -41,10 +46,13 @@ def test_set():
     wb = Workbook()
     ws = wb.active
     ws.title = "Testa_kopa"
-    cols = ["projekta_nr", "vertiba", "veids", "pieteicejs_reg_nr",
-            "m1_kadastra_dati", "m2_adreses_atbilstiba", "m3_aizsargajama_daba", "m4_pludi_10_gadi",
-            "m5_buvniecibas_lietas", "m6_apgrutinajumi", "parbaudes_datums", "avots_piezimes"]
-    header(ws, cols, [16, 30, 16, 18, 34, 28, 34, 30, 34, 34, 16, 44])
+    # readable Latvian headers (old names still accepted, engine/batch/headers.py)
+    by_name = {c.name: c for c in INPUT_COLUMNS + TEST_SET_COLUMNS}
+    names = ["projekta_nr", "vertiba", "veids", "pieteicejs_reg_nr",
+             "m1_kadastra_dati", "m2_adreses_atbilstiba", "m3_aizsargajama_daba", "m4_pludi_10_gadi",
+             "m5_buvniecibas_lietas", "m6_apgrutinajumi", "parbaudes_datums", "avots_piezimes"]
+    widths = [16, 30, 26, 24, 34, 28, 34, 30, 34, 34, 16, 44]
+    style_headers(ws, [(by_name[n], w) for n, w in zip(names, widths)], rows=500)
     hint = "‹Ir: … / Nav / Nav datu / Nav pārklājuma›"
     examples = [
         ["PIEMĒRS-1 (izdzēst)", "05000041006", "īpašums", "90000077325", hint, hint, hint, hint, hint, hint, None,
@@ -56,19 +64,12 @@ def test_set():
         for c, v in enumerate(row, 1):
             cell = ws.cell(row=r, column=c, value=v)
             cell.fill, cell.alignment = EXAMPLE_FILL, WRAP
-    for col in "ABCD":   # codes are text: keep leading zeros
-        for r in range(2, 502):
-            ws[f"{col}{r}"].number_format = "@"
     for r in range(2, 502):
         ws[f"K{r}"].number_format = "yyyy-mm-dd"
     dv = DataValidation(type="date", operator="greaterThan", formula1="DATE(2020,1,1)", allow_blank=True,
                         error="Ievadiet datumu (GGGG-MM-DD).", errorTitle="Datums")
     ws.add_data_validation(dv)
     dv.add("K2:K501")
-    kinds = DataValidation(type="list", formula1='"īpašums,zemes vienība,būve"', allow_blank=True,
-                           error="Izvēlieties: īpašums, zemes vienība vai būve.", errorTitle="Veids")
-    ws.add_data_validation(kinds)
-    kinds.add("C2:C501")
 
     info = wb.create_sheet("Instrukcija", 0)
     instructions(info, [
@@ -78,18 +79,20 @@ def test_set():
         "",
         "Kā aizpildīt:",
         "• Viena rinda = viens objekts. Ja projektā ir vairāki objekti, katram sava rinda ar to pašu projekta_nr.",
-        "• projekta_nr: projekta numurs (brīvs teksts).",
-        "• vertiba: kadastra numurs (11 cipari), kadastra apzīmējums (11, 14 vai 17 cipari) vai adrese. "
+        f"• {by_name['projekta_nr'].header}: projekta numurs (brīvs teksts).",
+        f"• {by_name['vertiba'].header} (obligāta): kadastra numurs (11 cipari), kadastra apzīmējums (11, 14 vai 17 cipari) vai adrese. "
         "Kolonnas A–D ir teksta formātā: ievadiet ciparus ar sākuma nullēm (piem., 05000041006).",
-        "• veids (neobligāts): īpašums, zemes vienība vai būve. Aizpildiet, ja 11 ciparu numurs var būt gan "
+        f"• {by_name['veids'].header}: izvēlieties no saraksta, ja 11 ciparu numurs var būt gan "
         "īpašuma numurs, gan citam īpašumam piederošas zemes vienības apzīmējums; bez tā rīks pārbauda abus.",
-        "• pieteicejs_reg_nr: pieteicēja juridiskās personas reģistrācijas numurs (ja ir). "
+        f"• {by_name['pieteicejs_reg_nr'].header}: pieteicēja juridiskās personas reģistrācijas numurs (ja ir). "
         "Fizisko personu vārdus un personas kodus neievadiet.",
-        "• m1–m6: jūsu manuālās pārbaudes atbilde katram modulim. Sāciet ar vienu no: "
+        "• M1–M6: jūsu manuālās pārbaudes atbilde katram modulim. Sāciet ar vienu no: "
         "«Ir: …» (atrasts, īsi ko), «Nav», «Nav datu» (objekts nav atrasts / nav ģeometrijas), "
         "«Nav pārklājuma» (avotā šai teritorijai nav datu, piem., nav plūdu kartes). Pēc tam īss paskaidrojums.",
-        "• parbaudes_datums: datums, kad veicāt pārbaudi (GGGG-MM-DD). Svarīgi, jo dati laika gaitā mainās.",
-        "• avots_piezimes: kurus portālus izmantojāt un citas piezīmes.",
+        f"• {by_name['parbaudes_datums'].header}: datums, kad veicāt pārbaudi (GGGG-MM-DD). Svarīgi, jo dati laika gaitā mainās.",
+        f"• {by_name['avots_piezimes'].header}: kurus portālus izmantojāt un citas piezīmes.",
+        "",
+        *LEGEND,
         "",
         "Moduļi:",
         "m1 Kadastra dati: zemes vienības / būves, platība, lietošanas mērķis, būves uz zemes vienības.",
