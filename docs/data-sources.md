@@ -354,7 +354,7 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
     - Coverage: `dok_id`, `dok_nosaukums`, `atvk_kods`, `the_geom` (MultiSurface), …
   - National counts (WFS `RESULTTYPE=hits`, 2026-10-13): **574,463** zone polygons; **3,347** coverage polygons.
   - **Pilot ATVK** (same filter): Jelgava `0003000` 1,464 zones / 42 coverage; Jūrmala `0004000` 3,164 / 333; Daugavpils `0002000` 2,161 / 5.
-  - **Zone groups in the pilot** (`grupa_kods` / `veids`, 12 types — used for rules v5 draft): 10101 Savrupmāju, 10102 Mazstāvu dzīvojamās, 10103 Daudzstāvu dzīvojamās, 10104 Publiskās, 10105 Jauktas centra, 10106 Rūpnieciskās, 10107 Transporta, 10108 Tehniskās, 10109 Dabas un apstādījumu, 10110 Mežu, 10111 Lauksaimniecības, 10112 Ūdeņu. Finer `kods` (204 distinct) kept for display; `nosaukums` is often empty.
+  - **Zone groups in the pilot** (`grupa_kods` / `veids`, 12 types — used for rules v5): 10101 Savrupmāju, 10102 Mazstāvu dzīvojamās, 10103 Daudzstāvu dzīvojamās, 10104 Publiskās, 10105 Jauktas centra, 10106 Rūpnieciskās, 10107 Transporta, 10108 Tehniskās, 10109 Dabas un apstādījumu, 10110 Mežu, 10111 Lauksaimniecības, 10112 Ūdeņu. Finer `kods` (204 distinct) kept for display; `nosaukums` is often empty.
   - Import: WFS GeoJSON pages filtered by pilot `atvk_kods`, snapshot in `ref.zoning_zone`, EPSG:3059 → 10306 via `lks92_to_lks2020`. Never queried live at check time.
   - PLAN's "~55% coverage" **area share was not measured**; coverage is the plan-territory mask above, not a % of Latvia.
 - [`fz-skelumi`](https://data.gov.lv/dati/lv/dataset/fz-skelumi) (VZD, quarterly): unbuilt parcels in building zones. **Not used in module 8 v1** (polygons from TAPIS already give the zone).
@@ -522,7 +522,7 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
 
 ## 4. Not done here (next steps)
 - **Phase 0 step 2:** done for the MVP sources (2026-10-09, Jelgava). Still open:
-  - ~~TAPIS WFS `DescribeFeatureType`~~: done 2026-10-13 (§3.7); module 8 built (rules v5 draft).
+  - ~~TAPIS WFS `DescribeFeatureType`~~: done 2026-10-13 (§3.7); module 8 built (rules v5 agreed).
   - ~~DAP `ATIS_CODE` vs cadastre `EncumbranceKindId`~~: done 2026-10-10, same code system (§7.4).
 - **Decisions:** D1, D5, D6, D9 and D1 E7 (LVĢMC MapServer) were decided on 2026-10-09; D3 has interim answers until Phase 10 (`docs/decisions.md`).
 - **D1 follow-up:** open geolatvija.lv products 309 and 361 and check for a stable SHP download URL.

@@ -5,16 +5,16 @@
 # (not_findings below). v3 (agreed by Janis Bardavskis 2026-10-13): rules for the
 # applicant modules 9 and 17 and for module 14 (Phase 8a); an open legal protection
 # proceeding (court or out-of-court) is high; the rules of modules 1-6 are unchanged
-# from v2. v5 (Phase 6 module 8 draft, 2026-10-13): TAPIS functional-zone groups
-# from the pilot (grupa_kods); industrial/technical medium, transport/public/mixed
-# low, residential and open-space types none; unmapped unknown. Modules 1–7, 9,
-# 14 and 17 unchanged from v3. Every run and report shows version and status.
-# A changed rule set gets a new version (back to status: draft until agreed).
-# The engine stores this whole file with each run, so an old run is replayed with
-# the rules it was made with.
+# from v2. v5 (agreed by Janis Bardavskis 2026-10-13, Phase 6 module 8): TAPIS
+# functional-zone groups from the pilot (grupa_kods); industrial/technical
+# medium, transport/public/mixed low, residential and open-space types none;
+# unmapped unknown. Modules 1–7, 9, 14 and 17 unchanged from v3. Every run and
+# report shows version and status. A changed rule set gets a new version (back
+# to status: draft until agreed). The engine stores this whole file with each
+# run, so an old run is replayed with the rules it was made with.
 
 version: "5"
-status: draft          # draft | agreed
+status: agreed         # draft | agreed
 
 # Records a module lists apart (collapsed) and never counts as findings: they do
 # not make a result `found` and no rule fires on them (items carry technical: true).
@@ -460,7 +460,7 @@ rules:
     reason: "The applicant's name equals a sanctioned entity's name without a Latvian reg. no.: never a finding by itself (D6, D10), only a flag for manual review."
     text_lv: "Nosaukums sakrīt ar sankciju saraksta ierakstu: pārbaudīt manuāli."
 
-  # --- 8 Zonējums (TAPIS) -- v5 draft ------------------------------------------
+  # --- 8 Zonējums (TAPIS) -- v5 (agreed 2026-10-13) -----------------------------
   # group_code = TAPIS grupa_kods (12 types in the pilot, docs/data-sources.md §3.7).
   - id: zoning_industrial
     module: zoning
