@@ -29,7 +29,7 @@ Status words used below:
 | 4 | ATIS restriction geometries | none; classifier `atis-datu-un-kadastra-objektu-apgrutinajumu-klasifikators` and frozen text list `apgrutinajumi-kas-kadastra-registreti-lidz-2025-gada-31-janvarim` | VZD | CSV, XLSX | data.gov.lv | other / never | 2026-01-27 / 2025-09-05 | CC-BY-4.0 | **Geometries NOT FOUND.** Per-parcel encumbrances exist as text only |
 | 5 | Flood maps | `pldu-riska-karu-atvrtie-dati-un-servisi` (spring 10y SHP), `…-servisi1` (spring 10y WMTS), `3-cikla-…-kartes` / `…-kartes1` (3rd cycle) | ĢEOLatvija.lv (LVĢMC data) | links to geolatvija.lv; WMS/WMTS | geolatvija.lv, geo-dpps.viss.gov.lv, geodata.lvgmc.lv | continuous | 2026-08-19 | CC0 | **UNCLEAR**: no direct vector download link on data.gov.lv. PLAN's slug is the wrong layer |
 | 6 | Nature (protected areas, microreserves, monuments, habitats) | `ipasi-aizsargajamas-dabas-teritorijas`, `mikroliegumi`, `dabas-pieminekli`, `aizsargajamas-dzivotnes-biotopi`, `dabas-vertibu-geotelpiskie-dati` | DAP | SHP, GDB (zip); ArcGIS REST | data.gov.lv; ozols.gov.lv (REST) | annual (REST: daily) | 2026-07-24 | CC0 | FOUND |
-| 7 | Zoning (TAPIS) | `teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati` (WFS/WMS), `fz-skelumi`, `tapis` | ĢEOLatvija.lv / VZD / VARAM | WFS, WMS; CSV | geo-dpps.viss.gov.lv → tapis.gov.lv; data.gov.lv | continuous / quarterly | 2026-08-19 / 2026-04-02 | CC0 / CC-BY-4.0 | FOUND (WFS). Coverage not checked |
+| 7 | Zoning (TAPIS) | `teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati` (WFS/WMS), `fz-skelumi`, `tapis` | ĢEOLatvija.lv / VZD / VARAM | WFS, WMS; CSV | geo-dpps.viss.gov.lv → tapis.gov.lv; data.gov.lv | continuous / quarterly | 2026-08-19 / 2026-04-02 | CC0 / CC-BY-4.0 | FOUND (WFS). Pilot coverage + `grupa_kods` verified 2026-10-13 (§3.7) |
 | 8 | Construction cases (BIS) | `bis_jlyakg7hgslonjnwyrwc6w` (cases), `bis_tln9s3hrpjlnucmjip9r3g` (case objects), `bis_04lylzfvt9f25h4divvcfq` (new builds, geo) | BVKB | CSV | data.gov.lv | daily | 2026-10-09 | CC0 | FOUND |
 | 9 | Companies (UR) | `uz` | UR | CSV | data.gov.lv | daily | 2026-10-08 | CC0 | FOUND. No NACE in this file |
 | 10 | VID rating, tax debts | `nodoklu-maksataju-reitings` | VID | CSV | data.gov.lv | irregular (≥ 4×/year) | 2026-10-06 | CC0 | Rating FOUND; **tax debts NOT FOUND** |
@@ -345,12 +345,20 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
 - **Import:** repair geometries (`make_valid`), and drop empty or zero-area pieces.
 
 ### 3.7 Zoning (TAPIS)
-- [`teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati`](https://data.gov.lv/dati/lv/dataset/teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati): WFS 2.0 (EPSG:3059) and WMS through `geo-dpps.viss.gov.lv` → `tapis.gov.lv` geoserver.
-  - WFS feature types include `tapis_apvienotie:funkcionalais_zonejums`, `teritorijas_ar_ipasiem_noteikumiem`, `apgrutinatas_teritorijas`, `riska_teritorijas`, `speka_esosu_planojumu_teritorijas` and 13 more.
-  - Attribute names were not read (DescribeFeatureType not called).
-- [`fz-skelumi`](https://data.gov.lv/dati/lv/dataset/fz-skelumi) (VZD, quarterly): unbuilt parcels in building zones, with `ZvKadApz, Fz, FzPlat, NilmSar, …`. Only where TAPIS is vectorised.
-- [`tapis`](https://data.gov.lv/dati/lv/dataset/tapis) (VARAM): list of planning documents. **Last modified 2024-07-08** despite "daily".
-- PLAN's "~55% coverage" figure was **not checked**.
+- [`teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati`](https://data.gov.lv/dati/lv/dataset/teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati): WFS 2.0 (EPSG:3059) and WMS through `geo-dpps.viss.gov.lv` → `tapis.gov.lv` geoserver (D1 E4). Licence CC0-1.0; CKAN frequency CONT.
+  - **18** feature types (verified 2026-10-13 `GetCapabilities`). Module 8 uses:
+    - `tapis_apvienotie:funkcionalais_zonejums` — findings (functional zones);
+    - `tapis_apvienotie:speka_esosu_planojumu_teritorijas` — coverage mask (territories of plans in force).
+  - **DescribeFeatureType (2026-10-13):**
+    - Zones: `tapis_id`, `kods`, `nosaukums`, `veids`, `indekss`, `grupa_kods`, `grupa_nos`, `atvk_kods`, `dok_id`, `dok_nos`, `geom` (Surface), …
+    - Coverage: `dok_id`, `dok_nosaukums`, `atvk_kods`, `the_geom` (MultiSurface), …
+  - National counts (WFS `RESULTTYPE=hits`, 2026-10-13): **574,463** zone polygons; **3,347** coverage polygons.
+  - **Pilot ATVK** (same filter): Jelgava `0003000` 1,464 zones / 42 coverage; Jūrmala `0004000` 3,164 / 333; Daugavpils `0002000` 2,161 / 5.
+  - **Zone groups in the pilot** (`grupa_kods` / `veids`, 12 types — used for rules v5 draft): 10101 Savrupmāju, 10102 Mazstāvu dzīvojamās, 10103 Daudzstāvu dzīvojamās, 10104 Publiskās, 10105 Jauktas centra, 10106 Rūpnieciskās, 10107 Transporta, 10108 Tehniskās, 10109 Dabas un apstādījumu, 10110 Mežu, 10111 Lauksaimniecības, 10112 Ūdeņu. Finer `kods` (204 distinct) kept for display; `nosaukums` is often empty.
+  - Import: WFS GeoJSON pages filtered by pilot `atvk_kods`, snapshot in `ref.zoning_zone`, EPSG:3059 → 10306 via `lks92_to_lks2020`. Never queried live at check time.
+  - PLAN's "~55% coverage" **area share was not measured**; coverage is the plan-territory mask above, not a % of Latvia.
+- [`fz-skelumi`](https://data.gov.lv/dati/lv/dataset/fz-skelumi) (VZD, quarterly): unbuilt parcels in building zones. **Not used in module 8 v1** (polygons from TAPIS already give the zone).
+- [`tapis`](https://data.gov.lv/dati/lv/dataset/tapis) (VARAM): list of planning documents. **Last modified 2024-07-08** despite "daily". Not imported.
 
 ### 3.8 Construction cases (BIS)
 - All BVKB, CC0, daily, modified 2026-10-09, CSV on data.gov.lv.
@@ -514,7 +522,7 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
 
 ## 4. Not done here (next steps)
 - **Phase 0 step 2:** done for the MVP sources (2026-10-09, Jelgava). Still open:
-  - TAPIS WFS `DescribeFeatureType` (module 8 is not MVP);
+  - ~~TAPIS WFS `DescribeFeatureType`~~: done 2026-10-13 (§3.7); module 8 built (rules v5 draft).
   - ~~DAP `ATIS_CODE` vs cadastre `EncumbranceKindId`~~: done 2026-10-10, same code system (§7.4).
 - **Decisions:** D1, D5, D6, D9 and D1 E7 (LVĢMC MapServer) were decided on 2026-10-09; D3 has interim answers until Phase 10 (`docs/decisions.md`).
 - **D1 follow-up:** open geolatvija.lv products 309 and 361 and check for a stable SHP download URL.

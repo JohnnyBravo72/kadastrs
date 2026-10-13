@@ -18,6 +18,7 @@ from etl.importers.nature import (
 )
 from etl.importers.ur import FidSanctions, UrCompanies, UrInsolvency, UrSanctions
 from etl.importers.varis import VarisAddresses
+from etl.importers.zoning import TapisZoning
 
 IMPORTERS = {
     "admin_boundaries": AdminBoundaries,
@@ -33,6 +34,7 @@ IMPORTERS = {
     "cadastre_encumbrances": CadastreEncumbrances,
     "encumbrances_frozen": EncumbrancesFrozen,
     "bis_cases": BisCases,
+    "tapis_zoning": TapisZoning,
     "ur_companies": UrCompanies,
     "ur_insolvency": UrInsolvency,
     "ur_sanctions": UrSanctions,

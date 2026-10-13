@@ -99,6 +99,7 @@ All imports run in the `etl` container (CLAUDE.md rule 12), never with the host 
 | `cadastre_encumbrances` | encumbrances registered on pilot parcels, parcel parts and buildings (code, text, area, date; no geometry) | ~1 min (pilot members only, by HTTP Range) |
 | `encumbrances_frozen` | the frozen list of encumbrances registered until 2025-01-31, pilot rows, flagged `frozen` (`docs/data-sources.md` §7.3) | ~1 min (175 MB download; never changes) |
 | `bis_cases` | BIS construction cases and case objects of the pilot cities (raw CSVs, never the DataStore) | ~1 min (145 MB download) |
+| `tapis_zoning` | TAPIS functional zoning (WFS D1 E4): pilot-city zones + plan-territory coverage mask; needs `admin_boundaries` | ~5–15 min (paged WFS; unchanged rerun much faster) |
 
 ```powershell
 docker compose run --rm etl import all
@@ -111,6 +112,7 @@ docker compose run --rm etl status                                 # live versio
 - **If a source changed its columns or XML elements, the import stops** (`failed`, with the reason in `import_log.message` and in the output), and the last good version stays live. Check the change, re-verify the source (`docs/data-sources.md`), update `config/schemas.yaml`, and import again.
 - The exit code is 1 if any source failed.
 - **Flood (`flood_10y`)** asks the LVĢMC MapServer (D1 E7) for the features in each pilot city's extent + 1 km, 25 at a time, with 1 cm simplification; it prints its progress. A batch that fails is retried and then fetched one object at a time. Layer 3 (200-year extent) is stored only as the coverage mask (`ref.flood_coverage_current`), never as a finding.
+- **Zoning (`tapis_zoning`)** pages the TAPIS WFS (D1 E4) for pilot `atvk_kods`: `funkcionalais_zonejums` as findings (`ref.zoning_zone`, role `finding`) and `speka_esosu_planojumu_teritorijas` as the coverage mask (role `coverage_mask`). Geometry is transformed LKS-92 → LKS-2020 with `lks92_to_lks2020`. Never queried live at check time.
 - Geometry repair uses PostGIS `ST_MakeValid(method=structure)`; the largest flood polygons (over a million vertices) take a few minutes each (`docs/data-sources.md` §6.3).
 - **BIS (`bis_cases`)** downloads the national case list and case objects and keeps only the pilot: objects whose ATVK is a pilot city or whose designation starts with the city's cadastral territory code (`pilot_cadastral_territory` in `config/etl.yaml`), and their cases. A new version is created only when the pilot rows change. Links to the cadastre are not stored: `ref.bis_object_link_current` computes them from the live BIS and cadastre text versions (`ref.bis_links(bis_version, cadastre_text_version)` for any past pair). Report:
   ```powershell
@@ -173,7 +175,7 @@ Row statuses: `resolved`, `ambiguous` (pick from `matches`), `not_found`, `unres
 
 ## Checks (runs and results)
 
-The check engine (`engine/checks`, PLAN.md §6) runs modules 1–6 on resolved objects and **stores** every result. A run pins the live version of every source at its start; modules read only those versions. Results are never changed: the database rejects `UPDATE` and `DELETE` on `work.check_result`, `work.run_target`, `work.run_version` and `work.run_input`, and a finished `work.run` (CLAUDE.md rule 3). Checking again creates a new run.
+The check engine (`engine/checks`, PLAN.md §6) runs object modules (1–6, 8, 14, …) on resolved objects and **stores** every result. A run pins the live version of every source at its start; modules read only those versions. Results are never changed: the database rejects `UPDATE` and `DELETE` on `work.check_result`, `work.run_target`, `work.run_version` and `work.run_input`, and a finished `work.run` (CLAUDE.md rule 3). Checking again creates a new run.
 
 | Module | id | Status values used |
 |---|---|---|
@@ -183,6 +185,7 @@ The check engine (`engine/checks`, PLAN.md §6) runs modules 1–6 on resolved o
 | 4 Plūdi (10 gadu) | `flood_10y` | `found`, `clear` (warning `partial_coverage` if part of the unit is outside the mask), `not_covered` (outside the 200-year mask), `no_data` |
 | 5 Būvniecības lietas | `bis` | `found` (one item per distinct case, best match type first, with `match_label`, e.g. "tuvumā (≤ 20 m), nav piesaistīts objektam"), `clear` |
 | 6 Apgrūtinājumi | `encumbrances` | `found` (current encumbrances; frozen-only ones next to them are warning lines, no risk increase), `found` with reason "tikai 2025-01-31 saraksta apgrūtinājumi – pārbaudīt manuāli" (all frozen-only: listed as items with `frozen: true`, risk `unknown`, never `clear`), `clear` |
+| 8 Zonējums | `zoning` | `found` (one item per overlapping zone; risk from TAPIS `grupa_kods` / rules v5 draft), `clear` (warning `partial_coverage` if part of the unit is outside the plan mask), `not_covered` (outside plan territories), `no_data` |
 
 Any module can also give `source_unavailable` (no live version) or `error` (reason holds the exception). **Risk comes only from `config/rules.yaml`** (mounted; edits apply to the next run). Rule set v1 is **agreed** (`status: agreed`, D4, 2026-10-11); a changed rule set gets a new version and is `draft` until agreed. Each run stores the whole rule set and its SHA-256, and summaries show version and status. Thresholds (§6.3) are in the same file: 0.5 m inward buffer, overlap ≥ 1 m² or ≥ 0.1 %, BIS "nearby" 20 m. The buffered overlap decides whether there is a finding; the m² and % reported are those of the whole unit.
 
