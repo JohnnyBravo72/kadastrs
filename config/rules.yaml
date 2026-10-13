@@ -5,15 +5,15 @@
 # (not_findings below). v3 (agreed by Janis Bardavskis 2026-10-13): rules for the
 # applicant modules 9 and 17 and for module 14 (Phase 8a); an open legal protection
 # proceeding (court or out-of-court) is high; the rules of modules 1-6 are unchanged
-# from v2. v4 (Phase 8b draft, 2026-10-13): modules 7, 10–13 and 18; de minimis
-# ceilings and VID / EU / FID / EIS levels as agreed in the Phase 8b plan.
+# from v2. v4 (agreed by Janis Bardavskis 2026-10-13): modules 7, 10–13 and 18;
+# de minimis ceilings and VID / EU / FID / EIS levels from the Phase 8b plan.
 # Every run and report shows version and status.
 # A changed rule set gets a new version (back to status: draft until agreed).
 # The engine stores this whole file with each run, so an old run is replayed with
 # the rules it was made with.
 
 version: "4"
-status: draft          # draft | agreed
+status: agreed         # draft | agreed
 
 # Records a module lists apart (collapsed) and never counts as findings: they do
 # not make a result `found` and no rule fires on them (items carry technical: true).

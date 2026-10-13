@@ -1,5 +1,5 @@
 """Phase 8a modules: 9 Pieteicējs (UR), 14 Uzņēmumi adresē, 17 Sankcijas
-(PLAN.md §6.1, docs/decisions.md D10; rule set v3 draft). Seed: APPLICANTS in
+(PLAN.md §6.1, docs/decisions.md D10; rule set v3 agreed). Seed: APPLICANTS in
 tests/checks/conftest.py."""
 
 import pytest

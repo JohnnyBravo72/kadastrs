@@ -345,7 +345,7 @@ docker compose run --rm etl import ur_companies ur_insolvency ur_sanctions fid_s
 
 ## Phase 8b: ownership, VID, de minimis, EU, EIS, FID frozen RE
 
-Decisions: `docs/decisions.md` D11. Rule set **v4 draft** (agree to set `status: agreed` in `config/rules.yaml`).
+Decisions: `docs/decisions.md` D11. Rule set **v4 agreed** 2026-10-13 (D4).
 
 ```powershell
 docker compose run --rm etl import cadastre_ownership vid_rating deminimis eu_projects eis_procurement fid_frozen_property

@@ -6,7 +6,7 @@
 
 **Data policy:** all data comes from **data.gov.lv** (section 2).
 
-**Status (2026-10-13):** Phase 8b (modules 7, 10–13, 18: ownership, VID, de minimis, EU projects, EIS, FID frozen RE) is built; data policy D11; rule set v4 is **draft** (awaiting agreement). Phase 8a (modules 9, 14, 17) is built and tested; rules v3 agreed 2026-10-13 (D4). Phase 7 is built and tested; Phase 6's zoning (module 8) is still open. Phases 1–3 are done; Phase 4 is built and tested (test-set comparison waits for filled files). Phase 5 is built and tested (colleague pilot timing open). Phase 0 steps 1 and 3 done; baseline and returned test set still open.
+**Status (2026-10-13):** Phase 8b (modules 7, 10–13, 18: ownership, VID, de minimis, EU projects, EIS, FID frozen RE) is built; data policy D11; rule set v4 **agreed** 2026-10-13 (D4). Phase 8a (modules 9, 14, 17) is built and tested; rules v3 agreed 2026-10-13 (D4). Phase 7 is built and tested; Phase 6's zoning (module 8) is still open. Phases 1–3 are done; Phase 4 is built and tested (test-set comparison waits for filled files). Phase 5 is built and tested (colleague pilot timing open). Phase 0 steps 1 and 3 done; baseline and returned test set still open.
 
 **Change log**
 - 2026-10-13 (Phase 8b): modules 7, 10–13 and 18 (D11; sources in `docs/data-sources.md` §3.10–3.13, §3.16–3.17).
@@ -16,7 +16,7 @@
   - **12 EU projects:** three CFLA periods; object match by cadastre; applicant module for the same reg. no.; natural-person/IK rows stripped (D11); location coverage warning.
   - **13 EIS procurement:** yearly files 2018–2026; winner name never stored; coverage "tikai EIS e-konkursu iepirkumi".
   - **18 FID frozen RE:** TA/VZD file; cadastre match; no person columns; risk high.
-  - **Rule set v4** `status: draft` until agreed (D4).
+  - **Rule set v4 (agreed by Janis Bardavskis 2026-10-13, D4):** modules 7, 10–13 and 18; ownership informational; VID A/B/C/J/N; de minimis ceilings and 80%/100% shares; EU ongoing high / finished medium / applicant low; EIS low; FID frozen RE high.
 - 2026-10-12 (Phase 8a, applicant): modules 9, 14 and 17 (D10 in `docs/decisions.md`; sources in `docs/data-sources.md` §3.9, §3.9a, §3.17).
   - **Sources** (whole country, legal entities only): UR `register.csv` (`ur_companies`), UR insolvency proceedings (`ur_insolvency`), UR sanctions file (`ur_sanctions`, `LEGAL_ENTITY` / `FOREIGN_ENTITY` rows only) and FID "Sankciju subjekti" (`fid_sanctions`, rows with a Latvian legal-entity reg. no.). Never imported: officers, members, beneficial owners, procurations, natural-person sanctions rows, FID's sanctioned-person column. No names of individual merchants (IK, IND). Database constraints enforce it.
   - **Applicant modules run once per applicant reg. no.** (results with scope `applicant`, stored on the first target that names it): 9 "Pieteicējs (UR)" (status aktīvs / likvidēts / reorganizēts, form, dates, legal address, open insolvency or legal protection) and 17 "Sankcijas" (reg. no. against UR entity rows and FID subjects, sanctioned entities linked to the applicant; a name-only hit is a manual-review flag, never a finding). Shown in their own section of the results page, on a new Excel sheet "Pieteicēji" and with their sources on Avoti.
@@ -462,7 +462,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report; a plain input page. **Built and tested 2026-10-11** | **Pilot with 2–3 colleagues; measured time per object vs the baseline** (open) |
 | 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list. **Results view built 2026-10-11** (map, layers, attention areas, cards, overview); zoning, header tabs and filter bar open | UI criteria pass for the pilot area |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in). **Built 2026-10-12** (entry dialog, import preview, unit selection, Atjaunot and latest-data reruns, project groups, Avoti and Žurnāls); per-user sessions wait for sign-in (Phase 10) | UI criteria pass |
-| 8. Applicant & funding | Modules 7 and 9–14, and 17–18. **8a built 2026-10-12:** modules 9, 14, 17 (rules v3 agreed). **8b built 2026-10-13:** modules 7, 10–13, 18 (D11; rule set v4 draft) | Each module verified on the test set; v4 agreed |
+| 8. Applicant & funding | Modules 7 and 9–14, and 17–18. **8a built 2026-10-12:** modules 9, 14, 17 (rules v3 agreed). **8b built 2026-10-13:** modules 7, 10–13, 18 (D11; rule set v4 agreed) | Each module verified on the test set; v4 agreed |
 | 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history), re-check value of `pirmsregistretas-buves` on whole-country data | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
 | 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, D3 final: shared hosting, sign-in (required before sharing), security review, retention, maintenance, legal wording; deployment behind sign-in | A refresh runs unattended; a failed import alerts the owner |
 

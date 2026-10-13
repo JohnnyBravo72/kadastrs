@@ -28,10 +28,10 @@ def result(module="flood_10y", status="found", items=(), warnings=(), reason=Non
     )
 
 
-def test_rule_set_v4_draft_covers_phase8b_modules():
+def test_rule_set_v4_agreed_covers_phase8b_modules():
     rs = rules_mod.load()
-    # v4 (Phase 8b modules 7, 10–13, 18) draft 2026-10-13; agree after review (D4)
-    assert (rs.version, rs.status) == ("4", "draft")
+    # v4 (Phase 8b modules 7, 10–13, 18) agreed by Janis Bardavskis 2026-10-13 (D4)
+    assert (rs.version, rs.status) == ("4", "agreed")
     assert rs.de_minimis is not None and rs.de_minimis.ceilings["2023/2831"] == 300000
     tap = next(r for r in rs.rules if r.id == "applicant_legal_protection_open")
     assert tap.level == "high" and "grūtībās nonākuša uzņēmuma" in tap.text_lv
