@@ -96,6 +96,9 @@ services:
       target: lint
     image: kadastrs-lint:dev
     working_dir: /src
+    # Host network: pre-commit installs hook envs from GitHub; some agent
+    # environments have no egress on the compose bridge.
+    network_mode: host
     volumes:
       - ..:/src
       - precommit_cache:/root/.cache/pre-commit
