@@ -71,25 +71,41 @@ class Flood10y:
 
     def _extents(self, ctx) -> dict[str, tuple[float, float, float, float]]:
         margin = float(ctx.options.get("margin_m", 1000))
+        scope = ctx.cfg.scope_atvk()  # None = every city (country)
         with ctx.conn_factory() as c:
             admin = c.execute("SELECT ref.live_version('admin_boundaries')").fetchone()[0]
-            rows = c.execute(
-                "SELECT atvk, ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b) FROM ("
-                " SELECT atvk, ST_Transform(ST_Expand(ST_Envelope(geom), %s), 3059) AS b"
-                " FROM ref.city_boundary WHERE atvk = ANY(%s)) e",
-                (margin, list(ctx.cfg.pilot_atvk)),
-            ).fetchall()
+            if scope is None:
+                rows = c.execute(
+                    "SELECT atvk, ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b) FROM ("
+                    " SELECT atvk, ST_Transform(ST_Expand(ST_Envelope(geom), %s), 3059) AS b"
+                    " FROM ref.city_boundary) e",
+                    (margin,),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT atvk, ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b) FROM ("
+                    " SELECT atvk, ST_Transform(ST_Expand(ST_Envelope(geom), %s), 3059) AS b"
+                    " FROM ref.city_boundary WHERE atvk = ANY(%s)) e",
+                    (margin, list(scope)),
+                ).fetchall()
         found = {r[0]: tuple(r[1:]) for r in rows}
-        missing = sorted(set(ctx.cfg.pilot_atvk) - set(found))
-        if admin is None or missing:
-            raise LookupError(
-                f"pilot city boundaries missing {missing}: import admin_boundaries first"
-            )
+        if ctx.cfg.is_pilot:
+            missing = sorted(set(scope or ()) - set(found))
+            if admin is None or missing:
+                raise LookupError(
+                    f"pilot city boundaries missing {missing}: import admin_boundaries first"
+                )
+            what = f"Features intersecting each pilot city's extent + {margin:g} m"
+        else:
+            if admin is None or not found:
+                raise LookupError("city boundaries missing: import admin_boundaries first")
+            what = f"Features intersecting every city extent + {margin:g} m (country)"
         ctx.processing.append(
             {
-                "id": "pilot_extent",
-                "what": f"Features intersecting each pilot city's extent + {margin:g} m",
+                "id": "import_extent",
+                "what": what,
                 "admin_boundaries_version": admin,
+                "import_scope": ctx.cfg.import_scope,
             }
         )
         return found

@@ -1,8 +1,10 @@
-"""Batch runs and the Excel report (PLAN.md §9 Phase 5).
+"""Batch runs and reports (PLAN.md §9 Phase 5 / Phase 10).
 
   POST /api/batch                  file (CSV / XLSX) or text (pasted list) -> new run;
                                    format=json (summary + report_url) or xlsx (the report)
-  GET  /api/runs/{id}/report.xlsx  the report of a stored run (built from stored results)
+  GET  /api/runs/{id}/report.xlsx  Excel report of a stored run
+  GET  /api/runs/{id}/report.html  print-ready HTML (Phase 10; Print → PDF)
+  GET  /api/runs/{id}/report.pdf   compact PDF summary (Phase 10)
   GET  /api/batch/template.xlsx    an empty input template
 (The page at / is the results view, web/, served by api/web.py.)
 
@@ -26,6 +28,8 @@ from engine.checks import runner, summary
 from engine.checks.contract import UnitRef
 from engine.resolve.context import SourceUnavailable, resolve_config
 from reports import excel
+from reports import html as html_report
+from reports import pdf as pdf_report
 
 router = APIRouter(tags=["batch"])
 
@@ -191,10 +195,7 @@ def batch_preview(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get("/api/runs/{run_id}/report.xlsx")
-def run_report(request: Request, run_id: int, grouping: int | None = None) -> Response:
-    """The report of a stored run, following its current project grouping (or the
-    grouping row `grouping`); the Avoti sheet names the row used."""
+def _load_report(request: Request, run_id: int, grouping: int | None):
     with request.app.state.pool.connection() as conn:
         try:
             data = excel.load(conn, run_id, grouping_id=grouping)
@@ -202,7 +203,39 @@ def run_report(request: Request, run_id: int, grouping: int | None = None) -> Re
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         if data is None:
             raise HTTPException(status_code=404, detail=f"pārbaude {run_id} nav atrasta")
-        return _xlsx_response(excel.to_bytes(data), excel.filename(run_id))
+        return data
+
+
+@router.get("/api/runs/{run_id}/report.xlsx")
+def run_report(request: Request, run_id: int, grouping: int | None = None) -> Response:
+    """The Excel report of a stored run, following its current project grouping
+    (or the grouping row `grouping`); the Avoti sheet names the row used."""
+    data = _load_report(request, run_id, grouping)
+    return _xlsx_response(excel.to_bytes(data), excel.filename(run_id))
+
+
+@router.get("/api/runs/{run_id}/report.html")
+def run_report_html(request: Request, run_id: int, grouping: int | None = None) -> Response:
+    """Print-ready HTML report (Phase 10). Use the browser's Print → Save as PDF
+    for a full Latvian layout."""
+    data = _load_report(request, run_id, grouping)
+    return Response(
+        content=html_report.to_bytes(data),
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Disposition": f'inline; filename="{html_report.filename(run_id)}"'},
+    )
+
+
+@router.get("/api/runs/{run_id}/report.pdf")
+def run_report_pdf(request: Request, run_id: int, grouping: int | None = None) -> Response:
+    """Compact PDF summary (Phase 10). Diacritics are folded in the page text;
+    prefer report.html + Print for a polished Latvian PDF."""
+    data = _load_report(request, run_id, grouping)
+    return Response(
+        content=pdf_report.to_bytes(data),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{pdf_report.filename(run_id)}"'},
+    )
 
 
 @router.get("/api/batch/template.xlsx")

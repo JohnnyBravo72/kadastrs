@@ -99,7 +99,7 @@ def test_flood_import(run_fast, server, q):
     assert v[0] == "2026-08-19" and v[2] == "CC0-1.0"
     ids = {p["id"] for p in v[1]}
     assert {
-        "pilot_extent",
+        "import_extent",
         "coverage_mask",
         "simplify_1cm",
         "make_valid",

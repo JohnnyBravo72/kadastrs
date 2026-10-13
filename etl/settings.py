@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
+from typing import Literal
 
 import yaml
 
@@ -25,13 +26,29 @@ def database_url() -> str:
     return url
 
 
+ImportScope = Literal["pilot", "country"]
+
+
 @dataclass(frozen=True)
 class EtlConfig:
     ckan_api: str
+    import_scope: ImportScope
     pilot_atvk: tuple[str, ...]
     pilot_cadastral_territory: dict[str, str]  # ATVK -> first 4 digits of designations
     files: dict[str, dict[str, str]]  # source id -> role -> CKAN resource id
     options: dict[str, dict]  # source id -> importer options
+
+    @property
+    def is_pilot(self) -> bool:
+        return self.import_scope == "pilot"
+
+    def scope_atvk(self) -> tuple[str, ...] | None:
+        """ATVK codes to keep, or None for whole-country (no ATVK filter)."""
+        return self.pilot_atvk if self.is_pilot else None
+
+    def scope_territories(self) -> set[str] | None:
+        """Cadastral territory prefixes for pilot filtering, or None for country."""
+        return set(self.pilot_cadastral_territory.values()) if self.is_pilot else None
 
 
 @cache
@@ -40,6 +57,9 @@ def etl_config(path: Path | None = None) -> EtlConfig:
     atvk = data["pilot_atvk"]
     if not all(isinstance(a, str) and len(a) == 7 and a.isdigit() for a in atvk):
         raise ValueError("pilot_atvk must be 7-digit strings (codes are text)")
+    scope = os.environ.get("KADASTRS_IMPORT_SCOPE") or data.get("import_scope") or "pilot"
+    if scope not in ("pilot", "country"):
+        raise ValueError("import_scope must be 'pilot' or 'country'")
     files = {
         sid: {str(k): str(v) for k, v in s["files"].items()} for sid, s in data["sources"].items()
     }
@@ -51,6 +71,7 @@ def etl_config(path: Path | None = None) -> EtlConfig:
         raise ValueError("pilot_cadastral_territory needs a 4-digit code (text) per pilot ATVK")
     return EtlConfig(
         ckan_api=data["ckan_api"],
+        import_scope=scope,
         pilot_atvk=tuple(atvk),
         pilot_cadastral_territory=territory,
         files=files,

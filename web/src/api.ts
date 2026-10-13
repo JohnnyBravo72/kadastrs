@@ -351,6 +351,8 @@ export const api = {
   layer: (id: number, name: LayerName, bbox: string, signal?: AbortSignal) =>
     get<FeatureCollection>(`/api/runs/${id}/layers/${name}?${new URLSearchParams({ bbox })}`, signal),
   reportUrl: (id: number) => `/api/runs/${id}/report.xlsx`,
+  reportHtmlUrl: (id: number) => `/api/runs/${id}/report.html`,
+  reportPdfUrl: (id: number) => `/api/runs/${id}/report.pdf`,
   propertyUnits: (n: string, signal?: AbortSignal) => get<PropertyUnits>(`/api/property/${encodeURIComponent(n)}/units`, signal),
   addressObjects: (code: string, signal?: AbortSignal) =>
     get<AddressObjects>(`/api/address/${encodeURIComponent(code)}/objects`, signal),

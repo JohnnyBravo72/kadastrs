@@ -4,9 +4,10 @@ Layers from config/sources.yaml E4 `wfs_layers`:
   finding         tapis_apvienotie:funkcionalais_zonejums
   coverage_mask   tapis_apvienotie:speka_esosu_planojumu_teritorijas
 
-Pilot ATVK filter (etl.yaml pilot_atvk). WFS GeoJSON in EPSG:3059 →
-lks92_to_lks2020() on load. Version date from the data.gov.lv listing
-(package_show metadata_modified). Snapshot only; never queried live.
+Pilot: ATVK filter (etl.yaml pilot_atvk). Country (Phase 9): unfiltered WFS
+pages. WFS GeoJSON in EPSG:3059 → lks92_to_lks2020() on load. Version date from
+the data.gov.lv listing (package_show metadata_modified). Snapshot only; never
+queried live.
 """
 
 from __future__ import annotations
@@ -60,49 +61,61 @@ class TapisZoning:
                 last = f"{type(exc).__name__}: {exc}"
         raise RuntimeError(f"{url}: failed after retries ({last})")
 
-    def _hits(self, ctx, base: str, typename: str, atvk: str) -> int:
-        filt = (
-            '<Filter xmlns="http://www.opengis.net/fes/2.0">'
-            "<PropertyIsEqualTo><ValueReference>atvk_kods</ValueReference>"
-            f"<Literal>{atvk}</Literal></PropertyIsEqualTo></Filter>"
-        )
-        resp = self._get(
-            ctx,
-            base,
-            {
-                "SERVICE": "WFS",
-                "VERSION": "2.0.0",
-                "REQUEST": "GetFeature",
-                "TYPENAMES": typename,
-                "RESULTTYPE": "hits",
-                "COUNT": "1",
-                "FILTER": filt,
-            },
-        )
+    def _hits(self, ctx, base: str, typename: str, atvk: str | None) -> int:
+        params = {
+            "SERVICE": "WFS",
+            "VERSION": "2.0.0",
+            "REQUEST": "GetFeature",
+            "TYPENAMES": typename,
+            "RESULTTYPE": "hits",
+            "COUNT": "1",
+        }
+        if atvk is not None:
+            params["FILTER"] = (
+                '<Filter xmlns="http://www.opengis.net/fes/2.0">'
+                "<PropertyIsEqualTo><ValueReference>atvk_kods</ValueReference>"
+                f"<Literal>{atvk}</Literal></PropertyIsEqualTo></Filter>"
+            )
+        resp = self._get(ctx, base, params)
         root = ET.fromstring(resp.content)  # noqa: S314 WFS hits XML from the allowed E4 endpoint
         return int(root.attrib.get("numberMatched") or 0)
 
-    def _page(self, ctx, base: str, typename: str, atvk: str, start: int, count: int) -> dict:
-        filt = (
-            '<Filter xmlns="http://www.opengis.net/fes/2.0">'
-            "<PropertyIsEqualTo><ValueReference>atvk_kods</ValueReference>"
-            f"<Literal>{atvk}</Literal></PropertyIsEqualTo></Filter>"
-        )
-        resp = self._get(
-            ctx,
-            base,
-            {
-                "SERVICE": "WFS",
-                "VERSION": "2.0.0",
-                "REQUEST": "GetFeature",
-                "TYPENAMES": typename,
-                "OUTPUTFORMAT": "application/json",
-                "COUNT": str(count),
-                "STARTINDEX": str(start),
-                "FILTER": filt,
-            },
-        )
-        return resp.json()
+    def _page(
+        self, ctx, base: str, typename: str, atvk: str | None, start: int, count: int
+    ) -> dict:
+        params = {
+            "SERVICE": "WFS",
+            "VERSION": "2.0.0",
+            "REQUEST": "GetFeature",
+            "TYPENAMES": typename,
+            "OUTPUTFORMAT": "application/json",
+            "COUNT": str(count),
+            "STARTINDEX": str(start),
+        }
+        if atvk is not None:
+            params["FILTER"] = (
+                '<Filter xmlns="http://www.opengis.net/fes/2.0">'
+                "<PropertyIsEqualTo><ValueReference>atvk_kods</ValueReference>"
+                f"<Literal>{atvk}</Literal></PropertyIsEqualTo></Filter>"
+            )
+        return self._get(ctx, base, params).json()
+
+    def _fetch_pages(self, ctx, base: str, typename: str, atvk: str | None, page_size: int):
+        n = self._hits(ctx, base, typename, atvk)
+        label = f"ATVK {atvk}" if atvk else "country"
+        print(f"   {typename} {label}: {n} features", file=sys.stderr, flush=True)
+        features = []
+        start = 0
+        while start < n:
+            doc = self._page(ctx, base, typename, atvk, start, page_size)
+            batch = doc.get("features") or []
+            if not batch:
+                break
+            features.extend(batch)
+            start += len(batch)
+            if len(batch) < page_size:
+                break
+        return features
 
     def fetch(self, ctx):
         base, layers, _ = _e4(ctx)
@@ -111,28 +124,12 @@ class TapisZoning:
         ctx.source_last_modified = datetime.fromisoformat(listed) if listed else None
         page_size = int(ctx.options.get("page_size", 500))
         ctx.workdir.mkdir(parents=True, exist_ok=True)
+        atvk_list: list[str | None] = list(ctx.cfg.pilot_atvk) if ctx.cfg.is_pilot else [None]
         files = []
         for role, typename in layers.items():
             features = []
-            for atvk in ctx.cfg.pilot_atvk:
-                n = self._hits(ctx, base, typename, atvk)
-                print(
-                    f"   {role} ATVK {atvk}: {n} features",
-                    file=sys.stderr,
-                    flush=True,
-                )
-                start = 0
-                while start < n or (n == 0 and start == 0):
-                    if n == 0:
-                        break
-                    doc = self._page(ctx, base, typename, atvk, start, page_size)
-                    batch = doc.get("features") or []
-                    if not batch:
-                        break
-                    features.extend(batch)
-                    start += len(batch)
-                    if len(batch) < page_size:
-                        break
+            for atvk in atvk_list:
+                features.extend(self._fetch_pages(ctx, base, typename, atvk, page_size))
             out = {
                 "type": "FeatureCollection",
                 "role": role,
@@ -154,11 +151,12 @@ class TapisZoning:
                     path=path,
                 )
             )
+        if ctx.cfg.is_pilot:
+            what = f"Features with atvk_kods in {list(ctx.cfg.pilot_atvk)}"
+        else:
+            what = "Unfiltered WFS pages (import_scope=country)"
         ctx.processing.append(
-            {
-                "id": "pilot_atvk",
-                "what": f"Features with atvk_kods in {list(ctx.cfg.pilot_atvk)}",
-            }
+            {"id": "import_scope", "what": what, "import_scope": ctx.cfg.import_scope}
         )
         return files
 

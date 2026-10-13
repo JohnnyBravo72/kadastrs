@@ -1,11 +1,13 @@
 """Registered encumbrances (PLAN §6.1 module 6; docs/data-sources.md §7.2-7.3).
 
-- cadastre_encumbrances: pilot members of the cadastre text encumbrance.zip
-  (HTTP Range, same identity rules as cadastre_text).
+- cadastre_encumbrances: scoped members of the cadastre text encumbrance.zip
+  (HTTP Range, same identity rules as cadastre_text; pilot or country).
 - atis_classifier: the ATIS and cadastre encumbrance classifier CSV.
-- encumbrances_frozen: the list frozen on 2025-01-31, pilot rows of the regional
-  files that hold the pilot cities. Part of it is not in the current list, so it
-  is imported with the flag `frozen` and its as-of date.
+- encumbrances_frozen: the list frozen on 2025-01-31. Pilot: rows of the regional
+  files that hold the pilot cities, cut by cadastral territory. Country: every
+  row of those same configured regional files (Latgale, Rīga, Zemgale — other
+  regions need verified resource ids before they are added). Imported with the
+  flag `frozen` and its as-of date.
 """
 
 import re
@@ -236,7 +238,7 @@ class EncumbrancesFrozen:
         return dates.pop()
 
     def load(self, ctx, conn, version_id, files):
-        territories = set(ctx.cfg.pilot_cadastral_territory.values())
+        territories = ctx.cfg.scope_territories()  # None = country (no prefix cut)
         counts = {}
         for role in self._roles(ctx):
             path = ctx.workdir / f"{role}.csv"
@@ -251,7 +253,9 @@ class EncumbrancesFrozen:
                 for row_no, r in enumerate(iter_csv(path), start=1):
                     n += 1
                     obj, flags = codes.normalize_code(r["CAD_NR"], length)
-                    if obj is None or obj[:4] not in territories:
+                    if obj is None:
+                        continue
+                    if territories is not None and obj[:4] not in territories:
                         continue
                     code = (r["ENCD_ID"] or "").strip()
                     if not code.isdigit():

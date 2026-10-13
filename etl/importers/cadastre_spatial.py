@@ -1,16 +1,23 @@
-"""cadastre_spatial: cadastre map SHP zips of the pilot cities (EPSG:10306).
+"""cadastre_spatial: cadastre map SHP zips (EPSG:10306).
+
+Pilot: cities in config/etl.yaml. Country (Phase 9): every municipality zip from
+CKAN (`{ATVK}_kk_shp.zip`).
 
 Layers: KKParcel, KKParcelPart, KKBuilding, KKEngineeringStructurePoly,
 KKWayRestriction, one copy per cadastral-group folder. The map is imported as
 delivered (the Daugavpils zip also holds groups 4460…, docs/data-sources.md §5.2).
 """
 
+import re
 import zipfile
 
 from etl import codes
+from etl.ckan import Ckan
 from etl.importers.common import FLAGS_AGG, create_stage, fetch_whole, flags_text, resource_date
 from etl.settings import schemas
 from etl.spatial import as_text, normalise_into, open_layers
+
+_ATVK_ZIP = re.compile(r"(?P<atvk>\d{7})_kk_shp\.zip$", re.I)
 
 # Rule E6: OBJECTCODE first digit per layer. Anything else stops the import.
 OBJECT_DIGIT = {
@@ -68,13 +75,29 @@ def check_object_code(layer: str, object_code: str | None, where: str) -> str:
 class CadastreSpatial:
     source_id = "cadastre_spatial"
 
+    @staticmethod
+    def country_roles(ckan: Ckan, dataset: str) -> dict[str, str]:
+        """Every municipality SHP zip in the spatial package (Phase 9)."""
+        pkg = ckan.package(dataset)
+        roles: dict[str, str] = {}
+        for res in pkg["resources"]:
+            url = res.get("url") or ""
+            name = res.get("name") or ""
+            m = _ATVK_ZIP.search(url) or _ATVK_ZIP.search(name)
+            if m:
+                roles[m.group("atvk")] = res["id"]
+        if len(roles) < 40:
+            raise LookupError(
+                f"{dataset}: expected ~42 ATVK kk_shp.zip resources, found {len(roles)}"
+            )
+        return dict(sorted(roles.items()))
+
     def fetch(self, ctx):
-        return [
-            fetch_whole(ctx, atvk, f"{atvk}_kk_shp.zip") for atvk in ctx.cfg.files[self.source_id]
-        ]
+        roles = list(ctx.resources)
+        return [fetch_whole(ctx, atvk, f"{atvk}_kk_shp.zip") for atvk in roles]
 
     def version_date(self, ctx, files):
-        return resource_date(ctx, ctx.cfg.files[self.source_id])
+        return resource_date(ctx, list(ctx.resources))
 
     def load(self, ctx, conn, version_id, files):
         spec = schemas()["shp"]

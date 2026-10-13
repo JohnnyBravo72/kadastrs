@@ -12,6 +12,7 @@ All commands are for **PowerShell**, run from the repo root (`C:\Users\PC\Downlo
 | `migrate-test` | creates and migrates the `kadastrs_test` database used by the ETL tests (profile `test`) | — |
 | `etl` | imports from data.gov.lv (profile `etl`); raw files of live versions in volume `kadastrs_etl_raw` | — |
 | `check` | check engine CLI: `run`, `show`, `replay`, `compare`, `batch`, `report` (profile `check`) | — |
+| `martin` | optional Martin vector tiles for live cadastre (profile `tiles`, Phase 9 / D12) | `http://127.0.0.1:3000` |
 
 ## One-time setup
 
@@ -105,7 +106,21 @@ All imports run in the `etl` container (CLAUDE.md rule 12), never with the host 
 docker compose run --rm etl import all
 docker compose run --rm etl import varis_addresses cadastre_text   # some sources only
 docker compose run --rm etl status                                 # live version and last run per source
+# Phase 9: whole-country import (large; default stays pilot)
+$env:KADASTRS_IMPORT_SCOPE = "country"
+docker compose run --rm etl import all
+# Phase 10: scheduled refresh + optional webhook alert on failure
+$env:KADASTRS_ALERT_WEBHOOK = "https://example.invalid/hooks/kadastrs"   # optional
+docker compose run --rm etl refresh
 ```
+
+**Import scope** (`config/etl.yaml` `import_scope`, override `KADASTRS_IMPORT_SCOPE`): `pilot` (default, three cities) or `country` (every ATVK cadastre SHP from CKAN; VARIS/BIS/flood/zoning/text unfiltered). Frozen encumbrances still use the Latgale/Rīga/Zemgale files listed in `sources.yaml` until other regional resource ids are verified.
+
+**Vector tiles (Phase 9):** `docker compose --profile tiles up -d martin` — MVT for live parcels/buildings at `http://127.0.0.1:3000/`. The results map stays on Leaflet + run GeoJSON (D12).
+
+**Auth (Phase 10):** set `KADASTRS_AUTH_TOKEN` for the `api` service; clients send `Authorization: Bearer <token>`. `/health` stays open. Required before any shared hosting (D3).
+
+**Reports:** Excel `GET /api/runs/{id}/report.xlsx`; HTML `…/report.html` (print to PDF); compact PDF `…/report.pdf`.
 
 - The import also loads `config/sources.yaml` into the registry, so a separate `etl.sources load` is not needed.
 - Each run writes one `import_log` row per source. New data creates a new `dataset_version`, which becomes `live` in the same transaction as its load; the previous version becomes `superseded`. If nothing changed, the run is `unchanged` and no version is created.

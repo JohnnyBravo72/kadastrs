@@ -86,7 +86,7 @@ def test_varis_addresses(run, server, q):
     ]
     his = q("SELECT code, code_his FROM ref.address_history_current ORDER BY row_no")
     assert his == [("101000001", None), ("101000099", "101000002")]  # linked either way
-    counts = out.row_counts["address"]["source_pilot_by_status"]
+    counts = out.row_counts["address"]["source_by_status"]
     assert counts == {"EKS": 2, "DEL": 1, "ERR": 1}
 
 

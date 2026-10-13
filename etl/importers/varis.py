@@ -1,9 +1,10 @@
-"""varis_addresses: building and parcel addresses of the pilot cities (EKS and
-DEL; ERR is never imported, CLAUDE.md rule 11) with their earlier texts.
+"""varis_addresses: building and parcel addresses (EKS and DEL; ERR is never
+imported, CLAUDE.md rule 11) with their earlier texts.
 
 Pilot filter (docs/data-sources.md §5.1): an address belongs to a pilot city
-when its VKUR_CD is the city or a street of the city. Coordinates: KOORD_X is
-the northing and KOORD_Y the easting (EPSG:10306).
+when its VKUR_CD is the city or a street of the city. Country (Phase 9): every
+city in aw_pilseta with status EKS. Coordinates: KOORD_X is the northing and
+KOORD_Y the easting (EPSG:10306).
 """
 
 import re
@@ -82,16 +83,22 @@ class VarisAddresses:
     def load(self, ctx, conn, version_id, files):
         self.check_schema(ctx)
         w = ctx.workdir
-        pilot = set(ctx.cfg.pilot_atvk)
+        scope = set(ctx.cfg.scope_atvk()) if ctx.cfg.is_pilot else None
 
         cities = {}
         for row in iter_csv(w / "aw_pilseta.csv"):
-            if row["ATRIB"] in pilot:
-                if row["STATUSS"] != "EKS":
-                    raise ValueError(f"pilot city {row['ATRIB']} has status {row['STATUSS']}")
-                cities[_code(row["KODS"], "aw_pilseta")] = row["ATRIB"]
-        if sorted(cities.values()) != sorted(pilot):
+            atvk = row["ATRIB"]
+            if scope is not None and atvk not in scope:
+                continue
+            if row["STATUSS"] != "EKS":
+                if scope is not None:
+                    raise ValueError(f"pilot city {atvk} has status {row['STATUSS']}")
+                continue  # country: only current cities
+            cities[_code(row["KODS"], "aw_pilseta")] = atvk
+        if scope is not None and sorted(cities.values()) != sorted(scope):
             raise ValueError(f"pilot cities found in aw_pilseta: {sorted(cities.values())}")
+        if not cities:
+            raise ValueError("no cities found in aw_pilseta for the import scope")
 
         street_city = {}
         for row in iter_csv(w / "aw_iela.csv"):
@@ -99,7 +106,7 @@ class VarisAddresses:
                 street_city[_code(row["KODS"], "aw_iela")] = row["VKUR_CD"]
 
         by_status: Counter = Counter()
-        pilot_codes: set[str] = set()
+        scoped_codes: set[str] = set()
 
         def addresses():
             for row in iter_csv(w / "aw_eka.csv"):
@@ -112,7 +119,7 @@ class VarisAddresses:
                 if status not in ("EKS", "DEL"):
                     continue  # ERR is never imported
                 code = _code(row["KODS"], "aw_eka")
-                pilot_codes.add(code)
+                scoped_codes.add(code)
                 geom = None
                 if row["KOORD_X"] or row["KOORD_Y"]:
                     north, east = row["KOORD_X"], row["KOORD_Y"]
@@ -144,7 +151,7 @@ class VarisAddresses:
         loaded = copy_rows(conn, "ref.address", ADDRESS_COLUMNS, addresses())
         expected = by_status["EKS"] + by_status["DEL"]
         if loaded != expected:
-            raise ValueError(f"address: {expected} EKS+DEL rows in the pilot but {loaded} loaded")
+            raise ValueError(f"address: {expected} EKS+DEL rows in scope but {loaded} loaded")
 
         his_total = 0
 
@@ -153,7 +160,7 @@ class VarisAddresses:
             for row_no, row in enumerate(iter_csv(w / "aw_eka_his.csv"), start=1):
                 his_total += 1
                 code, his = row["KODS"], row["KODS_HIS"] or None
-                if code not in pilot_codes and his not in pilot_codes:
+                if code not in scoped_codes and his not in scoped_codes:
                     continue
                 yield (
                     version_id,
@@ -173,10 +180,11 @@ class VarisAddresses:
         his_loaded = copy_rows(conn, "ref.address_history", HISTORY_COLUMNS, history())
         return {
             "address": {
-                "source_pilot_by_status": dict(by_status),
+                "source_by_status": dict(by_status),
                 "loaded": loaded,
-                "pilot_cities": len(cities),
-                "pilot_streets": len(street_city),
+                "cities": len(cities),
+                "streets": len(street_city),
+                "import_scope": ctx.cfg.import_scope,
             },
             "address_history": {"source_rows": his_total, "loaded": his_loaded},
         }

@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from pydantic import BaseModel
 
+from api.auth import BearerAuthMiddleware
 from api.batch import router as batch_router
 from api.db import create_pool
 from api.map import router as map_router
@@ -57,6 +58,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Kadastra pārbaude", version="0.1.0", lifespan=lifespan)
+app.add_middleware(BearerAuthMiddleware)
 app.include_router(resolve_router)
 app.include_router(runs_router)
 app.include_router(map_router)

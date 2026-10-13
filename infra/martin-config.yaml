@@ -1,0 +1,24 @@
+# Martin vector-tile server (Phase 9). Started by compose profile `tiles`.
+# Keep credentials in sync with infra/docker-compose.yml defaults.
+
+listen_addresses: "0.0.0.0:3000"
+worker_processes: 4
+keep_alive: 75
+
+postgres:
+  connection_string: "postgresql://kadastrs:kadastrs-dev@db:5432/kadastrs"
+  default_srid: 10306
+  auto_bounds: calc
+  tables:
+    kk_parcel_live:
+      schema: ref
+      table: kk_parcel_live
+      srid: 10306
+      geometry_column: geom
+      id_column: code
+    kk_building_live:
+      schema: ref
+      table: kk_building_live
+      srid: 10306
+      geometry_column: geom
+      id_column: code

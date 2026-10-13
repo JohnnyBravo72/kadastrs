@@ -1,11 +1,12 @@
-"""bis_cases: BIS construction cases of the pilot cities (docs/data-sources.md §7.1).
+"""bis_cases: BIS construction cases (docs/data-sources.md §7.1).
 
 Raw CSVs only, never the CKAN DataStore (truncated at 48,000 rows, designations
 typed as numbers). Pilot scope: a case object whose ATVK (zero-padded to 7) is a
 pilot city or whose designation starts with the city's cadastral territory code;
-the cases are those of the pilot objects. Version identity: SHA-256 of the
-canonical pilot rows (FileRecord.pilot_sha256), so a change elsewhere in Latvia
-creates no version. Links to the cadastre: ref.bis_links (migration 20261010120000).
+the cases are those of the pilot objects. Country (Phase 9): every case object.
+Version identity: SHA-256 of the canonical scoped rows (FileRecord.pilot_sha256),
+so in pilot mode a change elsewhere in Latvia creates no version. Links to the
+cadastre: ref.bis_links (migration 20261010120000).
 """
 
 import hashlib
@@ -103,15 +104,26 @@ class PilotObject:
     flags: list[str]
 
 
-def pilot_objects(path, pilot_atvk: set[str], territories: set[str]):
-    """Yield PilotObject for every pilot row of the case-objects CSV (row_no from 1)."""
+def pilot_objects(path, pilot_atvk: set[str] | None, territories: set[str] | None):
+    """Yield PilotObject for every in-scope row of the case-objects CSV (row_no from 1).
+
+    When pilot_atvk/territories are None (country scope), every row is kept.
+    """
     for row_no, row in enumerate(iter_csv(path), start=1):
         atvk, aflags = pad_atvk(row["Administrativas_teritorijas_kods"])
         des, building_code, dflags = designation(row["Buves_kadastra_apzimejums"])
+        if pilot_atvk is None and territories is None:
+            yield PilotObject(row_no, row, atvk, des, building_code, ["country"], aflags + dflags)
+            continue
         scope = []
-        if atvk in pilot_atvk:
+        if atvk in (pilot_atvk or ()):
             scope.append("atvk")
-        if des and des[:4] in territories and INVALID_DESIGNATION not in dflags:
+        if (
+            des
+            and territories is not None
+            and des[:4] in territories
+            and INVALID_DESIGNATION not in dflags
+        ):
             scope.append("designation_prefix")
         if scope:
             yield PilotObject(row_no, row, atvk, des, building_code, scope, aflags + dflags)
@@ -156,7 +168,9 @@ class BisCases:
     source_id = "bis_cases"
 
     def _scope(self, ctx):
-        return set(ctx.cfg.pilot_atvk), set(ctx.cfg.pilot_cadastral_territory.values())
+        if ctx.cfg.is_pilot:
+            return set(ctx.cfg.pilot_atvk), set(ctx.cfg.pilot_cadastral_territory.values())
+        return None, None
 
     def check_schema(self, ctx):
         for role, name in FILES.items():
@@ -252,11 +266,16 @@ class BisCases:
         duplicates = sum(n - 1 for n in seen_rows.values() if n > 1)
         ctx.processing = [
             {
-                "id": "pilot_scope",
-                "what": "Case objects whose ATVK is a pilot city or whose designation starts with "
-                "the city's cadastral territory code; the cases of those objects",
-                "pilot_objects": loaded_objects,
-                "pilot_cases": len(cases),
+                "id": "import_scope",
+                "what": (
+                    "Case objects whose ATVK is a pilot city or whose designation starts with "
+                    "the city's cadastral territory code; the cases of those objects"
+                    if ctx.cfg.is_pilot
+                    else "Every case object in the national BIS files (import_scope=country)"
+                ),
+                "import_scope": ctx.cfg.import_scope,
+                "scoped_objects": loaded_objects,
+                "scoped_cases": len(cases),
                 "cases_missing_from_case_list": missing,
             },
             {
@@ -272,12 +291,12 @@ class BisCases:
             },
         ]
         if missing:
-            ctx.notes.append(f"{missing} pilot cases are not in the case list")
+            ctx.notes.append(f"{missing} scoped cases are not in the case list")
         return {
             "bis_object": {"loaded": loaded_objects, "flags": dict(flag_counts)},
             "bis_case": {
                 "source_rows": source_cases,
-                "pilot_cases": len(cases),
+                "scoped_cases": len(cases),
                 "loaded": loaded_cases,
             },
         }

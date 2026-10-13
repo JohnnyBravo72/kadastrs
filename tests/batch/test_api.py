@@ -58,6 +58,23 @@ def test_bad_input_is_refused_with_a_reason(client):
 
 def test_unknown_run_report_is_404(client):
     assert client.get("/api/runs/999999/report.xlsx").status_code == 404
+    assert client.get("/api/runs/999999/report.html").status_code == 404
+    assert client.get("/api/runs/999999/report.pdf").status_code == 404
+
+
+def test_html_and_pdf_reports(client):
+    r = client.post("/api/batch", data={"text": "09000050400"})
+    assert r.status_code == 201, r.text
+    run_id = r.json()["id"]
+    html = client.get(f"/api/runs/{run_id}/report.html")
+    assert html.status_code == 200
+    assert "text/html" in html.headers["content-type"]
+    assert "Kadastra pārbaude" in html.text
+    assert "Informatīvs pārskats" in html.text
+    pdf = client.get(f"/api/runs/{run_id}/report.pdf")
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF")
 
 
 def test_input_page_and_template(client):
