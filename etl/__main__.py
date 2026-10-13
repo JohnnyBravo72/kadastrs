@@ -4,13 +4,17 @@ docker compose run --rm etl import all
 docker compose run --rm etl import cadastre_text varis_addresses
 docker compose run --rm etl status
 docker compose run --rm etl bis-links      # distinct BIS cases by best cadastre match
+docker compose run --rm etl refresh        # Phase 10: import all + alert on failure
 """
 
 import argparse
 import json
+import os
+import socket
 import sys
 from functools import partial
 
+import httpx
 import psycopg
 
 from etl import freshness
@@ -31,6 +35,7 @@ def cmd_import(names: list[str]) -> int:
     cfg, registry = etl_config(), load_config()
     conn_factory = partial(psycopg.connect, database_url())
     failed = 0
+    failed_names: list[str] = []
     with http_client() as client:
         for name in names:
             print(f"== {name}", flush=True)
@@ -45,8 +50,44 @@ def cmd_import(names: list[str]) -> int:
             print(f"   {out.status}  version={out.version_id}  {out.message}")
             if out.row_counts:
                 print("   " + json.dumps(out.row_counts, ensure_ascii=False, default=str))
-            failed += out.status == "failed"
+            if out.status == "failed":
+                failed += 1
+                failed_names.append(name)
+    # Stash for refresh alert (same process).
+    cmd_import.last_failed = failed_names  # type: ignore[attr-defined]
     return 1 if failed else 0
+
+
+def _post_alert(failed: list[str], message: str) -> None:
+    url = (os.environ.get("KADASTRS_ALERT_WEBHOOK") or "").strip()
+    if not url:
+        print("KADASTRS_ALERT_WEBHOOK unset; alert not sent", file=sys.stderr)
+        return
+    body = {
+        "event": "etl_import_failed",
+        "failed": failed,
+        "message": message,
+        "host": socket.gethostname(),
+        "import_scope": os.environ.get("KADASTRS_IMPORT_SCOPE") or etl_config().import_scope,
+    }
+    with httpx.Client(timeout=30.0) as client:
+        resp = client.post(url, json=body)
+        resp.raise_for_status()
+    print(f"alert posted to {url} ({resp.status_code})", file=sys.stderr)
+
+
+def cmd_refresh(names: list[str]) -> int:
+    """Import sources (default: all) and alert the owner when any fail (Phase 10)."""
+    code = cmd_import(names or ["all"])
+    if code == 0:
+        return 0
+    failed = getattr(cmd_import, "last_failed", []) or ["(unknown)"]
+    msg = f"etl refresh failed: {', '.join(failed)}"
+    try:
+        _post_alert(failed, msg)
+    except Exception as exc:
+        print(f"alert failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+    return code
 
 
 def cmd_status() -> int:
@@ -128,11 +169,18 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     imp = sub.add_parser("import", help="import sources (or all)")
     imp.add_argument("sources", nargs="+")
+    ref = sub.add_parser(
+        "refresh",
+        help="import sources (default all) and POST KADASTRS_ALERT_WEBHOOK on failure",
+    )
+    ref.add_argument("sources", nargs="*", default=["all"])
     sub.add_parser("status", help="live versions and last import per source")
     sub.add_parser("bis-links", help="distinct BIS cases by best cadastre match (live versions)")
     args = p.parse_args(argv)
     if args.cmd == "import":
         return cmd_import(args.sources)
+    if args.cmd == "refresh":
+        return cmd_refresh(args.sources)
     return cmd_bis_links() if args.cmd == "bis-links" else cmd_status()
 
 

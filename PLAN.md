@@ -468,8 +468,8 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list. **Results view built 2026-10-11**; **module 8 zoning built 2026-10-13** (TAPIS; rules v5 agreed); header tabs/filter bar from Phase 7 | UI criteria pass for the pilot area |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in). **Built 2026-10-12** (entry dialog, import preview, unit selection, Atjaunot and latest-data reruns, project groups, Avoti and Žurnāls); per-user sessions wait for sign-in (Phase 10) | UI criteria pass |
 | 8. Applicant & funding | Modules 7 and 9–14, and 17–18. **8a built 2026-10-12:** modules 9, 14, 17 (rules v3 agreed). **8b built 2026-10-13:** modules 7, 10–13, 18 (D11; rule set v4 agreed; merged with module 8 as rules v6) | Each module verified on the test set |
-| 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history), re-check value of `pirmsregistretas-buves` on whole-country data | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
-| 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, D3 final: shared hosting, sign-in (required before sharing), security review, retention, maintenance, legal wording; deployment behind sign-in | A refresh runs unattended; a failed import alerts the owner |
+| 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history), re-check value of `pirmsregistretas-buves` on whole-country data. **Built 2026-10-13:** `import_scope` pilot\|country, Martin MVT profile, D12 (Leaflet + optional Martin), E8 keep snapshots, skip `pirmsregistretas-buves` | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
+| 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, D3 final: shared hosting, sign-in (required before sharing), security review, retention, maintenance, legal wording; deployment behind sign-in. **Built 2026-10-13:** `etl refresh` + webhook alert, Bearer token (`KADASTRS_AUTH_TOKEN`), HTML/PDF reports, D3 final (local Docker; token before sharing) | A refresh runs unattended; a failed import alerts the owner |
 
 **Pilot area (decided 2026-10-09): the cities of Jelgava (ATVK 0003000), Jūrmala (0004000) and Daugavpils (0002000).** Together they cover all seed examples (§2.4) and have 10-year flood coverage of 15.9%, 10.2% and 8.0% of their area (`docs/data-sources.md` §2a). Samples were inspected for Jelgava; Jūrmala and Daugavpils use the same source formats. Final check against the test set (step 5) later.
 
@@ -494,7 +494,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 |---|---|---|
 | D1 | Agency-hosted resources listed on data.gov.lv count as data.gov.lv? | Phase 0 |
 | D2 | Basemap: **decided** OSM tiles with attribution (2026-10-11) | Phase 6 |
-| D3 | Hosting, sign-in, security review, retention, maintenance, legal status (section 1; interim answers recorded) | Phase 10 |
+| D3 | Hosting, sign-in, security review, retention, maintenance, legal status (section 1): **decided** 2026-10-13 (local Docker; Bearer token before sharing; see `docs/decisions.md`) | Phase 10 |
 | D4 | Risk rules v1, agreed with the team leads: **decided**, v1 agreed 2026-10-11 (revise after the test-set comparison) | Phase 4 |
 | D5 | Ownership module: **decided**, owner type only | Phase 8 |
 | D6 | Sanctions: **decided**, legal entities by reg. no. only (module 17) | Phase 8 |

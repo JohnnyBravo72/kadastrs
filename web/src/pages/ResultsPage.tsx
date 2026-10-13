@@ -280,6 +280,12 @@ function ObjectView({
           <a className="btn primary" href={api.reportUrl(run.id)} download data-testid="excel">
             ⤓ Lejupielādēt Excel
           </a>
+          <a className="btn" href={api.reportHtmlUrl(run.id)} data-testid="html-report">
+            HTML
+          </a>
+          <a className="btn" href={api.reportPdfUrl(run.id)} download data-testid="pdf-report">
+            PDF
+          </a>
         </div>
       </div>
 
@@ -472,6 +478,12 @@ function AllView({
           </button>
           <a className="btn primary" href={api.reportUrl(run.id)} download data-testid="excel">
             ⤓ Lejupielādēt Excel
+          </a>
+          <a className="btn" href={api.reportHtmlUrl(run.id)} data-testid="html-report">
+            HTML
+          </a>
+          <a className="btn" href={api.reportPdfUrl(run.id)} download data-testid="pdf-report">
+            PDF
           </a>
         </div>
       </div>

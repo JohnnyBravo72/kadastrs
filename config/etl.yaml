@@ -4,12 +4,17 @@
 
 ckan_api: "https://data.gov.lv/dati/api/3/action/"
 
+# Import scope (Phase 9): pilot = three cities below; country = whole Latvia
+# (cadastre SHP zips discovered from CKAN; text/VARIS/BIS/flood/zoning unfiltered).
+# Override with env KADASTRS_IMPORT_SCOPE=country for a national load.
+import_scope: pilot          # pilot | country
+
 # Pilot area (PLAN.md §9): Daugavpils, Jelgava, Jūrmala. ATVK codes are text.
 pilot_atvk: ["0002000", "0003000", "0004000"]
 # Cadastral territory code of each pilot city: the first 4 digits of its parcel and
 # building designations (checked on the cadastre text, docs/data-sources.md §7.1).
 # Sources without an ATVK per row (BIS objects, frozen encumbrances) are cut to the
-# pilot by designation prefix.
+# pilot by designation prefix. Ignored when import_scope is country.
 pilot_cadastral_territory: {"0002000": "0500", "0003000": "0900", "0004000": "1300"}
 
 sources:

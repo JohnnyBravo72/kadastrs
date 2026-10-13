@@ -43,6 +43,29 @@ def test_pilot_atvk_are_text():
     assert etl_config().pilot_atvk == ("0002000", "0003000", "0004000")
 
 
+def test_import_scope_defaults_to_pilot(monkeypatch):
+    monkeypatch.delenv("KADASTRS_IMPORT_SCOPE", raising=False)
+    etl_config.cache_clear()
+    cfg = etl_config()
+    assert cfg.import_scope == "pilot"
+    assert cfg.is_pilot
+    assert cfg.scope_atvk() == cfg.pilot_atvk
+    assert cfg.scope_territories() == set(cfg.pilot_cadastral_territory.values())
+    etl_config.cache_clear()
+
+
+def test_import_scope_country_clears_filters(monkeypatch):
+    monkeypatch.setenv("KADASTRS_IMPORT_SCOPE", "country")
+    etl_config.cache_clear()
+    cfg = etl_config()
+    assert cfg.import_scope == "country"
+    assert not cfg.is_pilot
+    assert cfg.scope_atvk() is None
+    assert cfg.scope_territories() is None
+    etl_config.cache_clear()
+    monkeypatch.delenv("KADASTRS_IMPORT_SCOPE", raising=False)
+
+
 def test_required_xml_paths_are_expected():
     for role, required in REQUIRED.items():
         assert set(required) <= set(schemas()["xml"][role]["paths"]), role

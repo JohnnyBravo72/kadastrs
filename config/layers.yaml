@@ -1,0 +1,31 @@
+# Map layers for vector tiles (Phase 9). Martin serves these from the live
+# PostGIS tables. The UI stays on Leaflet + GeoJSON for run-scoped layers;
+# Martin is for whole-country reference browsing (D12).
+
+martin:
+  # listen inside the compose network; host port 127.0.0.1:3000
+  listen_addresses: "0.0.0.0:3000"
+  worker_processes: 4
+  # Each table is published as /{table_id}/{z}/{x}/{y}
+  tables:
+    kk_parcel:
+      schema: ref
+      table: kk_parcel
+      srid: 10306
+      geometry_column: geom
+      id_column: code
+      # Filter to the live cadastre_spatial version in SQL view (see migration).
+      # Martin points at the view below after migrate.
+    kk_building:
+      schema: ref
+      table: kk_building
+      srid: 10306
+      geometry_column: geom
+      id_column: code
+
+# Decision D12: keep Leaflet for the results map; Martin MVT is optional
+# reference underlay. MapLibre only if Leaflet + MVT proves too slow.
+ui:
+  basemap: osm
+  vector_tiles: martin
+  results_map: leaflet

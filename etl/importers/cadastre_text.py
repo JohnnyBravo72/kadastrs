@@ -1,7 +1,8 @@
-"""cadastre_text: pilot members of the national cadastre XML zips.
+"""cadastre_text: scoped members of the national cadastre XML zips.
 
-Only the pilot cities' members are fetched, by HTTP Range (full download if
-the server ignores Range). Version identity: docs/data-sources.md §5.4.
+Pilot: only the pilot cities' members. Country (Phase 9): every ATVK member.
+Fetched by HTTP Range (full download if the server ignores Range). Version
+identity: docs/data-sources.md §5.4.
 """
 
 import json
@@ -58,11 +59,14 @@ OBJECT_KIND_LENGTH = {
 }
 
 
-def pilot_members(members, pilot: set[str]):
+def pilot_members(members, pilot: set[str] | None):
+    """Members whose path ATVK is in `pilot`, or every ATVK member when pilot is None."""
     out = []
     for m in members:
         hit = _MEMBER.match(m.name)
-        if hit and hit["atvk"] in pilot:
+        if not hit:
+            continue
+        if pilot is None or hit["atvk"] in pilot:
             out.append((hit["atvk"], m))
     return out
 
@@ -105,10 +109,11 @@ def iter_file_items(path: Path, role: str, seen_paths: set[str], root_children: 
 
 
 def fetch_pilot_members(ctx, roles) -> list[FileRecord]:
-    """Fetch the pilot members of national cadastre text zips by HTTP Range (whole
+    """Fetch scoped members of national cadastre text zips by HTTP Range (whole
     zip if Range is ignored). Raises RemoteUnchanged when the zips' remote
     fingerprints equal the live version's (docs/data-sources.md §5.4)."""
-    pilot = set(ctx.cfg.pilot_atvk)
+    # None = country (every ATVK member); set = pilot cities only.
+    scope = set(ctx.cfg.scope_atvk()) if ctx.cfg.is_pilot else None
     zips, records = {}, []
     for role in roles:
         res = ctx.resources[role]
@@ -133,10 +138,13 @@ def fetch_pilot_members(ctx, roles) -> list[FileRecord]:
 
     for rec in records:
         rz = zips[rec.role]
-        found = pilot_members(rz.members, pilot)
-        missing = pilot - {a for a, _ in found}
-        if missing:
-            raise ValueError(f"{rec.role}.zip has no member for ATVK {sorted(missing)}")
+        found = pilot_members(rz.members, scope)
+        if scope is not None:
+            missing = scope - {a for a, _ in found}
+            if missing:
+                raise ValueError(f"{rec.role}.zip has no member for ATVK {sorted(missing)}")
+        elif not found:
+            raise ValueError(f"{rec.role}.zip has no ATVK members")
         for _atvk, m in sorted(found, key=lambda x: x[1].name):
             rel = f"{rec.role}/{Path(m.name).name}"
             sha = rz.extract(m, ctx.workdir / rel)

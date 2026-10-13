@@ -49,6 +49,8 @@ services:
     image: kadastrs-api:dev
     environment:
       DATABASE_URL: *db-url
+      # Phase 10: when set, API requires Authorization: Bearer <token> (except /health).
+      KADASTRS_AUTH_TOKEN: ${KADASTRS_AUTH_TOKEN:-}
     volumes:
       # Live config: edits to config/*.yaml apply without rebuilding the image.
       - ../config:/app/config:ro
@@ -63,6 +65,24 @@ services:
       timeout: 6s
       retries: 12
       start_period: 5s
+
+  # --- tiles profile: Martin vector tiles for whole-country reference (Phase 9) ---
+  #   docker compose --profile tiles up -d martin
+  # Serves live cadastre parcel/building MVT at http://127.0.0.1:3000/
+  # (views ref.kk_parcel_live / ref.kk_building_live). Optional underlay; the
+  # results map stays on Leaflet + run-scoped GeoJSON (D12).
+
+  martin:
+    profiles: [tiles]
+    image: ghcr.io/maplibre/martin:v0.17.0
+    command: ["--config", "/config/martin-config.yaml"]
+    volumes:
+      - ./martin-config.yaml:/config/martin-config.yaml:ro
+    ports:
+      - "127.0.0.1:${KADASTRS_MARTIN_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   # --- lint profile: pre-commit hooks in Linux (CLAUDE.md rule 12) ---------------
 
@@ -94,6 +114,10 @@ services:
     environment:
       DATABASE_URL: *db-url
       KADASTRS_RAW_DIR: /data/raw
+      # Phase 9: pilot (default) or country. Override: KADASTRS_IMPORT_SCOPE=country
+      KADASTRS_IMPORT_SCOPE: ${KADASTRS_IMPORT_SCOPE:-}
+      # Phase 10: optional webhook URL posted when an import fails (JSON body).
+      KADASTRS_ALERT_WEBHOOK: ${KADASTRS_ALERT_WEBHOOK:-}
     volumes:
       - ..:/src:ro
       - etl_raw:/data/raw

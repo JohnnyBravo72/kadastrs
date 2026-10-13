@@ -106,10 +106,18 @@ def run_import(
     source = next((s for s in registry.sources if s.id == sid), None)
     if source is None or source.datagov is None:
         raise LookupError(f"{sid} is not a data.gov.lv source in config/sources.yaml")
-    roles = cfg.files[sid]
-    unlisted = set(roles.values()) - set(source.datagov.resource_ids)
-    if unlisted:
-        raise LookupError(f"{sid}: resources {unlisted} are not listed in config/sources.yaml")
+    ckan = Ckan(client, cfg.ckan_api)
+    datasets = source.datagov.dataset_ids
+    dataset = datasets[0]
+    # Phase 9: country scope may discover every ATVK SHP from CKAN (cadastre_spatial).
+    discover = getattr(importer, "country_roles", None)
+    if cfg.import_scope == "country" and callable(discover):
+        roles = discover(ckan, dataset)
+    else:
+        roles = cfg.files[sid]
+        unlisted = set(roles.values()) - set(source.datagov.resource_ids)
+        if unlisted:
+            raise LookupError(f"{sid}: resources {unlisted} are not listed in config/sources.yaml")
 
     with conn_factory() as c:
         sync_registry(c, registry)  # FK target and current metadata
@@ -122,9 +130,6 @@ def run_import(
     workdir = raw_root / sid / f".incoming-{log_id}"
     ctx: Context | None = None
     try:
-        ckan = Ckan(client, cfg.ckan_api)
-        datasets = source.datagov.dataset_ids
-        dataset = datasets[0]
         resources = {role: ckan.find_resource(datasets, rid) for role, rid in roles.items()}
         with conn_factory() as c:
             live = c.execute(

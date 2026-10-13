@@ -6,7 +6,8 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 |---|---|---|---|---|---|
 | D1 | Agency-hosted resources listed on data.gov.lv count as data.gov.lv? | Phase 0 | **decided** | Yes, see [D1](#d1-agency-hosted-resources) | Janis, 2026-10-09 |
 | D2 | Basemap: OSM or plain | Phase 6 | **decided** | OpenStreetMap tiles with attribution, see [D2](#d2-basemap-openstreetmap-tiles) | Janis, 2026-10-11 |
-| D3 | Hosting, sign-in, security review, retention, maintenance, legal status (PLAN.md §1) | **Phase 10** | open (**interim answers in force**) | Interim (2026-10-09): local Docker on Janis's PC for Phases 1–9; no sign-in, local only (sign-in required before any shared hosting); security review before shared hosting; keep all runs; maintenance Janis; footer "Informatīvs pārskats, balstīts uz atvērtajiem datiem; nav oficiāls reģistra izraksts". Revisit in Phase 10 | Janis, 2026-10-09 (interim) |
+| D3 | Hosting, sign-in, security review, retention, maintenance, legal status (PLAN.md §1) | **Phase 10** | **decided** (final) | See [D3](#d3-hosting-sign-in-retention-phase-10) | Janis, 2026-10-13 |
+| D12 | Whole-country map: Leaflet vs MapLibre; Martin vector tiles | Phase 9 | **decided** | Keep Leaflet + run-scoped GeoJSON for results; optional Martin MVT underlay for live cadastre reference. MapLibre only if Leaflet + MVT proves too slow. See [D12](#d12-vector-tiles-and-map-stack) | Janis, 2026-10-13 |
 | D4 | Risk rules, agreed with the team leads | Phase 4 | **decided** (v6 agreed) | v1 agreed by Janis Bardavskis 2026-10-11, to be revised after the test-set comparison. **v2 agreed 2026-10-12:** encumbrance codes 8317010100, 8317020100, 8317030100 (areas assessed for the cadastral value, about 54,000 pilot parcels) are `not_findings`: listed apart as "Tehniskie apgrūtinājumi", never a finding (an object with only these: clear, risk none instead of low). `config/rules.yaml` `version: "2"`, `status: agreed`; runs keep the rule set they were made with (v1 runs replay unchanged) **v3 agreed by Janis Bardavskis 2026-10-13:** rules for modules 9, 14 and 17 (Phase 8a); an open legal protection proceeding (court or out-of-court TAP) is high, "pārbaudīt atbilstību grūtībās nonākuša uzņēmuma kritērijiem"; sanctions_linked_entity kept (entity rows only); thresholds 183 days, 10 companies, 300 m². **v4 agreed by Janis Bardavskis 2026-10-13 (Phase 8b):** modules 7, 10–13, 18 — ownership informational (none); VID A/B/C/J/N → none/low/high/medium/medium; de minimis ceilings and 80%/100% shares; EU ongoing on object high, finished medium, applicant projects low; EIS context low; FID frozen RE high. **v5 agreed by Janis Bardavskis 2026-10-13 (module 8 zoning):** TAPIS `grupa_kods` — industrial/technical medium; transport/public/mixed low; residential and open-space none; unmapped unknown. **v6 agreed 2026-10-13:** combines v4 and v5; `config/rules.yaml` `version: "6"`, `status: agreed` | Janis Bardavskis, 2026-10-11 / 2026-10-12 / 2026-10-13 |
 | D5 | Ownership module | Phase 8 | **decided** | Built, with owner **type** only (`PersonStatus`); no names. See [Policy](#policy-open-data-only) | Janis, 2026-10-09 |
 | D6 | Sanctions module | Phase 8 | **decided** | Built for **legal entities by reg. no. only** (UR `sanctions`); natural-person fields never imported. See [Policy](#policy-open-data-only) | Janis, 2026-10-09 |
@@ -14,7 +15,7 @@ Decisions from PLAN.md §10. When a decision is settled, fill in the outcome, th
 | D8 | Project number format (free text for now) | Phase 7 | **decided** | Free text, 1–100 characters, as typed (a code, never a number); group names unique per run ignoring case; "Bez projekta" reserved | Janis, 2026-10-12 |
 | D9 | Storage and analysis CRS | Phase 1 | **decided** | EPSG:10306 (LKS-2020 / Latvia TM), see [D9](#d9-storage-and-analysis-crs) | Janis, 2026-10-09 |
 | D10 | Applicant data from UR and FID: which files, rows and fields | Phase 8 | **decided** (option B pending) | Legal-entity rows and fields only; option A for sanctions; see [D10](#d10-applicant-data-ur-fid) | Janis, 2026-10-12 |
-| D11 | Phase 8b data: VID rating, de minimis, EU projects, EIS procurement, FID frozen real estate | Phase 8 | **decided** (natural-person EU projects: DPO check before Phase 10) | Legal-entity rows and fields only; natural-person EU projects without any person field; see [D11](#d11-phase-8b-data-vid-de-minimis-eu-projects-eis-fid-real-estate) | Janis, 2026-10-13 |
+| D11 | Phase 8b data: VID rating, de minimis, EU projects, EIS procurement, FID frozen real estate | Phase 8 | **decided** (natural-person EU projects: DPO before shared hosting) | Legal-entity rows and fields only; natural-person EU projects without any person field; DPO gate retained under D3 before shared hosting; see [D11](#d11-phase-8b-data-vid-de-minimis-eu-projects-eis-fid-real-estate) | Janis, 2026-10-13 |
 
 ## Policy: open data only
 
@@ -197,3 +198,35 @@ Sources:
 ## Incident 2026-10-12: personal data printed during data discovery
 
 While checking the FID file "Sankciju subjekti" for Phase 8a, an inspection script printed what it took for header rows; they were the first three data rows, with the names of sanctioned natural persons and one birth date from the **public** FID list. The values appeared only in the developer session's output: nothing was stored in the database, the repository or any report, and the downloaded samples were deleted the same day. Rule added to CLAUDE.md (rule 13): during data discovery, print only counts, column names and pattern checks, never values from columns that may hold personal data.
+
+## D3: hosting, sign-in, retention (Phase 10)
+
+**Decided 2026-10-13 (Janis).** Final answers replacing the 2026-10-09 interim row in PLAN.md §1:
+
+| Topic | Decision |
+|---|---|
+| Hosting | **Local Docker on the operator's PC** remains the supported deployment. Shared hosting is optional later; it must not be opened without the auth token below and a security review. |
+| Sign-in | **Bearer token** via env `KADASTRS_AUTH_TOKEN` (API middleware). Empty/unset = open API for local use. When set, every route except `GET /health` requires `Authorization: Bearer <token>`. Full per-user accounts (Žurnāls per user) wait for a real identity provider if the tool is ever shared. |
+| Security review | Required before any shared hosting or exposing ports beyond `127.0.0.1`. |
+| Retention | **Keep all runs** (no deletion). Test origins (`test`, `e2e`) stay hidden in Žurnāls by default. |
+| Maintenance | Operator (Janis); scheduled refresh via `etl refresh` / the weekly GitHub Actions pilot-import workflow; failures alert through `KADASTRS_ALERT_WEBHOOK` when configured. |
+| Legal status of output | Footer unchanged: **"Informatīvs pārskats, balstīts uz atvērtajiem datiem; nav oficiāls reģistra izraksts"** (Excel, HTML, PDF). |
+| Reports | Excel remains the full report. Phase 10 adds print-ready **HTML** (`/api/runs/{id}/report.html`) and a compact **PDF** summary (`…/report.pdf`). Prefer HTML → Print → PDF for Latvian diacritics. |
+| OSM basemap | Still OK for local use; before shared hosting switch to own tiles or a provider with suitable terms (D2). |
+| D11 natural-person EU projects | Stay imported without person fields for double-funding control; **do not enable shared hosting until the DPO confirms** that cadastre-number-only rows are acceptable. |
+
+## D12: vector tiles and map stack (Phase 9)
+
+**Decided 2026-10-13 (Janis).**
+- Results map stays **Leaflet** with run-scoped GeoJSON from the API (pinned versions).
+- **Martin** (compose profile `tiles`, `infra/martin-config.yaml`) serves optional MVT for live `ref.kk_parcel_live` / `ref.kk_building_live` (country browsing). Not required for checks.
+- **MapLibre** is not adopted unless Leaflet + MVT is too slow in practice.
+- Config mirror: `config/layers.yaml`.
+
+## E8 / storage review (Phase 9)
+
+**Decided 2026-10-13 (Janis).** Keep **full `dataset_version` snapshots** (live version's raw files only on disk). Per-object history (CSBLatvia style) is not built: snapshots stay simpler and replay/report identity already depends on pinned versions. Indexes and live views added in migration `20261013190000_phase9_performance.sql`.
+
+## `pirmsregistretas-buves` (Phase 9 re-check)
+
+**Decided 2026-10-13 (Janis).** Still **not an MVP source**. Pilot evidence (Jelgava: parcel already in cadastre text for all pre-registered buildings without geometry; national leading-zero loss) stands; whole-country value does not justify a new importer. Remains a documented secondary cross-check outside the product.

@@ -99,8 +99,8 @@ def test_bis_import_pilot_rows_codes_and_flags(run, server, q):
     by_id = {p["id"]: p for p in processing}
     assert by_id["duplicate_rows"]["duplicate_rows"] == 1
     assert by_id["codes"]["room_group_cut"] == 1
-    assert by_id["pilot_scope"]["pilot_cases"] == 6
-    assert by_id["pilot_scope"]["cases_missing_from_case_list"] == 0
+    assert by_id["import_scope"]["scoped_cases"] == 6
+    assert by_id["import_scope"]["cases_missing_from_case_list"] == 0
 
 
 def test_bis_links_and_match_types(run, server, q):
