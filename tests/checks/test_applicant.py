@@ -35,7 +35,11 @@ def applicant_run(engine_db):
 def test_each_applicant_checked_once(conn, applicant_run):
     rows = [r for r in runner.stored(conn, applicant_run) if r.scope == "applicant"]
     keys = [(r.unit_code, r.result.module) for r in rows]
-    assert len(keys) == len(set(keys)) == (len(APPLICANTS) + 1) * 2
+    # Phase 8b adds applicant modules 10–13; count = applicants × applicant modules
+    from engine.checks.modules import APPLICANT
+
+    n_app_modules = len(APPLICANT)
+    assert len(keys) == len(set(keys)) == (len(APPLICANTS) + 1) * n_app_modules
     first = next(r for r in rows if r.unit_code == "40003100001")
     assert first.target_no == 0 and first.unit_type == "applicant"
     assert first.result.scope == "applicant"
@@ -43,7 +47,7 @@ def test_each_applicant_checked_once(conn, applicant_run):
     assert not [
         r
         for r in runner.stored(conn, applicant_run)
-        if r.result.module in ("applicant_company", "sanctions") and r.scope != "applicant"
+        if r.result.module in APPLICANT and r.scope != "applicant"
     ]
 
 

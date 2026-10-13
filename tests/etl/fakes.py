@@ -34,11 +34,25 @@ DATASETS = {
     "ur_insolvency": "maksatnespejas-procesi",
     "ur_sanctions": "sanctions",
     "fid_sanctions": "sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija",
+    "cadastre_ownership": "kadastra-informacijas-sistemas-atvertie-dati",
+    "vid_rating": "nodoklu-maksataju-reitings",
+    "deminimis": "pieskirtais-de-minimis-atbalsts-latvija",
+    "eis_procurement": "iepirkumu-rezultatu-datu-grupa",
+    "fid_frozen_property": "sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija",
 }
 # Sources whose resources sit in several CKAN datasets (config/sources.yaml).
 ROLE_DATASETS = {
     ("bis_cases", "cases"): "bis_jlyakg7hgslonjnwyrwc6w",
     ("bis_cases", "objects"): "bis_tln9s3hrpjlnucmjip9r3g",
+    ("eu_projects", "projects_2127"): "eiropas-savienibas-fondu-21-27-perioda-lidzfinansetie-projekti",
+    ("eu_projects", "locations_2127"): "eiropas-savienibas-fondu-21-27-perioda-lidzfinansetie-projekti",
+    ("eu_projects", "partners_2127"): "eiropas-savienibas-fondu-21-27-perioda-lidzfinansetie-projekti",
+    ("eu_projects", "projects_1420"): "es-lidzfinansetie-projekti",
+    ("eu_projects", "locations_1420"): "es-lidzfinansetie-projekti",
+    ("eu_projects", "partners_1420"): "es-lidzfinansetie-projekti",
+    ("eu_projects", "projects_rrf"): "eiropas-savienibas-atveselosanas-fonda-lidzfinansetie-projekti",
+    ("eu_projects", "locations_rrf"): "eiropas-savienibas-atveselosanas-fonda-lidzfinansetie-projekti",
+    ("eu_projects", "partners_rrf"): "eiropas-savienibas-atveselosanas-fonda-lidzfinansetie-projekti",
 }
 # Licences as on data.gov.lv: VZD data CC-BY-4.0 (FakeServer.licence), these CC0-1.0.
 CC0_DATASETS = (
@@ -55,7 +69,16 @@ CC0_DATASETS = (
     | {ds: "CC0-1.0" for ds in ROLE_DATASETS.values()}
     | {
         DATASETS[s]: "CC0-1.0"
-        for s in ("ur_companies", "ur_insolvency", "ur_sanctions", "fid_sanctions")
+        for s in (
+            "ur_companies",
+            "ur_insolvency",
+            "ur_sanctions",
+            "fid_sanctions",
+            "vid_rating",
+            "deminimis",
+            "eis_procurement",
+            "fid_frozen_property",
+        )
     }
 )
 # D1 E7 service (config/sources.yaml); the fake answers it, no network in tests.

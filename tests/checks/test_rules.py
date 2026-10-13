@@ -28,10 +28,11 @@ def result(module="flood_10y", status="found", items=(), warnings=(), reason=Non
     )
 
 
-def test_rule_set_v3_is_agreed_with_a_reason_per_rule():
+def test_rule_set_v4_draft_covers_phase8b_modules():
     rs = rules_mod.load()
-    # v3 (modules 9, 14, 17) agreed by Janis Bardavskis 2026-10-13 (D4)
-    assert (rs.version, rs.status) == ("3", "agreed")
+    # v4 (Phase 8b modules 7, 10–13, 18) draft 2026-10-13; agree after review (D4)
+    assert (rs.version, rs.status) == ("4", "draft")
+    assert rs.de_minimis is not None and rs.de_minimis.ceilings["2023/2831"] == 300000
     tap = next(r for r in rs.rules if r.id == "applicant_legal_protection_open")
     assert tap.level == "high" and "grūtībās nonākuša uzņēmuma" in tap.text_lv
     nf = rs.not_findings["encumbrances"]
@@ -41,6 +42,16 @@ def test_rule_set_v3_is_agreed_with_a_reason_per_rule():
     assert rs.modules() == set(BY_ID)  # every module has rules
     assert rs.thresholds.inward_buffer_m == 0.5
     assert (rs.thresholds.min_overlap_m2, rs.thresholds.min_overlap_share) == (1.0, 0.001)
+    for mid in (
+        "ownership",
+        "vid_rating",
+        "deminimis",
+        "eu_funding",
+        "eu_funding_applicant",
+        "procurement",
+        "fid_frozen_property",
+    ):
+        assert mid in rs.modules()
 
 
 def test_conditions():

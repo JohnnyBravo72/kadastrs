@@ -3,6 +3,7 @@
 from etl.importers import IMPORTERS
 from etl.importers.cadastre_text import REQUIRED
 from etl.importers.encumbrances import REQUIRED as ENCUMBRANCE_REQUIRED
+from etl.importers.ownership import REQUIRED as OWNERSHIP_REQUIRED
 from etl.settings import etl_config, schemas
 from etl.sources import load_config
 
@@ -36,6 +37,7 @@ def test_required_xml_paths_are_expected():
     for role, required in REQUIRED.items():
         assert set(required) <= set(schemas()["xml"][role]["paths"]), role
     assert set(ENCUMBRANCE_REQUIRED) <= set(schemas()["xml"]["encumbrance"]["paths"])
+    assert set(OWNERSHIP_REQUIRED) <= set(schemas()["xml"]["ownership"]["paths"])
 
 
 def test_pilot_cadastral_territory_per_city():

@@ -85,3 +85,39 @@ sources:
   fid_sanctions:
     files:
       subjects: "00f557d4-3096-4d8f-b0bb-c52f90ad50fb"
+  # --- Phase 8b: ownership, VID, de minimis, EU, EIS, FID frozen RE (D11) ------
+  cadastre_ownership:
+    files:            # national zip; only the pilot members are fetched (HTTP Range)
+      ownership: "a0d801da-8eb0-4426-9087-50e8139bce39"
+  vid_rating:
+    files:
+      rating: "acd4c6f9-5123-46a5-80f6-1f44b4517f58"
+  deminimis:
+    files: {}         # live export via D1 E1 (no usable CKAN last_modified)
+    options:
+      live_export: true
+  eu_projects:
+    files:
+      projects_2127: "80aca232-54ad-4a9e-b1e3-c06623c1020b"
+      locations_2127: "27733f45-ef48-41bf-9a9c-cc818ed9f32f"
+      partners_2127: "5d9b36b2-6ff4-44b7-8bb3-d99d8043a271"
+      projects_1420: "9c2d6bf2-41a4-4a58-a5ba-3a4ad6d7e79f"
+      locations_1420: "35da9d99-7750-4be8-85d9-4aaa920d4583"
+      partners_1420: "12f8a44f-e1a9-4f7e-8a32-7f472ac28de8"
+      projects_rrf: "bfcae357-328c-423f-9835-215e7fd3db4e"
+      locations_rrf: "fec77132-7058-4e28-b4fc-0772454b8041"
+      partners_rrf: "ad29f6bb-4183-4dd3-9b81-eb62c8959c92"
+  eis_procurement:
+    files:
+      y2018: "cecd0be7-c8e0-451a-8314-f1d806db3bc1"
+      y2019: "1d37ba16-4d7b-4c1e-9650-1ee9b6a32666"
+      y2020: "abf811a3-26e8-48c2-bc86-e9b74ca0b385"
+      y2021: "a1342945-ce4b-480b-abb5-b74d43c41534"
+      y2022: "97a7c410-60c0-4d08-b554-4d1abb9092da"
+      y2023: "71f88053-97c1-4928-93c3-8d83d714f27f"
+      y2024: "3a02a1a7-0322-4c0d-9700-8af9832f0f91"
+      y2025: "79b34e1c-8989-4984-816a-8e8f92b701f3"
+      y2026: "c4007411-1ba5-40f3-9b50-f25881c93f51"
+  fid_frozen_property:
+    files:
+      ta_vzd: "f8dd1178-da14-4009-8620-d871f79fb936"

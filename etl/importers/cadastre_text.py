@@ -27,6 +27,7 @@ ITEMS = {
     "building": "BuildingItemData",
     "property": "PropertyItemData",
     "encumbrance": "EncumbranceItemData",  # cadastre_encumbrances (etl/importers/encumbrances.py)
+    "ownership": "OwnershipItemData",  # cadastre_ownership (etl/importers/ownership.py)
 }
 # Elements the importer reads; each must exist in the file (schema check).
 REQUIRED = {

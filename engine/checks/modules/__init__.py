@@ -1,5 +1,5 @@
-"""Check modules (PLAN.md §6.1), in report order: object modules 1-6 and 14,
-applicant modules 9 and 17 (Phase 8a, run once per applicant)."""
+"""Check modules (PLAN.md §6.1), in report order: object modules 1–7, 12, 14, 18;
+applicant modules 9–13 and 17 (Phase 8a/8b, run once per applicant)."""
 
 from engine.checks.modules import (
     address_consistency,
@@ -10,6 +10,7 @@ from engine.checks.modules import (
     encumbrances,
     flood,
     nature,
+    phase8b,
 )
 from engine.checks.modules.base import ModuleSpec
 
@@ -20,8 +21,15 @@ MODULES: list[ModuleSpec] = [
     flood.SPEC,
     bis.SPEC,
     encumbrances.SPEC,
+    phase8b.OWNERSHIP,
     companies_at_address.SPEC,
+    phase8b.EU_OBJECT,
+    phase8b.FID_FROZEN,
     applicant.COMPANY,
+    phase8b.VID,
+    phase8b.DEMINIMIS,
+    phase8b.EU_APPLICANT,
+    phase8b.PROCUREMENT,
     applicant.SANCTIONS,
 ]
 BY_ID = {m.id: m for m in MODULES}

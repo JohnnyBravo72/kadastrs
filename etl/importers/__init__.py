@@ -16,6 +16,14 @@ from etl.importers.nature import (
     NatureMonuments,
     NatureProtectedAreas,
 )
+from etl.importers.ownership import CadastreOwnership
+from etl.importers.phase8b import (
+    Deminimis,
+    EisProcurement,
+    EuProjects,
+    FidFrozenProperty,
+    VidRating,
+)
 from etl.importers.ur import FidSanctions, UrCompanies, UrInsolvency, UrSanctions
 from etl.importers.varis import VarisAddresses
 
@@ -37,4 +45,10 @@ IMPORTERS = {
     "ur_insolvency": UrInsolvency,
     "ur_sanctions": UrSanctions,
     "fid_sanctions": FidSanctions,
+    "cadastre_ownership": CadastreOwnership,
+    "vid_rating": VidRating,
+    "deminimis": Deminimis,
+    "eu_projects": EuProjects,
+    "eis_procurement": EisProcurement,
+    "fid_frozen_property": FidFrozenProperty,
 }
