@@ -85,6 +85,9 @@ def test_layers_in_a_box(client, run):
     kinds = {f["properties"]["kind"] for f in flood["features"]}
     assert kinds == {"flood_10y", "no_flood_map"}  # the box reaches beyond the mask
     assert flood["sources"][0]["dataset_date"] == "2026-10-10"
+    zoning = client.get(f"/api/runs/{run}/layers/zonejums", params={"bbox": wide(box, 0.02)}).json()
+    zkinds = {f["properties"]["kind"] for f in zoning["features"]}
+    assert "zoning" in zkinds and zoning["sources"][0]["id"] == "tapis_zoning"
     big = client.get(f"/api/runs/{run}/layers/daba", params={"bbox": "21,56,24,57.5"})
     assert big.status_code == 413 and "pietuviniet" in big.json()["detail"]
     assert client.get(f"/api/runs/{run}/layers/x", params={"bbox": wide(box)}).status_code == 404

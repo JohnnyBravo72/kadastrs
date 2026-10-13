@@ -293,6 +293,29 @@ sources:
         - "06533bca-0146-4b7d-a4ae-9ca750e28e51"   # 10. zemes vienību daļām Zemgalē
     licence: CC-BY-4.0
 
+  # --- Phase 6 leftover: module 8 zoning (verified 2026-10-13, docs/data-sources.md §3.7) ---
+  - id: tapis_zoning
+    names:
+      lv: "Funkcionālais zonējums (TAPIS)"
+      en: "Functional zoning (TAPIS)"
+    owner: VARAM
+    group: Zonējums
+    order: 55
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    # coverage (en): Territories of municipal plans in force (WFS coverage mask); pilot ATVK
+    coverage_lv: "Spēkā esošo plānojumu teritorijas (TAPIS maska); pilota ATVK"
+    partial_coverage: true
+    processing_lv:
+      - "Importēti funkcionālā zonējuma poligoni un spēkā esošo plānojumu robežas (pārklājuma maska) pilota ATVK."
+      - "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
+    source_stale_after: P180D
+    datagov:
+      dataset_id: teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati
+    external_resources: [E4]
+    licence: CC0-1.0
+
   # --- Phase 8a: applicant (verified 2026-10-12, docs/data-sources.md §3.9, §3.17) ---
   # Personal data (CLAUDE.md rule 5, docs/decisions.md D10): only legal-entity rows
   # and fields; no names of individual merchants (IK, IND); never the officers,
@@ -425,11 +448,32 @@ allowed_external_resources:
   - id: E4
     name: "TAPIS WFS/WMS (via DPPS proxy)"
     url:
-      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_454_4DUoZx/e4ab2161-88bf-4f35-85b8-f1ca8dd5ebb3"
-      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_451_GKJOzb/96f059e4-9ed2-479c-976f-dcbed668972f"
+      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_454_4DUoZx/e4ab2161-88bf-4f35-85b8-f1ca8dd5ebb3"  # WFS
+      - "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/Teritorija_451_GKJOzb/96f059e4-9ed2-479c-976f-dcbed668972f"  # WMS (map images; not imported)
     host: geo-dpps.viss.gov.lv
     datagov_dataset: teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati
     status: allowed
+    access: snapshot       # imported as a versioned snapshot; never queried live
+    # Module 8 layers (verified DescribeFeatureType 2026-10-13, docs/data-sources.md §3.7)
+    wfs_layers:
+      finding: tapis_apvienotie:funkcionalais_zonejums
+      coverage_mask: tapis_apvienotie:speka_esosu_planojumu_teritorijas
+    processing:
+      - id: coverage_mask
+        what: "speka_esosu_planojumu_teritorijas is the coverage mask; outside it module 8 reports not_covered"
+        why: "Zoning vectors exist only where a plan in force is published in TAPIS"
+        effect: "Outside the mask: not_covered, never clear"
+        report_lv: "Ārpus TAPIS spēkā esošo plānojumu teritorijām – zonējuma vektordati šeit nav pieejami."
+      - id: make_valid
+        what: "Invalid geometries repaired with PostGIS ST_MakeValid(method=structure)"
+        why: "WFS polygons can self-intersect"
+        effect: "Area change negligible after make_valid"
+        report_lv: "Nederīgas ģeometrijas labotas automātiski."
+      - id: reproject
+        what: "Transformed EPSG:3059 -> EPSG:10306 with EPSG:10838 (NTv2 grid lv_lgia_lks92to2020.tif)"
+        why: "Storage CRS is LKS-2020 (D9)"
+        effect: "~1 cm accuracy"
+        report_lv: "Pārveidots no LKS-92 uz LKS-2020 (EPSG:10838, ~1 cm precizitāte)."
   - id: E5
     name: "Plūdu WMTS/WMS (map images only)"
     url:

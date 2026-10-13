@@ -93,7 +93,7 @@ def test_every_result_names_pinned_versions(conn, first_run):
 def test_run_records_the_rule_set(conn, first_run):
     s = summary.summarize(conn, first_run)
     assert s["status"] == "done"
-    assert s["rule_set"]["version"] == "3" and s["rule_set"]["status"] == "agreed"
+    assert s["rule_set"]["version"] == "5" and s["rule_set"]["status"] == "draft"
     assert s["rule_set"]["sha256"] == rules_mod.load().sha256
 
 
@@ -201,7 +201,7 @@ def test_api_run_summary_and_results(client):
     r = client.post("/api/runs", json=body)
     assert r.status_code == 201, r.text
     s = r.json()
-    assert s["targets"] == 4 and s["rule_set"]["status"] == "agreed"
+    assert s["targets"] == 4 and s["rule_set"]["status"] == "draft"
     m2 = next(m for m in s["modules_summary"] if m["module"] == "address_consistency")
     # Three targets have no given address: not applicable, not a data gap.
     assert m2["status"]["not_applicable"] == 3 and m2["status"]["no_data"] == 0

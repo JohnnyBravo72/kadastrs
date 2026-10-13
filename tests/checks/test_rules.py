@@ -28,10 +28,10 @@ def result(module="flood_10y", status="found", items=(), warnings=(), reason=Non
     )
 
 
-def test_rule_set_v3_is_agreed_with_a_reason_per_rule():
+def test_rule_set_v5_draft_covers_all_modules():
     rs = rules_mod.load()
-    # v3 (modules 9, 14, 17) agreed by Janis Bardavskis 2026-10-13 (D4)
-    assert (rs.version, rs.status) == ("3", "agreed")
+    # v5 (module 8 zoning) draft 2026-10-13; agree after review (D4)
+    assert (rs.version, rs.status) == ("5", "draft")
     tap = next(r for r in rs.rules if r.id == "applicant_legal_protection_open")
     assert tap.level == "high" and "grūtībās nonākuša uzņēmuma" in tap.text_lv
     nf = rs.not_findings["encumbrances"]

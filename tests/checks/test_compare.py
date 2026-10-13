@@ -94,7 +94,7 @@ def test_compare_filled_template(engine_db, filled, tmp_path):
         report = compare.compare(conn, filled)
     lines = {(line.row_no, line.module): line for line in report.lines}
     assert {line.row_no for line in report.lines} == {4, 5, 6, 7, 8, 9}  # examples skipped
-    assert report.rule_set == "3 (agreed)"
+    assert report.rule_set == "5 (draft)"
 
     flood = lines[(4, "flood_10y")]
     assert (flood.designation, flood.manual, flood.engine, flood.outcome) == (

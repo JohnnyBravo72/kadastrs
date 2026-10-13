@@ -10,7 +10,7 @@ the map shows exactly what the stored results and the Excel report are about.
   engine used (flood parts unioned per layer; nature by the item's global_id
   and version). Their areas equal the stored overlap_m2. Each carries the risk
   of the rule that fired for its item (RuleSet.explain, stored rule set).
-- layer(): Kadastrs, Plūdi, Daba, BIS clipped to a view box, simplified to it.
+- layer(): Kadastrs, Plūdi, Daba, Zonējums, BIS clipped to a view box, simplified to it.
 Output in EPSG:4326 (CLAUDE.md CRS).
 """
 
@@ -37,7 +37,7 @@ RISK_LV = {
     "low": "zems",
     "none": "nav",
 }
-SPATIAL_MODULES = ("flood_10y", "nature", "bis")
+SPATIAL_MODULES = ("flood_10y", "nature", "zoning", "bis")
 
 
 class BoxTooLarge(ValueError):
@@ -268,6 +268,19 @@ def _item_geometry(ctx: RunContext, unit: str, module: str, item: dict, props: d
             if row
             else []
         )  # noqa: E501
+    if module == "zoning":
+        row = c.execute(
+            f"""SELECT {GEOJSON.format(g="geom")}, ST_Area(geom) FROM (
+                    SELECT ST_Multi(ST_CollectionExtract(
+                               ST_Union(ST_Intersection(g.geom, p.geom)), 3)) AS geom
+                    FROM chk_geom g
+                    JOIN ref.zoning_zone_part p ON p.dataset_version_id = %s
+                         AND p.role = 'finding' AND p.object_id = %s
+                         AND ST_Intersects(g.inner_geom, p.geom)
+                    WHERE g.code = %s) x WHERE geom IS NOT NULL""",  # noqa: S608
+            (ctx.v("tapis_zoning"), item.get("object_id"), unit),
+        ).fetchone()
+        return [_feature(row[0], props | {"area_m2": round(row[1], 2)})] if row else []
     if module == "bis":
         out = []
         extra = {
@@ -295,7 +308,7 @@ def _item_geometry(ctx: RunContext, unit: str, module: str, item: dict, props: d
 
 # --- layers ---------------------------------------------------------------------------------
 
-LAYERS = ("kadastrs", "pludi", "daba", "bis")
+LAYERS = ("kadastrs", "pludi", "daba", "zonejums", "bis")
 
 
 def _box(conn, bbox: tuple[float, float, float, float]):
@@ -414,6 +427,51 @@ def layer(conn, run_id: int, name: str, bbox: tuple[float, float, float, float])
                 "zone_type": row[2] if row[1] == "protected_area_zone" else None,
                 "category": row[3],
             },
+        )
+    elif name == "zonejums":
+        sources = [_source(pinned, "tapis_zoning")]
+        zv = v.get("tapis_zoning")
+        take(
+            conn.execute(
+                f"""SELECT {GEOJSON.format(g="g")}, group_code, group_name, zone_code,
+                           zone_index, zone_name FROM (
+                        SELECT z.group_code, z.group_name, z.zone_code, z.zone_index,
+                               z.zone_name,
+                               ST_SimplifyPreserveTopology(
+                                   ST_Union(ST_Intersection(p.geom, {env})), %s) AS g
+                        FROM ref.zoning_zone_part p
+                        JOIN ref.zoning_zone z ON z.dataset_version_id = p.dataset_version_id
+                             AND z.role = p.role AND z.object_id = p.object_id
+                        WHERE p.dataset_version_id = %s AND p.role = 'finding'
+                              AND p.geom && {env}
+                        GROUP BY z.object_id, z.group_code, z.group_name, z.zone_code,
+                                 z.zone_index, z.zone_name) x
+                    WHERE NOT ST_IsEmpty(g)
+                    LIMIT %s""",  # noqa: S608
+                (*box, tol, zv, *box, MAX_FEATURES + 1),
+            ),
+            lambda row: {
+                "kind": "zoning",
+                "group_code": row[1],
+                "group_name": row[2],
+                "zone_code": row[3],
+                "zone_index": row[4],
+                "zone_name": row[5],
+            },
+        )
+        take(
+            conn.execute(
+                f"""SELECT {GEOJSON.format(g="g")} FROM (
+                        SELECT ST_SimplifyPreserveTopology(ST_Difference({env},
+                                   coalesce(ST_Union(ST_Intersection(p.geom, {env})),
+                                            ST_GeomFromText('POLYGON EMPTY', 10306))), %s) AS g
+                        FROM ref.zoning_zone_part p
+                        WHERE p.dataset_version_id = %s AND p.role = 'coverage_mask'
+                              AND p.geom && {env}) x
+                    WHERE NOT ST_IsEmpty(g)""",  # noqa: S608
+                (*box, *box, tol, zv, *box),
+            ),
+            lambda row: {"kind": "no_zoning_map", "label": "nav zonējuma plānojuma"},
         )
     else:  # bis
         sources = [_source(pinned, "bis_cases")]

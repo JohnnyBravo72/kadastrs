@@ -309,7 +309,7 @@ export interface Grouping {
   assignment: Record<string, string>;
 }
 
-export type LayerName = "kadastrs" | "pludi" | "daba" | "bis";
+export type LayerName = "kadastrs" | "pludi" | "daba" | "zonejums" | "bis";
 
 export class ApiError extends Error {
   constructor(

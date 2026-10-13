@@ -72,6 +72,13 @@ sources:
       riga_part: "89ace2d7-2bf1-4b51-843a-82aee7730f2d"
       zemgale_parcel: "9ede9729-b682-4eeb-8779-3329e802a832"
       zemgale_part: "06533bca-0146-4b7d-a4ae-9ca750e28e51"
+  # --- Phase 6: module 8 zoning (D1 E4 WFS; no data.gov.lv files) -------------
+  tapis_zoning:
+    files: {}
+    options:
+      page_size: 500                  # WFS COUNT / STARTINDEX pages
+      request_pause_s: 0.1
+      retry_pauses: [1, 4, 9]
   # --- Phase 8a: applicant (national files; legal-entity rows only, D10) ------
   ur_companies:
     files:

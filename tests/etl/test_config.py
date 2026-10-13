@@ -28,6 +28,16 @@ def test_flood_layers_come_from_d1_e7():
     assert sorted(roles) == e7.model_extra["layers"]
 
 
+def test_zoning_layers_come_from_d1_e4():
+    e4 = next(e for e in load_config().allowed_external_resources if e.id == "E4")
+    layers = e4.model_extra["wfs_layers"]
+    assert layers == {
+        "finding": "tapis_apvienotie:funkcionalais_zonejums",
+        "coverage_mask": "tapis_apvienotie:speka_esosu_planojumu_teritorijas",
+    }
+    assert e4.model_extra.get("access") == "snapshot"
+
+
 def test_pilot_atvk_are_text():
     assert etl_config().pilot_atvk == ("0002000", "0003000", "0004000")
 

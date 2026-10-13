@@ -12,14 +12,16 @@ export const DEFAULT_LAYERS: Layers = {
   kadastrs: { on: true, opacity: 0.9 },
   pludi: { on: false, opacity: 0.75 },
   daba: { on: false, opacity: 0.8 },
+  zonejums: { on: false, opacity: 0.7 },
   bis: { on: false, opacity: 1 },
 };
 
-const DATA_LAYERS: LayerName[] = ["kadastrs", "pludi", "daba", "bis"];
+const DATA_LAYERS: LayerName[] = ["kadastrs", "pludi", "daba", "zonejums", "bis"];
 const PANES: [string, number][] = [
   ["kadastrs", 405],
   ["pludi", 410],
   ["daba", 415],
+  ["zonejums", 420],
   ["targets", 430],
   ["attention", 440],
   ["bis", 450],
@@ -35,6 +37,7 @@ export const NATURE_STYLE: Record<string, { label: string; color: string; dash?:
   habitat: { label: "Aizsargājams biotops", color: "#9E9D24" },
 };
 const FLOOD_COLOR = "#2F6FD0";
+const ZONING_COLOR = "#C45C26";
 const BIS_COLOR = "#3F2A7A";
 
 interface Props {
@@ -249,7 +252,7 @@ export function MapView({ runId, outlines, focus, attention, layers: given, setL
       window.clearTimeout(timer);
       ctrl.abort();
     };
-  }, [runId, layers.kadastrs.on, layers.pludi.on, layers.daba.on, layers.bis.on]);
+  }, [runId, layers.kadastrs.on, layers.pludi.on, layers.daba.on, layers.zonejums.on, layers.bis.on]);
 
   // --- opacity per layer (its pane) -------------------------------------------------------
   useEffect(() => {
@@ -300,6 +303,11 @@ function styleOf(key: LayerName, p: Record<string, unknown>): L.PathOptions {
     const s = NATURE_STYLE[String(p.kind)] ?? { color: "#2E7D32" };
     return { color: s.color, weight: 1.6, dashArray: s.dash, fillColor: s.color, fillOpacity: 0.16 };
   }
+  if (key === "zonejums") {
+    return p.kind === "no_zoning_map"
+      ? { color: "#8a8a8a", weight: 0.6, fillColor: "url(#hatch-noflood)", fillOpacity: 1 }
+      : { color: ZONING_COLOR, weight: 1, fillColor: ZONING_COLOR, fillOpacity: 0.28 };
+  }
   return {};
 }
 
@@ -316,6 +324,16 @@ function layerPopup(key: LayerName, p: Record<string, unknown>): string {
       ["Zonas veids", p.zone_type],
       ["Kategorija", p.category],
     ]);
+  if (key === "zonejums")
+    return p.kind === "no_zoning_map"
+      ? popup("Nav zonējuma plānojuma", [
+          ["", "Ārpus TAPIS spēkā esošo plānojumu teritorijām: zonējuma vektordati šeit nav pieejami"],
+        ])
+      : popup(String(p.group_name ?? "Funkcionālā zona"), [
+          ["Indekss", p.zone_index],
+          ["Kods", p.zone_code],
+          ["Grupa", p.group_code],
+        ]);
   return popup(`Būvniecības lieta ${String(p.case_number ?? "")}`, [
     ["Objekts", p.object_name],
     ["Stadija", p.stage],
@@ -400,6 +418,21 @@ const LEGEND: { key: LayerKey; title: string; entries: LegendEntry[] }[] = [
       label: s.label,
       swatch: { background: `${s.color}33`, borderColor: s.color, borderStyle: s.dash ? "dashed" : "solid" },
     })),
+  },
+  {
+    key: "zonejums",
+    title: "Zonējums (TAPIS)",
+    entries: [
+      {
+        label: "Funkcionālā zona",
+        swatch: { background: `${ZONING_COLOR}66`, borderColor: ZONING_COLOR },
+      },
+      {
+        label: "Nav zonējuma plānojuma",
+        swatch: { backgroundColor: "#fff", borderColor: "#8a8a8a" },
+        className: "hatch",
+      },
+    ],
   },
   {
     key: "bis",

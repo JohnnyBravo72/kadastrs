@@ -34,6 +34,7 @@ DATASETS = {
     "ur_insolvency": "maksatnespejas-procesi",
     "ur_sanctions": "sanctions",
     "fid_sanctions": "sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija",
+    "tapis_zoning": "teritorijas-attstbas-plnoanas-informcijas-sistmas-tapis-eotelpiskie-dati",
 }
 # Sources whose resources sit in several CKAN datasets (config/sources.yaml).
 ROLE_DATASETS = {
@@ -55,11 +56,22 @@ CC0_DATASETS = (
     | {ds: "CC0-1.0" for ds in ROLE_DATASETS.values()}
     | {
         DATASETS[s]: "CC0-1.0"
-        for s in ("ur_companies", "ur_insolvency", "ur_sanctions", "fid_sanctions")
+        for s in (
+            "ur_companies",
+            "ur_insolvency",
+            "ur_sanctions",
+            "fid_sanctions",
+            "tapis_zoning",
+        )
     }
 )
 # D1 E7 service (config/sources.yaml); the fake answers it, no network in tests.
 E7_BASE = "https://geodata.lvgmc.lv/server/rest/services/Atvertie_dati/Pavasara_pludu_kartes_3_cikls/MapServer"
+# D1 E4 TAPIS WFS (first URL in sources.yaml).
+E4_WFS = (
+    "https://geo-dpps.viss.gov.lv/api/DPPSPackage/client/"
+    "Teritorija_454_4DUoZx/e4ab2161-88bf-4f35-85b8-f1ca8dd5ebb3"
+)
 
 
 @dataclass
@@ -75,6 +87,8 @@ class FakeServer:
     arcgis: dict[int, dict] = field(default_factory=dict)  # layer -> {"info", "features"}
     arcgis_fail_in_batch: set[int] = field(default_factory=set)  # ids that break batches > 1
     arcgis_batches: list[tuple[int, list[int], dict]] = field(default_factory=list)
+    # TAPIS WFS (E4): typename -> list of GeoJSON features (properties include atvk_kods)
+    wfs: dict[str, list[dict]] = field(default_factory=dict)
 
     def publish(
         self,
@@ -128,6 +142,8 @@ class FakeServer:
             )
         if url.startswith(E7_BASE):
             return self._arcgis(request)
+        if url.startswith(E4_WFS):
+            return self._wfs(request)
         body = self.files.get(url)
         if body is None:
             return httpx.Response(404)
@@ -173,6 +189,39 @@ class FakeServer:
             return httpx.Response(500, text="Error performing query operation")
         feats = [layer["features"][i] for i in ids if i in layer["features"]]
         return httpx.Response(200, json={"type": "FeatureCollection", "features": feats})
+
+    def _wfs(self, request: httpx.Request) -> httpx.Response:
+        """Minimal WFS 2.0: hits + GeoJSON pages filtered by atvk_kods."""
+        p = request.url.params
+        req = (p.get("REQUEST") or p.get("request") or "").lower()
+        if not req or req == "getcapabilities":
+            return httpx.Response(
+                200,
+                content=b'<?xml version="1.0"?><wfs:WFS_Capabilities version="2.0.0"'
+                b' xmlns:wfs="http://www.opengis.net/wfs/2.0"/>',
+            )
+        typename = p.get("TYPENAMES") or p.get("TYPENAME") or ""
+        feats = list(self.wfs.get(typename, []))
+        # FILTER … <Literal>ATVK</Literal>
+        filt = p.get("FILTER") or ""
+        m = re.search(r"<Literal>(\d{7})</Literal>", filt)
+        if m:
+            atvk = m.group(1)
+            feats = [f for f in feats if (f.get("properties") or {}).get("atvk_kods") == atvk]
+        if (p.get("RESULTTYPE") or "").lower() == "hits":
+            xml = (
+                '<?xml version="1.0"?><wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0"'
+                f' numberMatched="{len(feats)}" numberReturned="0"/>'
+            )
+            return httpx.Response(200, content=xml.encode())
+        start = int(p.get("STARTINDEX") or 0)
+        count = int(p.get("COUNT") or 500)
+        page = feats[start : start + count]
+        return httpx.Response(
+            200,
+            json={"type": "FeatureCollection", "features": page},
+            headers={"content-type": "application/json"},
+        )
 
     def client(self) -> httpx.Client:
         return httpx.Client(transport=httpx.MockTransport(self.handler))
