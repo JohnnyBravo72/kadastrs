@@ -2,7 +2,7 @@
 
 GET /api/runs/{id}/map/targets                 outlines of the checked units, worst risk
 GET /api/runs/{id}/targets/{no}/attention      overlap areas and BIS objects of the findings
-GET /api/runs/{id}/layers/{name}?bbox=…        kadastrs | pludi | daba | zonejums | bis in a view box
+GET /api/runs/{id}/layers/{name}?bbox=…        kadastrs|pludi|daba|zonejums|bis (view box)
                                                (minLon,minLat,maxLon,maxLat, EPSG:4326)
 """
 
