@@ -341,7 +341,7 @@ docker compose run --rm etl import ur_companies ur_insolvency ur_sanctions fid_s
 - Modules 9 "Pieteicējs (UR)" and 17 "Sankcijas" run **once per applicant** and show in the **Pieteicējs** section of the results page, on the Excel sheet **Pieteicēji** and on Detaļas ("pieteicējs <reg. no.>"). Module 14 "Uzņēmumi adresē" is an object module (chip, card, Kopsavilkums column).
 - "Skatīt UR" opens UR's public search with the reg. no. to copy; "Skatīt sankciju sarakstā" runs FID's public list search (`docs/data-sources.md` §8).
 - `GET /api/runs/{id}/applicants`: per applicant the targets, results and links.
-- Rule set v3 is a **draft**: reports show "noteikumi: melnraksts" until it is agreed (D4).
+- Rule set v3 (agreed 2026-10-13, D4) holds the rules of modules 9, 14 and 17.
 
 ## Run the tests
 

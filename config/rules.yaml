@@ -2,15 +2,16 @@
 # Rule set v1 is decision D4: agreed by Janis Bardavskis 2026-10-11, to be revised
 # after the test-set comparison. v2 (agreed by Janis Bardavskis 2026-10-12): the
 # encumbrance codes 8317* (areas assessed for the cadastral value) are not findings
-# (not_findings below). v3 (DRAFT, 2026-10-12, for review by Janis Bardavskis):
-# rules for the applicant modules 9 and 17 and for module 14 (Phase 8a); the rules
-# of modules 1-6 are unchanged from v2. Every run and report shows version and status.
+# (not_findings below). v3 (agreed by Janis Bardavskis 2026-10-13): rules for the
+# applicant modules 9 and 17 and for module 14 (Phase 8a); an open legal protection
+# proceeding (court or out-of-court) is high; the rules of modules 1-6 are unchanged
+# from v2. Every run and report shows version and status.
 # A changed rule set gets a new version (back to status: draft until agreed).
 # The engine stores this whole file with each run, so an old run is replayed with
 # the rules it was made with.
 
 version: "3"
-status: draft          # draft | agreed
+status: agreed         # draft | agreed
 
 # Records a module lists apart (collapsed) and never counts as findings: they do
 # not make a result `found` and no rule fires on them (items carry technical: true).
@@ -368,7 +369,7 @@ rules:
     reason: "No encumbrance registered on the object."
     text_lv: "Apgrūtinājumi nav reģistrēti."
 
-  # --- 9 Pieteicējs (UR) -- v3 draft ---------------------------------------------
+  # --- 9 Pieteicējs (UR) -- v3 -------------------------------------------------
   - id: applicant_active
     module: applicant_company
     level: none
@@ -395,10 +396,10 @@ rules:
     text_lv: "Pieteicējam ir atvērts maksātnespējas process."
   - id: applicant_legal_protection_open
     module: applicant_company
-    level: medium
+    level: high
     when: {item: {open_proceeding: [LEGAL_PROTECTION, OUT_OF_COURT_LEGAL_PROTECTION]}}
-    reason: "An open (out-of-court) legal protection proceeding: financial difficulty, but the entity keeps operating under a plan; weaker than insolvency."
-    text_lv: "Pieteicējam ir atvērts tiesiskās aizsardzības process."
+    reason: "An open legal protection proceeding (court or out-of-court TAP): the applicant may be an undertaking in difficulty, which State-aid rules usually exclude; to be checked against those criteria (agreed 2026-10-13)."
+    text_lv: "Atvērts tiesiskās aizsardzības process – pārbaudīt atbilstību grūtībās nonākuša uzņēmuma kritērijiem."
   - id: applicant_recently_registered
     module: applicant_company
     level: medium
@@ -412,7 +413,7 @@ rules:
     reason: "The reg. no. is not in the Register of Enterprises open data: a typing error, or an entity not registered with UR; check manually."
     text_lv: "Pieteicēja reģistrācijas numurs nav atrasts Uzņēmumu reģistrā."
 
-  # --- 14 Uzņēmumi adresē -- v3 draft ---------------------------------------------
+  # --- 14 Uzņēmumi adresē -- v3 -------------------------------------------------
   # Pilot data (2026-10-12): of 4,428 addresses with a building and an active company,
   # 36 have >= 10 active companies; 31 are non-residential office buildings (median
   # 3,422 m2), 5 are residential houses (use 1110 / 1121, 150-1,000 m2), 3 of them
@@ -436,7 +437,7 @@ rules:
     reason: "10 or more active companies in a building under 300 m2: too small to house them; in the pilot 3 such addresses, all residential houses."
     text_lv: "Ēkā, kas mazāka par 300 m², reģistrēti 10 vai vairāk aktīvi uzņēmumi."
 
-  # --- 17 Sankcijas -- v3 draft (D10 option A) -----------------------------------
+  # --- 17 Sankcijas -- v3 (D10 option A) ---------------------------------------
   - id: sanctions_reg_no
     module: sanctions
     level: high
