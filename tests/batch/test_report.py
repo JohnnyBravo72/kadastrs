@@ -249,7 +249,7 @@ def test_sources_sheet_has_versions_rule_set_and_thresholds(wb, batch_db, run):
     cells = [c.value for row in ws.iter_rows() for c in row if c.value is not None]
     with batch_db() as c:
         sha = c.execute("SELECT rule_set_sha256 FROM work.run WHERE id = %s", (run,)).fetchone()[0]
-    assert sha in cells and "saskaņoti" in cells
+    assert sha in cells and "saskaņoti" in cells  # rules v5 agreed (module 8)
     assert any(isinstance(v, str) and "1 cm" in v for v in cells)  # flood processing note
     assert "Visa valsts (tikai kartētie biotopi)" in cells  # coverage in Latvian
     assert not any(isinstance(v, str) and v.startswith("Whole country") for v in cells)

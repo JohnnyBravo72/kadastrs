@@ -34,6 +34,17 @@ def describe(module: str, item: dict[str, Any]) -> str:
         )
     if module == "flood_10y":
         return f"10 gadu plūdu zona ({item.get('layer_name') or item.get('layer')})"
+    if module == "zoning":
+        name = item.get("group_name") or item.get("zone_index") or item.get("zone_code") or ""
+        bits = [name]
+        if item.get("zone_index") and item.get("zone_index") != name:
+            bits.append(item["zone_index"])
+        if item.get("zone_code"):
+            bits.append(str(item["zone_code"]))
+        text = " / ".join(b for b in bits if b) or "funkcionālā zona"
+        if item.get("share") is not None:
+            text += f"; {item['share']:.1%}"
+        return text
     if module == "bis":
         bits = [
             item.get("object_name"),

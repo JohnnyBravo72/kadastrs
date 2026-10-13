@@ -33,7 +33,11 @@ export const MODULE_SHORT: Record<string, string> = {
   flood_10y: "Plūdi",
   bis: "BIS",
   encumbrances: "Apgrūtinājumi",
+  ownership: "Īpašumtiesības",
+  zoning: "Zonējums",
+  eu_funding: "ES projekti",
   companies_at_address: "Uzņēmumi adresē",
+  fid_frozen_property: "FID īpašumi",
   applicant_company: "Pieteicējs (UR)",
   sanctions: "Sankcijas",
 };
@@ -44,7 +48,11 @@ const MODULE_LAYER: Record<string, LayerKey> = {
   flood_10y: "pludi",
   bis: "bis",
   encumbrances: "kadastrs",
+  ownership: "kadastrs",
+  zoning: "zonejums",
+  eu_funding: "kadastrs",
   companies_at_address: "kadastrs",
+  fid_frozen_property: "kadastrs",
 };
 
 const INPUT_STATUS_LV: Record<string, string> = {
@@ -63,6 +71,7 @@ export function hiddenLayers(modules: string[]): LayerKey[] {
   const need: [LayerKey, string][] = [
     ["pludi", "flood_10y"],
     ["daba", "nature"],
+    ["zonejums", "zoning"],
     ["bis", "bis"],
   ];
   return need.filter(([, m]) => !modules.includes(m)).map(([k]) => k);
@@ -82,7 +91,7 @@ export function autoLayers(old: Layers, detail: TargetDetail): Layers {
     }
   }
   const next = { ...old };
-  for (const k of ["kadastrs", "pludi", "daba", "bis"] as LayerKey[]) next[k] = { ...old[k], on: on.has(k) };
+  for (const k of ["kadastrs", "pludi", "daba", "zonejums", "bis"] as LayerKey[]) next[k] = { ...old[k], on: on.has(k) };
   next.attention = { ...old.attention, on: true };
   return next;
 }

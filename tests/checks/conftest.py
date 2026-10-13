@@ -29,6 +29,11 @@ Applicant (Phase 8a, synthetic; no person data): see APPLICANTS and seed_applica
   09000050406 (Druvu iela 27, VARIS 101000006) with house 09000050406001 (use 1110,
   180 m2): 12 active companies + 1 liquidated at its address -> module 14 medium;
   2 active at Institūta iela 4 (101765287, 09000360220 and its school) -> low.
+Zoning (TAPIS; same Jelgava mask box as flood):
+  09000050400  industrial group 10106 on finding A box -> found, risk medium
+  09000010048  in the mask, no zone                     -> clear
+  05000010069 / 09000360220 outside the mask           -> not_covered
+  09000050401  half inside the mask                    -> clear + partial_coverage
 """
 
 from functools import partial
@@ -55,13 +60,14 @@ V = RESOLVE_V | {
     "ur_insolvency": 15,
     "ur_sanctions": 16,
     "fid_sanctions": 17,
+    "tapis_zoning": 18,
     # Phase 8b (empty live versions so modules pin a version id)
-    "cadastre_ownership": 18,
-    "vid_rating": 19,
-    "deminimis": 20,
-    "eu_projects": 21,
-    "eis_procurement": 22,
-    "fid_frozen_property": 23,
+    "cadastre_ownership": 19,
+    "vid_rating": 20,
+    "deminimis": 21,
+    "eu_projects": 22,
+    "eis_procurement": 23,
+    "fid_frozen_property": 24,
 }
 CHECK_SOURCES = [s for s in V if s not in RESOLVE_V]
 
@@ -240,6 +246,35 @@ def seed_checks(conn) -> None:
             (V["encumbrances_frozen"], row_no, obj, code),
         )
     seed_applicants(conn)
+    seed_zoning(conn)
+
+
+def seed_zoning(conn) -> None:
+    """Synthetic TAPIS zones (module 8): industrial zone on 09000050400; coverage
+    mask over the Jelgava flood mask box; Daugavpils parcel left outside the mask."""
+    z = V["tapis_zoning"]
+    # finding: covers flood parcel 09000050400 (473000..473010 × 273000..273010)
+    box = env(472950, 272950, 473050, 273050)
+    conn.execute(
+        "INSERT INTO ref.zoning_zone (dataset_version_id, role, object_id, group_code,"
+        " group_name, zone_code, zone_index, atvk, dok_id, dok_name, parts, geom)"
+        " VALUES (%s, 'finding', 'z-1', '10106', 'Rūpnieciskās apbūves teritorija',"
+        f" '1010600', 'R', '0003000', '1', 'Jelgavas TP', 1, {box})",
+        (z,),
+    )
+    # coverage mask ≈ Jelgava flood mask
+    conn.execute(
+        "INSERT INTO ref.zoning_zone (dataset_version_id, role, object_id, atvk, dok_id,"
+        " dok_name, parts, geom) VALUES (%s, 'coverage_mask', '1:0003000', '0003000', '1',"
+        f" 'Jelgavas TP', 1, {env(472000, 272000, 476000, 276000)})",
+        (z,),
+    )
+    conn.execute(
+        "INSERT INTO ref.zoning_zone_part (dataset_version_id, role, object_id, part_no, geom)"
+        " SELECT dataset_version_id, role, object_id, 1, (ST_Dump(geom)).geom"
+        " FROM ref.zoning_zone WHERE dataset_version_id = %s",
+        (z,),
+    )
 
 
 # reg_no -> what it tests (Phase 8a modules 9 and 17)

@@ -1,4 +1,4 @@
-"""Modules 1-6 and the spatial rules (PLAN.md §6.1-6.3) on synthetic data.
+"""Modules 1–6, 8 and the spatial rules (PLAN.md §6.1-6.3) on synthetic data.
 Fixture layout: tests/checks/conftest.py."""
 
 import pytest
@@ -7,6 +7,7 @@ from engine.checks import runner
 from engine.checks.contract import TargetIn
 from engine.checks.modules.encumbrances import FROZEN_ONLY, ONLY_FROZEN_REASON
 from engine.checks.modules.flood import NOT_COVERED
+from engine.checks.modules.zoning import NOT_COVERED as ZONING_NOT_COVERED
 
 pytestmark = pytest.mark.stack
 
@@ -100,6 +101,60 @@ def test_flood_result_names_its_versions(flood):
         [V["flood_10y"], V["cadastre_spatial"], V["cadastre_text"]]
     )
     assert r.source.id == "flood_10y" and r.source.dataset_version_id == V["flood_10y"]
+
+
+# --- module 8: zoning (TAPIS) -----------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def zoning(engine_db):
+    parcels = [
+        "09000050400",
+        "09000010048",
+        "05000010069",
+        "09000050401",
+        "09000360220",
+    ]
+    with engine_db() as c:
+        res = check(c, *(parcel(p) for p in parcels), sources=["tapis_zoning"])
+    return {p: res[(i, "zoning")]["target"] for i, p in enumerate(parcels)}
+
+
+def test_zoning_industrial_found(zoning):
+    r = zoning["09000050400"]
+    assert r.status == "found"
+    assert r.items[0]["group_code"] == "10106"
+    assert r.items[0]["overlap_m2"] == pytest.approx(100.0)
+    assert r.risk == "medium" and r.rule_ids == ["zoning_industrial"]
+
+
+def test_zoning_clear_inside_plan_mask(zoning):
+    r = zoning["09000010048"]
+    assert (r.status, r.items, r.risk, r.rule_ids) == ("clear", [], "none", ["zoning_clear"])
+
+
+def test_zoning_outside_mask_is_not_covered_never_clear(zoning):
+    for code in ("05000010069", "09000360220"):
+        r = zoning[code]
+        assert r.status == "not_covered"
+        assert r.reason == ZONING_NOT_COVERED
+        assert r.risk == "none" and r.rule_ids == ["zoning_not_covered"]
+
+
+def test_zoning_partial_coverage_warns(zoning):
+    r = zoning["09000050401"]
+    assert r.status == "clear" and "partial_coverage" in codes(r)
+    assert r.risk == "none" and "zoning_partial_coverage" in r.rule_ids
+
+
+def test_zoning_result_names_its_versions(zoning):
+    from tests.checks.conftest import V
+
+    r = zoning["09000050400"]
+    assert r.dataset_version_ids == sorted(
+        [V["tapis_zoning"], V["cadastre_spatial"], V["cadastre_text"]]
+    )
+    assert r.source.id == "tapis_zoning" and r.source.dataset_version_id == V["tapis_zoning"]
 
 
 # --- module 3: nature ----------------------------------------------------------------

@@ -7,12 +7,16 @@
 # proceeding (court or out-of-court) is high; the rules of modules 1-6 are unchanged
 # from v2. v4 (agreed by Janis Bardavskis 2026-10-13): modules 7, 10–13 and 18;
 # de minimis ceilings and VID / EU / FID / EIS levels from the Phase 8b plan.
-# Every run and report shows version and status.
-# A changed rule set gets a new version (back to status: draft until agreed).
-# The engine stores this whole file with each run, so an old run is replayed with
-# the rules it was made with.
+# v5 (agreed by Janis Bardavskis 2026-10-13): TAPIS functional-zone groups from
+# the pilot (grupa_kods); industrial/technical medium, transport/public/mixed
+# low, residential and open-space types none; unmapped unknown. v6 (2026-10-13):
+# combines v4 and v5 (both already agreed) when Phase 8b merged onto main with
+# module 8. Every run and report shows version and status. A changed rule set
+# gets a new version (back to status: draft until agreed). The engine stores
+# this whole file with each run, so an old run is replayed with the rules it
+# was made with.
 
-version: "4"
+version: "6"
 status: agreed         # draft | agreed
 
 # Records a module lists apart (collapsed) and never counts as findings: they do
@@ -472,7 +476,70 @@ rules:
     reason: "The applicant's name equals a sanctioned entity's name without a Latvian reg. no.: never a finding by itself (D6, D10), only a flag for manual review."
     text_lv: "Nosaukums sakrīt ar sankciju saraksta ierakstu: pārbaudīt manuāli."
 
-  # --- 7 Īpašumtiesības -- v4 --------------------------------------------------
+  # --- 8 Zonējums (TAPIS) -- v5 / v6 -------------------------------------------
+  # group_code = TAPIS grupa_kods (12 types in the pilot, docs/data-sources.md §3.7).
+  - id: zoning_industrial
+    module: zoning
+    level: medium
+    when: {item: {group_code: ["10106"]}}
+    reason: "Industrial building zone (Rūpnieciskās apbūves teritorija): use restrictions and neighbour effects matter for funding."
+    text_lv: "Objekts atrodas rūpnieciskās apbūves teritorijā."
+  - id: zoning_technical
+    module: zoning
+    level: medium
+    when: {item: {group_code: ["10108"]}}
+    reason: "Technical building zone (Tehniskās apbūves teritorija): infrastructure / utility use."
+    text_lv: "Objekts atrodas tehniskās apbūves teritorijā."
+  - id: zoning_transport
+    module: zoning
+    level: low
+    when: {item: {group_code: ["10107"]}}
+    reason: "Transport infrastructure zone."
+    text_lv: "Objekts atrodas transporta infrastruktūras teritorijā."
+  - id: zoning_public_or_mixed
+    module: zoning
+    level: low
+    when: {item: {group_code: ["10104", "10105"]}}
+    reason: "Public or mixed-centre building zone: context for the planned works."
+    text_lv: "Objekts atrodas publiskās vai jauktas centra apbūves teritorijā."
+  - id: zoning_residential
+    module: zoning
+    level: none
+    when: {item: {group_code: ["10101", "10102", "10103"]}}
+    reason: "Residential building zone (detached, low-rise or multi-storey): listed for context, no elevated risk by itself."
+    text_lv: "Objekts atrodas dzīvojamās apbūves teritorijā."
+  - id: zoning_open_space
+    module: zoning
+    level: none
+    when: {item: {group_code: ["10109", "10110", "10111", "10112"]}}
+    reason: "Nature/greenery, forest, agriculture or water zone: listed for context."
+    text_lv: "Objekts atrodas dabas, mežu, lauksaimniecības vai ūdeņu teritorijā."
+  - id: zoning_unmapped
+    module: zoning
+    level: unknown
+    when: {item: {group_code_not_in: ["10101", "10102", "10103", "10104", "10105", "10106", "10107", "10108", "10109", "10110", "10111", "10112"]}}
+    reason: "Zone group not mapped in this rule set (new or empty grupa_kods): manual check."
+    text_lv: "Zonas veids nav klasificēts – pārbaudīt manuāli."
+  - id: zoning_not_covered
+    module: zoning
+    level: none
+    when: {status: not_covered}
+    reason: "Outside territories of plans in force published in TAPIS; status stays not_covered (never clear)."
+    text_lv: "Ārpus TAPIS spēkā esošo plānojumu teritorijām – zonējuma vektordati šeit nav pieejami."
+  - id: zoning_partial_coverage
+    module: zoning
+    level: none
+    when: {status: clear, warning: partial_coverage}
+    reason: "Only part of the unit lies inside a published plan territory, with no zone finding there."
+    text_lv: "Zonējuma plānojums aptver tikai daļu objekta; funkcionālā zona nav konstatēta."
+  - id: zoning_clear
+    module: zoning
+    level: none
+    when: {status: clear}
+    reason: "Inside a published plan territory and no functional zone overlaps the unit above the thresholds."
+    text_lv: "Funkcionālā zona nav konstatēta."
+
+  # --- 7 Īpašumtiesības -- v4 / v6 ---------------------------------------------
   - id: ownership_type
     module: ownership
     level: none
@@ -480,7 +547,7 @@ rules:
     reason: "Open data publishes owner type only; informational, no eligibility rule without the land book (D5)."
     text_lv: "Īpašumtiesību statuss un personas tips (bez vārdiem)."
 
-  # --- 10 VID reitings -- v4 ---------------------------------------------------
+  # --- 10 VID reitings -- v4 / v6 ----------------------------------------------
   - id: vid_rating_a
     module: vid_rating
     level: none
@@ -518,7 +585,7 @@ rules:
     reason: "Reg. no. not in the VID rating file: too new, wrong number, or not rated."
     text_lv: "Pieteicējs nav atrasts VID reitingā."
 
-  # --- 11 De minimis -- v4 -----------------------------------------------------
+  # --- 11 De minimis -- v4 / v6 ------------------------------------------------
   - id: deminimis_aid
     module: deminimis
     level: low
@@ -538,7 +605,7 @@ rules:
     reason: "Aid sum in the window reaches or exceeds the regulation ceiling."
     text_lv: "De minimis summa sasniedz vai pārsniedz regulas griestus."
 
-  # --- 12 ES projekti -- v4 ----------------------------------------------------
+  # --- 12 ES projekti -- v4 / v6 -----------------------------------------------
   - id: eu_object_ongoing
     module: eu_funding
     level: high
@@ -558,7 +625,7 @@ rules:
     reason: "Other EU-funded projects for the same applicant: context, not an object conflict."
     text_lv: "Pieteicējam ir citi ES līdzfinansētie projekti."
 
-  # --- 13 Iepirkumi (EIS) -- v4 ------------------------------------------------
+  # --- 13 Iepirkumi (EIS) -- v4 / v6 -------------------------------------------
   - id: procurement_context
     module: procurement
     level: low
@@ -566,7 +633,7 @@ rules:
     reason: "EIS e-competition contracts where the applicant is buyer or winner; coverage is EIS only (D11)."
     text_lv: "EIS e-konkursu iepirkumi (pircējs vai uzvarētājs)."
 
-  # --- 18 FID frozen real estate -- v4 -----------------------------------------
+  # --- 18 FID frozen real estate -- v4 / v6 ------------------------------------
   - id: fid_frozen_property
     module: fid_frozen_property
     level: high
