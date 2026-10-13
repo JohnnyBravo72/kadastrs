@@ -1,4 +1,4 @@
-"""Module 8 zoning rules (v5 draft): TAPIS grupa_kods levels."""
+"""Module 8 zoning rules (v5 agreed): TAPIS grupa_kods levels."""
 
 from engine.checks import rules as rules_mod
 from engine.checks.contract import CheckResult, Display, Subject, Warning_
@@ -18,9 +18,9 @@ def result(status="found", items=(), warnings=(), reason=None):
     )
 
 
-def test_rule_set_v5_draft_covers_zoning():
+def test_rule_set_v5_agreed_covers_zoning():
     rs = rules_mod.load()
-    assert (rs.version, rs.status) == ("5", "draft")
+    assert (rs.version, rs.status) == ("5", "agreed")
     assert "zoning" in rs.modules()
 
 
