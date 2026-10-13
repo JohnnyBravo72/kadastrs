@@ -64,7 +64,7 @@ def test_seed_objects(conn, live):
     rid = runner.start_run(conn, targets, origin="test")
     rows = results(conn, rid)
     s = summary.summarize(conn, rid)
-    assert s["status"] == "done" and len(s["modules_summary"]) == 8  # modules 1–6, 8 and 14
+    assert s["status"] == "done" and len(s["modules_summary"]) == 11  # 1–8, 12, 14, 18
     for (_no, _module, _scope, _unit), r in rows.items():
         assert r.dataset_version_ids and set(r.dataset_version_ids) <= set(live.values())
         assert r.status != "error", r.reason
@@ -102,5 +102,5 @@ def test_100_objects_in_time_and_replayable(conn, live):
     elapsed = time.monotonic() - t0
     assert elapsed < RUN_100_LIMIT_S, f"100 objects took {elapsed:.1f} s"
     stored = [r.comparable() for r in runner.stored(conn, rid)]
-    assert len(stored) == 800  # 100 parcels x 8 object modules (1–6, 8, 14)
+    assert len(stored) == 1100  # 100 parcels x 11 object modules (1–8, 12, 14, 18)
     assert [r.comparable() for r in runner.replay(conn, rid)] == stored

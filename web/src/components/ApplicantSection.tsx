@@ -5,11 +5,18 @@ import { worst } from "../risk";
 import { RiskPill } from "./RiskPill";
 import { SourceLinks } from "./SourceLinks";
 
-const SHORT: Record<string, string> = { applicant_company: "Pieteicējs (UR)", sanctions: "Sankcijas" };
+const SHORT: Record<string, string> = {
+  applicant_company: "Pieteicējs (UR)",
+  vid_rating: "VID",
+  deminimis: "De minimis",
+  eu_funding_applicant: "ES projekti",
+  procurement: "EIS",
+  sanctions: "Sankcijas",
+};
 
-/** The applicant section (Phase 8a): modules 9 "Pieteicējs (UR)" and 17
- *  "Sankcijas", checked once per applicant reg. no., with "Skatīt UR" and
- *  "Skatīt sankciju sarakstā". `compact`: one line per applicant (all objects). */
+/** The applicant section (Phase 8a/8b): modules 9–13 and 17, checked once per
+ *  applicant reg. no., with "Skatīt UR" and "Skatīt sankciju sarakstā".
+ *  `compact`: one line per applicant (all objects). */
 export function ApplicantSection({
   run,
   applicants,

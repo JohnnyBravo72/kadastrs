@@ -153,6 +153,7 @@ def _day(dt: datetime | None) -> str | None:
 def assess(conn, remotes: dict[str, Remote], at: datetime) -> dict[str, dict]:
     """Freshness of every live version, from this look (or the last good one).
     Read before `record` so "the last good check" is an earlier one."""
+    cfg = etl_config()
     out = {}
     for sid, stale_after, stale_text, ours, last_at, last_remote in conn.execute(_STATE_SQL):
         r = remotes.get(sid)
@@ -165,6 +166,37 @@ def assess(conn, remotes: dict[str, Remote], at: datetime) -> dict[str, dict]:
             latest = checked_at = None
         ours = _utc(ours)
         latest = _utc(latest)
+        live_export = bool(cfg.options.get(sid, {}).get("live_export"))
+
+        if live_export:
+            # D11: CSV is generated on request; fresh while our last download is
+            # younger than source_stale_after. The text names the download date.
+            checked_at = at if live else last_at
+            if checked_at is None and ours is None:
+                status, text = "unknown", "nav zināms: live eksports vēl nav lejupielādēts"
+            elif (
+                stale_after is not None
+                and ours is not None
+                and at - ours > _as_timedelta(stale_after)
+            ):
+                status = "source_stale"
+                text = f"live eksports – atkārtoti lejupielādēt (pēdējā lejupielāde {_day(ours)})"
+            else:
+                status = "current"
+                text = f"live eksports (lejupielādēts {_day(ours)})" if ours else "live eksports"
+            if checked_at is not None and not live:
+                text += f"; pēdējā pārbaude {_day(checked_at)}"
+            out[sid] = {
+                "status": status,
+                "label_lv": LABEL_LV[status],
+                "text_lv": text,
+                "warn": status != "current",
+                "source_updated": _day(ours),
+                "checked_at": checked_at.isoformat() if checked_at else None,
+                "checked_live": live,
+                "source_stale_after": stale_text,
+            }
+            continue
 
         if checked_at is None:
             status = "unknown"

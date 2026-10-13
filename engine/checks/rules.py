@@ -26,6 +26,14 @@ class Thresholds(BaseModel):
     bis_nearby_m: float
 
 
+class DeMinimis(BaseModel):
+    """Ceilings and window for module 11 (Phase 8b, D11; rule set v4)."""
+
+    window_days: int = 1095  # rolling 3 years before the run date
+    warn_share: float = 0.8
+    ceilings: dict[str, float]  # regulation_key -> EUR
+
+
 class Rule(BaseModel):
     id: str = Field(pattern=r"^[a-z0-9_]+$")
     module: str
@@ -65,6 +73,8 @@ class RuleSet(BaseModel):
     rules: list[Rule]
     # module id -> records that are not findings (v1 has none)
     not_findings: dict[str, NotFindings] = Field(default_factory=dict)
+    # Phase 8b module 11; absent in v1–v3 snapshots stored with older runs
+    de_minimis: DeMinimis | None = None
 
     @model_validator(mode="after")
     def _complete(self) -> RuleSet:
@@ -83,6 +93,8 @@ class RuleSet(BaseModel):
         data = self.model_dump(mode="json")
         if not data["not_findings"]:  # v1 snapshots (and their checksum) stay as stored
             del data["not_findings"]
+        if data.get("de_minimis") is None:  # v1–v3 snapshots stay as stored
+            del data["de_minimis"]
         return data
 
     @property

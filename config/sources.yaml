@@ -400,6 +400,145 @@ sources:
       resource_ids: ["00f557d4-3096-4d8f-b0bb-c52f90ad50fb"]   # Sankciju subjekti (Excel)
     licence: CC0-1.0
 
+  # --- Phase 8b (verified 2026-10-13, docs/data-sources.md §3.10–3.13, §3.16–3.17; D11) ---
+  - id: cadastre_ownership
+    names:
+      lv: "Īpašumtiesību statuss"
+      en: "Ownership status"
+    owner: VZD
+    group: Kadastrs
+    order: 63
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage_lv: "Pilota pilsētas: īpašnieka tips un statuss (bez vārdiem)"
+    processing_lv:
+      - "Saglabāts tikai īpašumtiesību statuss un personas tips (fiziska / juridiska persona, valsts, pašvaldība, cits); vārdi netiek publicēti avotā."
+    source_stale_after: P30D
+    datagov:
+      dataset_id: kadastra-informacijas-sistemas-atvertie-dati
+      resource_ids: ["a0d801da-8eb0-4426-9087-50e8139bce39"]   # ownership.zip
+    licence: CC-BY-4.0
+  - id: vid_rating
+    names:
+      lv: "Nodokļu maksātāju reitings (VID)"
+      en: "Taxpayer rating (VID)"
+    owner: VID
+    group: Pieteicējs
+    order: 74
+    type: check
+    subject_kinds: [applicant]
+    default_selected: true
+    coverage_lv: "Visa valsts: juridisko personu reitings A/B/C/J/N; nodokļu parādi nav atvērto datu avotā"
+    processing_lv:
+      - "Nosaukums netiek saglabāts (IK nosaukums ir personas vārds); rādītais nosaukums nāk no UR."
+      - "Importēti tikai ieraksti ar juridiskās personas reģistrācijas numuru."
+    source_stale_after: P120D
+    datagov:
+      dataset_id: nodoklu-maksataju-reitings
+      resource_ids: ["acd4c6f9-5123-46a5-80f6-1f44b4517f58"]
+    licence: CC0-1.0
+  - id: deminimis
+    names:
+      lv: "De minimis atbalsts"
+      en: "De minimis aid"
+    owner: FM
+    group: Pieteicējs
+    order: 75
+    type: check
+    subject_kinds: [applicant]
+    default_selected: true
+    coverage_lv: "Visa valsts: piešķirtais de minimis atbalsts (tiešais eksports); tikai juridiskās personas"
+    partial_coverage: true
+    processing_lv:
+      - "Importētas tikai rindas ar juridiskās personas reģistrācijas numuru; personas vārds un projekta nosaukums netiek saglabāti."
+      - "Summa tikai šim reģ. Nr.; vienotā uzņēmuma saistītie uzņēmumi nav ņemti vērā."
+    source_stale_after: P7D
+    datagov:
+      dataset_id: pieskirtais-de-minimis-atbalsts-latvija
+      resource_ids: ["6253edd2-17d1-4a9a-bd48-3dd5b9ce5ff4"]
+    external_resources: [E1]
+    licence: CC0-1.0
+  - id: eu_projects
+    names:
+      lv: "ES līdzfinansētie projekti"
+      en: "EU co-financed projects"
+    owner: CFLA
+    group: Finansējums
+    order: 80
+    type: check
+    subject_kinds: [object, applicant]
+    default_selected: true
+    coverage_lv: "Visa valsts: 2014–20, 2021–27 un RRF projekti; atrašanās vieta tikai ar kadastra numuru"
+    partial_coverage: true
+    processing_lv:
+      - "Fizisko personu un IK projekti importēti bez vārda, nosaukuma, reģ. Nr. un adreses (tikai projekta un kadastra dati, D11)."
+      - "Partneru nosaukumi netiek saglabāti; tikai juridiskās personas reģ. Nr."
+    source_stale_after: P7D
+    datagov:
+      dataset_id:
+        - eiropas-savienibas-fondu-21-27-perioda-lidzfinansetie-projekti
+        - es-lidzfinansetie-projekti
+        - eiropas-savienibas-atveselosanas-fonda-lidzfinansetie-projekti
+      resource_ids:
+        - "80aca232-54ad-4a9e-b1e3-c06623c1020b"
+        - "27733f45-ef48-41bf-9a9c-cc818ed9f32f"
+        - "5d9b36b2-6ff4-44b7-8bb3-d99d8043a271"
+        - "9c2d6bf2-41a4-4a58-a5ba-3a4ad6d7e79f"
+        - "35da9d99-7750-4be8-85d9-4aaa920d4583"
+        - "12f8a44f-e1a9-4f7e-8a32-7f472ac28de8"
+        - "bfcae357-328c-423f-9835-215e7fd3db4e"
+        - "fec77132-7058-4e28-b4fc-0772454b8041"
+        - "ad29f6bb-4183-4dd3-9b81-eb62c8959c92"
+    licence: CC0-1.0
+  - id: eis_procurement
+    names:
+      lv: "Iepirkumi (EIS)"
+      en: "Procurement (EIS)"
+    owner: VDAA
+    group: Pieteicējs
+    order: 76
+    type: check
+    subject_kinds: [applicant]
+    default_selected: true
+    coverage_lv: "Tikai EIS e-konkursu iepirkumi (2018–2026)"
+    partial_coverage: true
+    processing_lv:
+      - "Uzvarētāja nosaukums netiek saglabāts; uzvarētāja reģ. Nr. tikai ar juridiskās personas rakstu."
+    source_stale_after: P7D
+    datagov:
+      dataset_id: iepirkumu-rezultatu-datu-grupa
+      resource_ids:
+        - "cecd0be7-c8e0-451a-8314-f1d806db3bc1"
+        - "1d37ba16-4d7b-4c1e-9650-1ee9b6a32666"
+        - "abf811a3-26e8-48c2-bc86-e9b74ca0b385"
+        - "a1342945-ce4b-480b-abb5-b74d43c41534"
+        - "97a7c410-60c0-4d08-b554-4d1abb9092da"
+        - "71f88053-97c1-4928-93c3-8d83d714f27f"
+        - "3a02a1a7-0322-4c0d-9700-8af9832f0f91"
+        - "79b34e1c-8989-4984-816a-8e8f92b701f3"
+        - "c4007411-1ba5-40f3-9b50-f25881c93f51"
+    licence: CC0-1.0
+  - id: fid_frozen_property
+    names:
+      lv: "Iesaldēts nekustamais īpašums (FID)"
+      en: "Frozen real estate (FID)"
+    owner: FID
+    group: Sankcijas
+    order: 64
+    type: check
+    subject_kinds: [object]
+    default_selected: true
+    coverage_lv: "Visa valsts: FID TA, VZD saraksta nekustamie īpašumi ar kadastra numuru"
+    partial_coverage: true
+    processing_lv:
+      - "Subjekta vārds, dzimšanas dati, adrese un sankciju saraksta personas lauki netiek saglabāti; turētāja reģ. Nr. tikai juridiskai personai."
+    source_stale_after: P1Y
+    datagov:
+      dataset_id: sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija
+      resource_ids: ["f8dd1178-da14-4009-8620-d871f79fb936"]
+    licence: CC0-1.0
+
 # Example entry (placeholder values, not verified):
 #
 # sources:

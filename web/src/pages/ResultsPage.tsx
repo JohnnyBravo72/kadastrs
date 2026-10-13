@@ -33,8 +33,11 @@ export const MODULE_SHORT: Record<string, string> = {
   flood_10y: "Plūdi",
   bis: "BIS",
   encumbrances: "Apgrūtinājumi",
+  ownership: "Īpašumtiesības",
   zoning: "Zonējums",
+  eu_funding: "ES projekti",
   companies_at_address: "Uzņēmumi adresē",
+  fid_frozen_property: "FID īpašumi",
   applicant_company: "Pieteicējs (UR)",
   sanctions: "Sankcijas",
 };
@@ -45,8 +48,11 @@ const MODULE_LAYER: Record<string, LayerKey> = {
   flood_10y: "pludi",
   bis: "bis",
   encumbrances: "kadastrs",
+  ownership: "kadastrs",
   zoning: "zonejums",
+  eu_funding: "kadastrs",
   companies_at_address: "kadastrs",
+  fid_frozen_property: "kadastrs",
 };
 
 const INPUT_STATUS_LV: Record<string, string> = {

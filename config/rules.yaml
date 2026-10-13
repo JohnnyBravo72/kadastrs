@@ -5,15 +5,18 @@
 # (not_findings below). v3 (agreed by Janis Bardavskis 2026-10-13): rules for the
 # applicant modules 9 and 17 and for module 14 (Phase 8a); an open legal protection
 # proceeding (court or out-of-court) is high; the rules of modules 1-6 are unchanged
-# from v2. v5 (agreed by Janis Bardavskis 2026-10-13, Phase 6 module 8): TAPIS
-# functional-zone groups from the pilot (grupa_kods); industrial/technical
-# medium, transport/public/mixed low, residential and open-space types none;
-# unmapped unknown. Modules 1–7, 9, 14 and 17 unchanged from v3. Every run and
-# report shows version and status. A changed rule set gets a new version (back
-# to status: draft until agreed). The engine stores this whole file with each
-# run, so an old run is replayed with the rules it was made with.
+# from v2. v4 (agreed by Janis Bardavskis 2026-10-13): modules 7, 10–13 and 18;
+# de minimis ceilings and VID / EU / FID / EIS levels from the Phase 8b plan.
+# v5 (agreed by Janis Bardavskis 2026-10-13): TAPIS functional-zone groups from
+# the pilot (grupa_kods); industrial/technical medium, transport/public/mixed
+# low, residential and open-space types none; unmapped unknown. v6 (2026-10-13):
+# combines v4 and v5 (both already agreed) when Phase 8b merged onto main with
+# module 8. Every run and report shows version and status. A changed rule set
+# gets a new version (back to status: draft until agreed). The engine stores
+# this whole file with each run, so an old run is replayed with the rules it
+# was made with.
 
-version: "5"
+version: "6"
 status: agreed         # draft | agreed
 
 # Records a module lists apart (collapsed) and never counts as findings: they do
@@ -30,6 +33,19 @@ thresholds:
   min_overlap_m2: 1.0        # a finding needs >= 1 m2 overlap ...
   min_overlap_share: 0.001   # ... or >= 0.1 % of the parcel
   bis_nearby_m: 20           # module 5 "nearby": a BIS object point within this distance
+
+# Module 11 de minimis (D11): rolling window and regulation ceilings (EUR).
+de_minimis:
+  window_days: 1095          # 3 years before the run date
+  warn_share: 0.8
+  ceilings:
+    "2023/2831": 300000      # general
+    "1407/2013": 200000      # general (legacy)
+    "1407/2013-road": 100000 # road freight under 1407/2013
+    "1408/2013": 50000       # agriculture
+    "717/2014": 30000        # fisheries
+    "2023/2832": 750000      # SGEI
+    "360/2012": 750000       # SGEI (legacy)
 
 # Worst first. A property's aggregate takes the worst risk of its units; "unknown"
 # ranks above "low" so a gap in the data is never hidden by a low finding.
@@ -460,7 +476,7 @@ rules:
     reason: "The applicant's name equals a sanctioned entity's name without a Latvian reg. no.: never a finding by itself (D6, D10), only a flag for manual review."
     text_lv: "Nosaukums sakrīt ar sankciju saraksta ierakstu: pārbaudīt manuāli."
 
-  # --- 8 Zonējums (TAPIS) -- v5 (agreed 2026-10-13) -----------------------------
+  # --- 8 Zonējums (TAPIS) -- v5 / v6 -------------------------------------------
   # group_code = TAPIS grupa_kods (12 types in the pilot, docs/data-sources.md §3.7).
   - id: zoning_industrial
     module: zoning
@@ -522,3 +538,105 @@ rules:
     when: {status: clear}
     reason: "Inside a published plan territory and no functional zone overlaps the unit above the thresholds."
     text_lv: "Funkcionālā zona nav konstatēta."
+
+  # --- 7 Īpašumtiesības -- v4 / v6 ---------------------------------------------
+  - id: ownership_type
+    module: ownership
+    level: none
+    when: {status: found}
+    reason: "Open data publishes owner type only; informational, no eligibility rule without the land book (D5)."
+    text_lv: "Īpašumtiesību statuss un personas tips (bez vārdiem)."
+
+  # --- 10 VID reitings -- v4 / v6 ----------------------------------------------
+  - id: vid_rating_a
+    module: vid_rating
+    level: none
+    when: {item: {rating: A}}
+    reason: "VID rating A: good tax compliance."
+    text_lv: "VID reitings A – laba saistību izpilde."
+  - id: vid_rating_b
+    module: vid_rating
+    level: low
+    when: {item: {rating: B}}
+    reason: "VID rating B: compliance should be improved; flag, not a block."
+    text_lv: "VID reitings B – jāuzlabo saistību izpilde."
+  - id: vid_rating_c
+    module: vid_rating
+    level: high
+    when: {item: {rating: C}}
+    reason: "VID rating C: documented violations of tax obligations."
+    text_lv: "VID reitings C – pārkāpumi saistību izpildē."
+  - id: vid_rating_j
+    module: vid_rating
+    level: medium
+    when: {item: {rating: J}}
+    reason: "Newly registered taxpayer: little track record (aligns with the 6-month UR rule)."
+    text_lv: "VID reitings J – jaunreģistrēts nodokļu maksātājs."
+  - id: vid_rating_n
+    module: vid_rating
+    level: medium
+    when: {item: {rating: N}}
+    reason: "Inactive taxpayer in the VID rating."
+    text_lv: "VID reitings N – neaktīvs nodokļu maksātājs."
+  - id: vid_rating_missing
+    module: vid_rating
+    level: unknown
+    when: {status: no_data}
+    reason: "Reg. no. not in the VID rating file: too new, wrong number, or not rated."
+    text_lv: "Pieteicējs nav atrasts VID reitingā."
+
+  # --- 11 De minimis -- v4 / v6 ------------------------------------------------
+  - id: deminimis_aid
+    module: deminimis
+    level: low
+    when: {status: found}
+    reason: "De minimis aid recorded for this reg. no. in the rolling window; linked undertakings not summed (D11)."
+    text_lv: "Piešķirts de minimis atbalsts (tikai šim reģ. Nr.)."
+  - id: deminimis_near_ceiling
+    module: deminimis
+    level: medium
+    when: {item: {share_gte: 0.8}}
+    reason: "Aid sum in the window is at least 80 % of the regulation ceiling; headroom is tight."
+    text_lv: "De minimis summa ≥ 80 % no regulas griestiem."
+  - id: deminimis_at_ceiling
+    module: deminimis
+    level: high
+    when: {item: {share_gte: 1.0}}
+    reason: "Aid sum in the window reaches or exceeds the regulation ceiling."
+    text_lv: "De minimis summa sasniedz vai pārsniedz regulas griestus."
+
+  # --- 12 ES projekti -- v4 / v6 -----------------------------------------------
+  - id: eu_object_ongoing
+    module: eu_funding
+    level: high
+    when: {item: {match: object, ongoing: true}}
+    reason: "Another ongoing EU-funded project on the same cadastre number: double-funding control."
+    text_lv: "Objektā ir cits ES projekts ar statusu „Līgums”."
+  - id: eu_object_finished
+    module: eu_funding
+    level: medium
+    when: {item: {match: object, ongoing: false}}
+    reason: "A finished EU-funded project on the same object: check monitoring / overlap."
+    text_lv: "Objektā ir cits pabeigts ES projekts."
+  - id: eu_applicant_projects
+    module: eu_funding_applicant
+    level: low
+    when: {status: found}
+    reason: "Other EU-funded projects for the same applicant: context, not an object conflict."
+    text_lv: "Pieteicējam ir citi ES līdzfinansētie projekti."
+
+  # --- 13 Iepirkumi (EIS) -- v4 / v6 -------------------------------------------
+  - id: procurement_context
+    module: procurement
+    level: low
+    when: {status: found}
+    reason: "EIS e-competition contracts where the applicant is buyer or winner; coverage is EIS only (D11)."
+    text_lv: "EIS e-konkursu iepirkumi (pircējs vai uzvarētājs)."
+
+  # --- 18 FID frozen real estate -- v4 / v6 ------------------------------------
+  - id: fid_frozen_property
+    module: fid_frozen_property
+    level: high
+    when: {status: found}
+    reason: "Cadastre number appears on FID's frozen real-estate list (TA, VZD)."
+    text_lv: "Objekta kadastra numurs ir FID iesaldēto nekustamo īpašumu sarakstā."

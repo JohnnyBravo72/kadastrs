@@ -1,5 +1,5 @@
 """Phase 8a modules: 9 Pieteicējs (UR), 14 Uzņēmumi adresē, 17 Sankcijas
-(PLAN.md §6.1, docs/decisions.md D10; rule set v3 draft). Seed: APPLICANTS in
+(PLAN.md §6.1, docs/decisions.md D10; rule set v3 agreed). Seed: APPLICANTS in
 tests/checks/conftest.py."""
 
 import pytest
@@ -35,7 +35,11 @@ def applicant_run(engine_db):
 def test_each_applicant_checked_once(conn, applicant_run):
     rows = [r for r in runner.stored(conn, applicant_run) if r.scope == "applicant"]
     keys = [(r.unit_code, r.result.module) for r in rows]
-    assert len(keys) == len(set(keys)) == (len(APPLICANTS) + 1) * 2
+    # Phase 8b adds applicant modules 10–13; count = applicants × applicant modules
+    from engine.checks.modules import APPLICANT
+
+    n_app_modules = len(APPLICANT)
+    assert len(keys) == len(set(keys)) == (len(APPLICANTS) + 1) * n_app_modules
     first = next(r for r in rows if r.unit_code == "40003100001")
     assert first.target_no == 0 and first.unit_type == "applicant"
     assert first.result.scope == "applicant"
@@ -43,7 +47,7 @@ def test_each_applicant_checked_once(conn, applicant_run):
     assert not [
         r
         for r in runner.stored(conn, applicant_run)
-        if r.result.module in ("applicant_company", "sanctions") and r.scope != "applicant"
+        if r.result.module in APPLICANT and r.scope != "applicant"
     ]
 
 
@@ -163,7 +167,14 @@ def test_api_applicant_section(client, applicant_run):
     by = {a["reg_no"]: a for a in body}
     alfa = by["40003100001"]
     assert alfa["target_nos"] == [0, len(APPLICANTS) + 1] and alfa["name"] == 'SIA "Alfa"'
-    assert [r["module"] for r in alfa["results"]] == ["applicant_company", "sanctions"]
+    assert [r["module"] for r in alfa["results"]] == [
+        "applicant_company",
+        "vid_rating",
+        "deminimis",
+        "eu_funding_applicant",
+        "procurement",
+        "sanctions",
+    ]
     systems = [lk["system"] for lk in alfa["links"]]
     assert systems == ["UR", "FID sankciju saraksti"]
     ur, fid = alfa["links"]

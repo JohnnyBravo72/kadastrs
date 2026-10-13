@@ -4,13 +4,16 @@ repos:
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
+        # DER certificates are binary; a trailing newline would break the pinned SHA-256.
+        exclude: \.crt$
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
       - id: check-added-large-files
         args: [--maxkb=1024]
       - id: mixed-line-ending
         args: [--fix=lf]
-        exclude: \.(tif|xlsx)$
+        # .crt is DER (binary bytes may include 0x0D); .tif/.xlsx are binary too.
+        exclude: \.(tif|xlsx|crt)$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.10

@@ -20,6 +20,155 @@ csv:
   ur_register: [regcode, sepa, name, name_before_quotes, name_in_quotes, name_after_quotes, without_quotes, regtype, regtype_text, type, type_text, registered, terminated, closed, address, index, addressid, region, city, atvk, reregistration_term]
   ur_insolvency: [proceeding_id, debtor_name, debtor_registration_number, debtor_cleaned_name, debtor_address, proceeding_started_on, proceeding_ended_on, proceeding_form, proceeding_type, proceeding_subtype, proceeding_resolution_type, proceeding_resolution_name, entry_created_on, court_case_initial_number, court_code, court_name, creditor_applications_deadline_date, creditor_applications_deadline_in_days, creditor_applications_deadline_in_weeks, creditor_applications_deadline_in_months, creditor_applications_deadline_in_years, legislation_number, legislation_version]
   ur_sanctions: [id, registered_on, entity_type, name, birth_date, latvian_identity_number_masked, nationality, legal_form_code, legal_entity_registration_number, legal_entity_name, legal_entity_country, position, position_text_lv, position_text_en, sanctions_subject_legal_form_code, sanctions_subject_registration_number, sanctions_subject_name, list, list_text, program, entry_date, legal_base, legal_base_url]
+  # Phase 8b (verified 2026-10-13, docs/data-sources.md §3.10–3.13); whole header checked.
+  vid_rating: [Registracijas_kods, Nosaukums, Reitings, Skaidrojums, Informacijas_atjaunosanas_datums]
+  deminimis: [assign_date, person_reg_nr, person_title, project_title, assigner_title, program_title, assigned_amount, regul_title, instrument_title]
+  # EU project lists differ per period; person columns listed even when never stored (D11).
+  eu_projects_2127:
+    - SamNumurs
+    - SamNosaukums
+    - PasakumaNumurs
+    - PasakumaNosaukums
+    - AtbildigaIestade
+    - ProjektaNosaukums
+    - ProjektaNumurs
+    - ProjektsIrStrategiskiSvarigs
+    - PvnIrAttiecinamasIzmaksas
+    - ProjektsTiekIstenotsSaskanaArPrivataSektoraPartneribasStrukturu
+    - AtlasesVeids
+    - PecuzraudzibasPeriodsGados
+    - ProjektaklasifikacijaNACE
+    - IesniedzejaNosaukums
+    - IesniedzejaRegNo
+    - IesniedzejaJuridiskaAdrese
+    - FinansejumaSanemejaEpasts
+    - FinansejumaSanemejaTimeklaVietne
+    - ProjektaIesniedzejaTips
+    - IrValstsBudzetaFinansetaInstitucija
+    - ProjektaStatuss
+    - LigumaNoslegsanasDatums
+    - ProjektaIeviesanasSakumaDatums
+    - ProjektaIeviesanasBeiguDatums
+    - KopsavilkumsKasPublicejamsEiropasSavienibasfondutimeklavietne
+    - ProjektaMerkis
+    - ProjektaMerkaGrupa
+    - Fonds
+    - ProjektaKopejasIzmaksas
+    - KopejaisAttiecinamaisFinansejums
+    - ProjektamPieskirtaisESFonduLidzfinansejums
+    - NacionalaisPubliskaisFinansejums
+    - NacionalaisPrivataisFinansejums
+    - ESLidzfinansejumaLikme
+    - PedejasDatuAtjauninasanasDatums
+  eu_projects_1420:
+    - SamNumurs
+    - SamNosaukums
+    - PasakumaNumurs
+    - PasakumaNosaukums
+    - AtbildigaIestade
+    - ProjektaNosaukums
+    - ProjektaNumurs
+    - ProjektsIrLielais
+    - PvnIrAttiecinamasIzmaksas
+    - ProjektsTiekIstenotsSaskanaArPrivataSektoraPartneribasStrukturu
+    - AtlasesVeids
+    - PecuzraudzibasPeriodsGados
+    - ProjektaKlasifikacijaNACE
+    - IesniedzejaNosaukums
+    - IesniedzejaRegNo
+    - IesniedzejaJuridiskaAdrese
+    - FinansejumaSanemejaEpasts
+    - FinansejumaSanemejaTimeklaVietne
+    - ProjektaIesniedzejaTips
+    - IrValstsBudzetaFinansetaInstitucija
+    - ProjektaStatuss
+    - LigumaNoslegsanasDatums
+    - SakumaDatums
+    - BeiguDatums
+    - Kopsavilkums
+    - MerkaGrupa
+    - EsFonds
+    - Jni
+    - KopejaisFinansejums
+    - KopejaisAttiecinamaisFinansejums
+    - EsFonduLidzfinansejums
+    - JniFinansejums
+    - NacionalaisPubliskaisFinansejums
+    - NacionalaisPrivataisFinansejums
+    - PrioritaraVirzienaLidzfinansejumaLikme
+    - PedejasDatuAtjauninasanasDatums
+  eu_projects_rrf:
+    - InvesticijasReformasNumurs
+    - InvesticijasReformasNosaukums
+    - PasakumaNumurs
+    - PasakumaNosaukums
+    - NozaresMinistrija
+    - ProjektaNosaukums
+    - ProjektaNumurs
+    - ProjektsIrStrategiskiSvarigs
+    - PvnIrAttiecinamasIzmaksas
+    - ProjektsTiekIstenotsSaskanaArPrivataSektoraPartneribasStrukturu
+    - AtlasesVeids
+    - PecuzraudzibasPeriodsGados
+    - ProjektaklasifikacijaNACE
+    - IesniedzejaNosaukums
+    - IesniedzejaRegNo
+    - IesniedzejaJuridiskaAdrese
+    - FinansejumaSanemejaEpasts
+    - FinansejumaSanemejaTimeklaVietne
+    - ProjektaIesniedzejaTips
+    - IrValstsBudzetaFinansetaInstitucija
+    - ProjektaStatuss
+    - LigumaNoslegsanasDatums
+    - SakumaDatums
+    - BeiguDatums
+    - ProjektaMerkis
+    - EsFonds
+    - KopejaisFinansejums
+    - KopejaisAttiecinamaisFinansejums
+    - EsFonduLidzfinansejums
+    - NacionalaisPubliskaisFinansejums
+    - NacionalaisPrivataisFinansejums
+    - PedejasDatuAtjauninasanasDatums
+  eu_locations: [ProjektaNumurs, Adrese, KadastraNumurs, Regions]
+  eu_partners: [ProjektaNumurs, Nosaukums, RegNr, Adrese]
+  eis_results:
+    - Iepirkuma_ID
+    - Iepirkuma_nosaukums
+    - Iepirkuma_identifikacijas_numurs
+    - Pasutitaja_nosaukums
+    - Pasutitaja_registracijas_numurs
+    - Pasutitaja_registracijas_numura_veids
+    - Pasutitaja_PVS_ID
+    - Augstak_stavosa_organizacija
+    - Iepirkuma_statuss
+    - Regulejosais_tiesibu_akts
+    - Proceduras_veids
+    - Hipersaite_EIS_kura_pieejams_zinojums
+    - Hipersaite_uz_IUB_publikaciju
+    - Ir_dalijums_dalas
+    - Iepirkuma_dalas_nr
+    - Iepirkuma_dalas_nosaukums
+    - Iepirkuma_dalas_statuss
+    - Uzvaretaja_nosaukums
+    - Uzvaretaja_registracijas_numurs
+    - Uzvaretaja_registracijas_numura_veids
+    - Uzvaretaja_valsts
+    - Liguma_dok_veids
+    - Noslegta_liguma_dok_ID
+    - Saistita_liguma_ID
+    - Aktuala_liguma_summa
+    - Aktuala_liguma_summas_valuta
+    - Sakotneja_liguma_summa
+    - Sakotneja_liguma_summas_valuta
+    - Liguma_izpildes_termins
+    - Liguma_izpilde_no
+    - Liguma_izpilde_lidz
+    - Ligums_ir_vispariga_vienosanas
+    - Liguma_dok_noslegsanas_datums
+    - Liguma_dok_publicesanas_datums
+    - Izbeigsanas_datums
+    - Izbeigsanas_iemesls
 
 # XLSX sheets: the first row's column titles (empty trailing titles ignored).
 xlsx:
@@ -36,6 +185,29 @@ xlsx:
       - "8. Normatīvais akts, saskaņā ar ko veikta iesaldēšana"
       - "9. FID pārbaudīts*"
       - "10. Datums, kad FID pirmo reizi publicējis informāciju par sankciju subjektu"
+  # FID TA, VZD: two header rows; row 2 holds the numbered titles (verified 2026-10-13).
+  fid_ta_vzd:
+    sheet: Dati
+    header_row: 2
+    columns:
+      - "1. Sankciju subjekts, kā saimnieciskie resursi ir iesaldēti (vārds, uzvārds / nosaukums)"
+      - "2. Dzimšanas datums / reģistrācijas Nr."
+      - "3. Valstspiederība / reģistrācijas valsts"
+      - "4.  Iesaldēto saimniecisko resursu veids"
+      - "5. Iesaldēto saimniecisko resursu saistība ar sankciju subjektu"
+      - "6. Kadastra numurs"
+      - "7. Adrese"
+      - "8. Fiskālā kadastrālā vērtība (EUR)"
+      - "9. Universālā kadastrālā vērtība (EUR)"
+      - "10. Atzīme reģistrā - tiesas piemērotie liegumi"
+      - "11.Atzīme reģistrā par nosūtīts izvērtēšanai tiesai"
+      - "12. Saimniecisko resursu iesaldēšanas pamats"
+      - "13. Sankciju sarakstā iekļautās personas vārds, uzvārds vai nosaukums"
+      - "14. Sankciju sarakstā iekļautās personas dzimšanas dati, reģistrācijas numurs"
+      - "15. Datums, no kura spēkā ir sankcijas, pret 13. kolonnā norādīto personu"
+      - "16. Normatīvais akts, saskaņā ar ko veikta iesaldēšana"
+      - "17. FID pārbaudīts"
+      - "18. Datums, kad FID publicējis informāciju par attiecīgo saimniecisko resursu"
 
 # SHP layers: [name, DBF type, width]. CRS: EPSG code the .prj must name (or
 # the exact PROJCS name, for .prj files without an AUTHORITY clause).
@@ -348,6 +520,19 @@ xml:
       - ObjectRelation
       - ObjectRelation/ObjectCadastreNr
       - ObjectRelation/ObjectType
+  # Phase 8b module 7 (verified 2026-10-13 on a Jelgava member; type only, D5).
+  ownership:
+    root: OwnershipFullData
+    root_children: [ATVK, FilePartCount, FilePartNr, OwnershipItemList, PacketId, PreparedDate]
+    item: OwnershipItemData
+    paths:
+      - ObjectRelation
+      - ObjectRelation/ObjectCadastreNr
+      - ObjectRelation/ObjectType
+      - OwnershipStatusKindList
+      - OwnershipStatusKindList/OwnershipStatusKind
+      - OwnershipStatusKindList/OwnershipStatusKind/OwnershipStatus
+      - OwnershipStatusKindList/OwnershipStatusKind/PersonStatus
 
 # --- Phase 2b (verified 2026-10-09, docs/data-sources.md §6) ---
 # DAP nature SHP: .prj named LKS_1992_Latvia_TM without AUTHORITY -> EPSG:3059.

@@ -18,9 +18,9 @@ def result(status="found", items=(), warnings=(), reason=None):
     )
 
 
-def test_rule_set_v5_agreed_covers_zoning():
+def test_rule_set_v6_agreed_covers_zoning():
     rs = rules_mod.load()
-    assert (rs.version, rs.status) == ("5", "agreed")
+    assert (rs.version, rs.status) == ("6", "agreed")
     assert "zoning" in rs.modules()
 
 

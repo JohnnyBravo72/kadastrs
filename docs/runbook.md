@@ -346,6 +346,19 @@ docker compose run --rm etl import ur_companies ur_insolvency ur_sanctions fid_s
 - `GET /api/runs/{id}/applicants`: per applicant the targets, results and links.
 - Rule set v3 (agreed 2026-10-13, D4) holds the rules of modules 9, 14 and 17.
 
+## Phase 8b: ownership, VID, de minimis, EU, EIS, FID frozen RE
+
+Decisions: `docs/decisions.md` D11. Rule set **v4 agreed** 2026-10-13 (D4).
+
+```powershell
+docker compose run --rm etl import cadastre_ownership vid_rating deminimis eu_projects eis_procurement fid_frozen_property
+```
+
+- **De minimis** downloads from D1 E1 with the pinned Sectigo intermediate in `infra/certs/` (TLS stays on). Freshness is "live export": re-import when the last download is older than `source_stale_after` (P7D).
+- Applicant modules **10 VID**, **11 De minimis**, **12 ES projekti** (`eu_funding_applicant`) and **13 EIS** appear in the Pieteicējs section with 9 and 17.
+- Object modules **7 Īpašumtiesības**, **12 ES projekti (objekts)** and **18 Iesaldēts nekustamais īpašums (FID)** are chips/cards on the object.
+- Module 12 matches locations **only by cadastre number**; address text is not used. Natural-person/IK EU rows keep only project and cadastre fields (D11).
+
 ## Run the tests
 
 ```powershell

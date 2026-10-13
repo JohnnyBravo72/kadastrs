@@ -6,10 +6,19 @@
 
 **Data policy:** all data comes from **data.gov.lv** (section 2).
 
-**Status (2026-10-13):** Module 8 zoning (TAPIS) is built; rule set **v5 agreed** (D4). Phase 8a (modules 9, 14, 17) is built and tested; rules v3 agreed 2026-10-13 (D4). Phase 7 is built and tested. Phases 1–3 are done; Phase 4 is built and tested (test-set comparison waits for filled files). Phase 5 is built and tested (colleague pilot timing open). Phase 0 steps 1 and 3 done; baseline and returned test set still open.
+**Status (2026-10-13):** Phase 8b (modules 7, 10–13, 18) and module 8 zoning are built; rule set **v6 agreed** (D4; combines v4 + v5). Phase 8a (modules 9, 14, 17) is built and tested. Phase 7 is built and tested. Phases 1–3 are done; Phase 4 is built and tested (test-set comparison waits for filled files). Phase 5 is built and tested (colleague pilot timing open). Phase 0 steps 1 and 3 done; baseline and returned test set still open.
 
 **Change log**
-- 2026-10-13: **Rule set v5 agreed** by Janis Bardavskis (D4): module 8 zoning from pilot TAPIS `grupa_kods` — industrial/technical medium; transport/public/mixed low; residential and open-space none; unmapped unknown. `config/rules.yaml` `version: "5"`, `status: agreed`.
+- 2026-10-13: **Rule set v6** (D4): merges agreed v4 (Phase 8b) and v5 (module 8 zoning) when 8b landed on main. `config/rules.yaml` `version: "6"`, `status: agreed`.
+- 2026-10-13 (Phase 8b): modules 7, 10–13 and 18 (D11; sources in `docs/data-sources.md` §3.10–3.13, §3.16–3.17).
+  - **7 Ownership:** pilot members of `ownership.zip`; `OwnershipStatus` + `PersonStatus` only (D5); risk none (informational).
+  - **10 VID rating:** reg. no., rating, explanation, date; name never stored; A none / B low / C high / J·N medium / missing unknown.
+  - **11 De minimis:** live CSV via D1 E1 with pinned Sectigo intermediate (`infra/certs/`); legal entities only; 3-year rolling sum vs ceilings in `rules.yaml`; linked-undertakings warning always.
+  - **12 EU projects:** three CFLA periods; object match by cadastre; applicant module for the same reg. no.; natural-person/IK rows stripped (D11); location coverage warning.
+  - **13 EIS procurement:** yearly files 2018–2026; winner name never stored; coverage "tikai EIS e-konkursu iepirkumi".
+  - **18 FID frozen RE:** TA/VZD file; cadastre match; no person columns; risk high.
+  - **Rule set v4 (agreed by Janis Bardavskis 2026-10-13, D4):** modules 7, 10–13 and 18; ownership informational; VID A/B/C/J/N; de minimis ceilings and 80%/100% shares; EU ongoing high / finished medium / applicant low; EIS low; FID frozen RE high.
+- 2026-10-13: **Rule set v5 agreed** by Janis Bardavskis (D4): module 8 zoning from pilot TAPIS `grupa_kods` — industrial/technical medium; transport/public/mixed low; residential and open-space none; unmapped unknown.
 - 2026-10-13 (Phase 6 leftover, module 8): TAPIS functional zoning (D1 E4 WFS; `docs/data-sources.md` §3.7).
   - Source `tapis_zoning`: `funkcionalais_zonejums` (findings) + `speka_esosu_planojumu_teritorijas` (coverage mask); pilot ATVK; EPSG:3059 → 10306 via `lks92_to_lks2020`.
   - Check module 8 with §6.3 overlaps; map layer Zonējums; `fz-skelumi` not used in v1.
@@ -458,7 +467,7 @@ A modal "Meklēt īpašumu" on first load; "Skip to map" closes it and "New sear
 | 5. Batch + Excel | CLI and API: list (pasted or CSV/XLSX) → run → Excel report; a plain input page. **Built and tested 2026-10-11** | **Pilot with 2–3 colleagues; measured time per object vs the baseline** (open) |
 | 6. Map + dashboard | Main screen (section 8.2), layers incl. zoning (module 8), results list. **Results view built 2026-10-11**; **module 8 zoning built 2026-10-13** (TAPIS; rules v5 agreed); header tabs/filter bar from Phase 7 | UI criteria pass for the pilot area |
 | 7. Entry dialog + projects | Full entry dialog, import UI, project grouping, server-side sessions (needs sign-in). **Built 2026-10-12** (entry dialog, import preview, unit selection, Atjaunot and latest-data reruns, project groups, Avoti and Žurnāls); per-user sessions wait for sign-in (Phase 10) | UI criteria pass |
-| 8. Applicant & funding | Modules 7 and 9–14, and 17. **8a built 2026-10-12:** modules 9, 14, 17 (UR, FID; rules v3 agreed 2026-10-13); 7, 10–13 open | Each module verified on the test set |
+| 8. Applicant & funding | Modules 7 and 9–14, and 17–18. **8a built 2026-10-12:** modules 9, 14, 17 (rules v3 agreed). **8b built 2026-10-13:** modules 7, 10–13, 18 (D11; rule set v4 agreed; merged with module 8 as rules v6) | Each module verified on the test set |
 | 9. Whole country + performance | Full import, vector tiles, MapLibre decision, storage review (E8: snapshots vs per-object history), re-check value of `pirmsregistretas-buves` on whole-country data | Search < 300 ms; a 1,000-row batch finishes in < 5 min |
 | 10. Hardening | Scheduled refresh, monitoring, alerts, runbook, PDF report, D3 final: shared hosting, sign-in (required before sharing), security review, retention, maintenance, legal wording; deployment behind sign-in | A refresh runs unattended; a failed import alerts the owner |
 

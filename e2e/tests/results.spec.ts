@@ -45,7 +45,8 @@ test("search, chips, layer, Excel", async ({ page }) => {
   await expect(page).toHaveURL(/[?&]run=\d+/);
   await expect(page.getByTestId("designation")).toHaveText("09000050400");
   const strip = page.getByTestId("status-strip");
-  await expect(strip.locator(".chip")).toHaveCount(8); // modules 1–6, 8 and 14
+  // object modules 1–8, 12, 14, 18 (applicant modules are not chips)
+  await expect(strip.locator(".chip")).toHaveCount(11);
   await expect(strip.locator('[data-module="flood_10y"]')).toContainText("atrasts · risks: augsts");
   await expect(strip.locator('[data-module="address_consistency"]')).toContainText("nav piemērojams");
 
@@ -137,7 +138,7 @@ test("property -> untick one unit -> run -> change sources -> Atjaunot -> Žurn�
   await expect(page.getByTestId("parent-note")).toContainText(`Atjaunots no pārbaudes nr. ${first}`);
   await expect(page.getByTestId("pending")).toHaveCount(0);
   await expect(strip.locator('[data-module="bis"]')).toHaveCount(0);
-  await expect(strip.locator(".chip")).toHaveCount(7);
+  await expect(strip.locator(".chip")).toHaveCount(10);
   await expect(page.locator("#card-bis")).toHaveCount(0);
   // its layer is gone from the map panel
   await expect(page.getByTestId("layer-panel")).not.toContainText("Būvniecības lietas (BIS)");
