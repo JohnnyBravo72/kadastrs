@@ -55,6 +55,13 @@ V = RESOLVE_V | {
     "ur_insolvency": 15,
     "ur_sanctions": 16,
     "fid_sanctions": 17,
+    # Phase 8b (empty live versions so modules pin a version id)
+    "cadastre_ownership": 18,
+    "vid_rating": 19,
+    "deminimis": 20,
+    "eu_projects": 21,
+    "eis_procurement": 22,
+    "fid_frozen_property": 23,
 }
 CHECK_SOURCES = [s for s in V if s not in RESOLVE_V]
 

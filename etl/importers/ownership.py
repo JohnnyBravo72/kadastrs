@@ -59,9 +59,7 @@ class CadastreOwnership:
         def rows():
             for m in f.members:
                 scan_header(ctx.workdir / m.path)
-                for item in iter_file_items(
-                    ctx.workdir / m.path, self.role, seen, root_children
-                ):
+                for item in iter_file_items(ctx.workdir / m.path, self.role, seen, root_children):
                     counts["items"] += 1
                     cad = text(item, "ObjectRelation", "ObjectCadastreNr")
                     otype = text(item, "ObjectRelation", "ObjectType")

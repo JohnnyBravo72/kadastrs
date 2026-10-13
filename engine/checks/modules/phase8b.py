@@ -1,12 +1,12 @@
 """Phase 8b check modules (PLAN.md §6.1; docs/decisions.md D11; rule set v4).
 
-  7  ownership              object: owner type only
-  10 vid_rating             applicant: A/B/C/J/N
-  11 deminimis              applicant: 3-year rolling sum vs ceilings
-  12 eu_funding             object: other EU projects on the same cadastre number
-  12 eu_funding_applicant   applicant: other EU projects for the same reg. no.
-  13 procurement            applicant: EIS contracts as buyer or winner
-  18 fid_frozen_property    object: FID TA/VZD frozen real estate
+7  ownership              object: owner type only
+10 vid_rating             applicant: A/B/C/J/N
+11 deminimis              applicant: 3-year rolling sum vs ceilings
+12 eu_funding             object: other EU projects on the same cadastre number
+12 eu_funding_applicant   applicant: other EU projects for the same reg. no.
+13 procurement            applicant: EIS contracts as buyer or winner
+18 fid_frozen_property    object: FID TA/VZD frozen real estate
 """
 
 from __future__ import annotations
@@ -159,9 +159,7 @@ def run_deminimis(ctx: RunContext, units: list[Unit]) -> dict[str, CheckResult]:
            ORDER BY reg_no, assign_date DESC""",
         (v, regs, start),
     ):
-        by_reg.setdefault(reg, []).append(
-            (assign_date, amount, regul, key, programme, instrument)
-        )
+        by_reg.setdefault(reg, []).append((assign_date, amount, regul, key, programme, instrument))
     out: dict[str, CheckResult] = {}
     for u in units:
         rows = by_reg.get(u.code, [])

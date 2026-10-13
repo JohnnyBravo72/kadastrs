@@ -180,10 +180,7 @@ def assess(conn, remotes: dict[str, Remote], at: datetime) -> dict[str, dict]:
                 and at - ours > _as_timedelta(stale_after)
             ):
                 status = "source_stale"
-                text = (
-                    f"live eksports – atkārtoti lejupielādēt "
-                    f"(pēdējā lejupielāde {_day(ours)})"
-                )
+                text = f"live eksports – atkārtoti lejupielādēt (pēdējā lejupielāde {_day(ours)})"
             else:
                 status = "current"
                 text = f"live eksports (lejupielādēts {_day(ours)})" if ours else "live eksports"

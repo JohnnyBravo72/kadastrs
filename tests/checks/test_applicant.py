@@ -167,7 +167,14 @@ def test_api_applicant_section(client, applicant_run):
     by = {a["reg_no"]: a for a in body}
     alfa = by["40003100001"]
     assert alfa["target_nos"] == [0, len(APPLICANTS) + 1] and alfa["name"] == 'SIA "Alfa"'
-    assert [r["module"] for r in alfa["results"]] == ["applicant_company", "sanctions"]
+    assert [r["module"] for r in alfa["results"]] == [
+        "applicant_company",
+        "vid_rating",
+        "deminimis",
+        "eu_funding_applicant",
+        "procurement",
+        "sanctions",
+    ]
     systems = [lk["system"] for lk in alfa["links"]]
     assert systems == ["UR", "FID sankciju saraksti"]
     ur, fid = alfa["links"]

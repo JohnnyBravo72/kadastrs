@@ -35,7 +35,11 @@ HEADERS = {
         "Norādītā adrese",
         "Pieteicēja reģ. nr.",
         # object modules only; the applicant modules have their own sheet
-        *[f"{m.no}. {m.name_lv}" for m in MODULES if m.subject == "object"],
+        # (same order as reports/excel.py: by module number)
+        *[
+            f"{m.no}. {m.name_lv}"
+            for m in sorted((m for m in MODULES if m.subject == "object"), key=lambda m: m.no)
+        ],
         "Kopējais risks",
         "Brīdinājumi",
     ],
@@ -67,7 +71,10 @@ HEADERS = {
         "Juridiskā adrese",
         "Atvērti procesi",
         "Objekti (Nr.)",
-        *[f"{m.no}. {m.name_lv}" for m in MODULES if m.subject == "applicant"],
+        *[
+            f"{m.no}. {m.name_lv}"
+            for m in sorted((m for m in MODULES if m.subject == "applicant"), key=lambda m: m.no)
+        ],
         "Kopējais risks",
         "Brīdinājumi",
     ],

@@ -28,7 +28,9 @@ TRUNCATE work.run_grouping, work.check_result, work.run_input, work.run_target, 
          ref.building_parcel, ref.property, ref.property_object,
          ref.bis_case, ref.bis_object, ref.encumbrance, ref.atis_classifier,
          ref.encumbrance_frozen, ref.ur_company, ref.ur_insolvency, ref.ur_sanction,
-         ref.fid_sanction,
+         ref.fid_sanction, ref.ownership, ref.vid_rating, ref.deminimis_aid,
+         ref.eu_project, ref.eu_project_location, ref.eu_project_partner,
+         ref.eis_contract, ref.fid_frozen_property,
          source_check, import_log, dataset_version, source, allowed_external_resource
          RESTART IDENTITY CASCADE
 """

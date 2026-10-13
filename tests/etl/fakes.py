@@ -17,6 +17,11 @@ from etl.settings import etl_config, schemas
 API = "https://ckan.test/dati/api/3/action/"
 FILES = "https://files.test/"
 
+# Long data.gov.lv dataset ids (kept short in the maps below for the line length).
+_FID_ASSETS = "sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija"
+_EU_2127 = "eiropas-savienibas-fondu-21-27-perioda-lidzfinansetie-projekti"
+_EU_RRF = "eiropas-savienibas-atveselosanas-fonda-lidzfinansetie-projekti"
+
 DATASETS = {
     "admin_boundaries": "varis-atvertie-dati",
     "varis_addresses": "varis-atvertie-dati",
@@ -33,26 +38,26 @@ DATASETS = {
     "ur_companies": "uz",
     "ur_insolvency": "maksatnespejas-procesi",
     "ur_sanctions": "sanctions",
-    "fid_sanctions": "sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija",
+    "fid_sanctions": _FID_ASSETS,
     "cadastre_ownership": "kadastra-informacijas-sistemas-atvertie-dati",
     "vid_rating": "nodoklu-maksataju-reitings",
     "deminimis": "pieskirtais-de-minimis-atbalsts-latvija",
     "eis_procurement": "iepirkumu-rezultatu-datu-grupa",
-    "fid_frozen_property": "sankciju-subjektu-lidzekli-un-saimnieciskie-resursi-kas-iesaldeti-latvija",
+    "fid_frozen_property": _FID_ASSETS,
 }
 # Sources whose resources sit in several CKAN datasets (config/sources.yaml).
 ROLE_DATASETS = {
     ("bis_cases", "cases"): "bis_jlyakg7hgslonjnwyrwc6w",
     ("bis_cases", "objects"): "bis_tln9s3hrpjlnucmjip9r3g",
-    ("eu_projects", "projects_2127"): "eiropas-savienibas-fondu-21-27-perioda-lidzfinansetie-projekti",
-    ("eu_projects", "locations_2127"): "eiropas-savienibas-fondu-21-27-perioda-lidzfinansetie-projekti",
-    ("eu_projects", "partners_2127"): "eiropas-savienibas-fondu-21-27-perioda-lidzfinansetie-projekti",
+    ("eu_projects", "projects_2127"): _EU_2127,
+    ("eu_projects", "locations_2127"): _EU_2127,
+    ("eu_projects", "partners_2127"): _EU_2127,
     ("eu_projects", "projects_1420"): "es-lidzfinansetie-projekti",
     ("eu_projects", "locations_1420"): "es-lidzfinansetie-projekti",
     ("eu_projects", "partners_1420"): "es-lidzfinansetie-projekti",
-    ("eu_projects", "projects_rrf"): "eiropas-savienibas-atveselosanas-fonda-lidzfinansetie-projekti",
-    ("eu_projects", "locations_rrf"): "eiropas-savienibas-atveselosanas-fonda-lidzfinansetie-projekti",
-    ("eu_projects", "partners_rrf"): "eiropas-savienibas-atveselosanas-fonda-lidzfinansetie-projekti",
+    ("eu_projects", "projects_rrf"): _EU_RRF,
+    ("eu_projects", "locations_rrf"): _EU_RRF,
+    ("eu_projects", "partners_rrf"): _EU_RRF,
 }
 # Licences as on data.gov.lv: VZD data CC-BY-4.0 (FakeServer.licence), these CC0-1.0.
 CC0_DATASETS = (

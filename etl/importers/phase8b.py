@@ -394,9 +394,7 @@ class EuProjects:
                         _decimal(r[total_col], f"{path.name}:{line} total"),
                         _decimal(r[eu_col], f"{path.name}:{line} eu"),
                         int(mon) if mon.isdigit() else None,
-                        _iso_date(
-                            r["PedejasDatuAtjauninasanasDatums"], f"{path.name}:{line} upd"
-                        ),
+                        _iso_date(r["PedejasDatuAtjauninasanasDatums"], f"{path.name}:{line} upd"),
                     )
 
         def location_rows():

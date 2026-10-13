@@ -44,8 +44,7 @@ def test_deminimis_ceilings():
 def test_eu_and_fid_and_ownership():
     rs = rules_mod.load()
     assert (
-        rs.evaluate(result("eu_funding", items=[{"match": "object", "ongoing": True}]))[0]
-        == "high"
+        rs.evaluate(result("eu_funding", items=[{"match": "object", "ongoing": True}]))[0] == "high"
     )
     assert (
         rs.evaluate(result("eu_funding", items=[{"match": "object", "ongoing": False}]))[0]
