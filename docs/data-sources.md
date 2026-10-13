@@ -77,7 +77,7 @@ Status words used below:
    - DAP ArcGIS REST (`ozols.gov.lv`, alongside SHP that is on data.gov.lv);
    - all flood and TAPIS services (`geo-dpps.viss.gov.lv` proxying `geodata.lvgmc.lv`, `geoserver.lvgmc.lv`, `tapis.gov.lv`);
    - flood SHP files, which are only reachable through geolatvija.lv product pages.
-7. **TLS:** Python's default CA store fails on `deminimis.fm.gov.lv` and `open.iub.gov.lv` (*CERTIFICATE_VERIFY_FAILED, unable to get local issuer certificate*). `curl` with the Windows store connects (HTTP 200). The ETL needs a proper CA bundle; verification must not be switched off.
+7. **TLS:** Python's default CA store fails on `deminimis.fm.gov.lv` and `open.iub.gov.lv` (*CERTIFICATE_VERIFY_FAILED, unable to get local issuer certificate*). `curl` with the Windows store connects (HTTP 200). The ETL needs a proper CA bundle; verification must not be switched off. **Cause and fix (2026-10-13, §3.11):** `deminimis.fm.gov.lv` does not send its intermediate certificate; the ETL adds the pinned intermediate to its CA bundle (`infra/certs/`). `open.iub.gov.lv` now sends its full chain.
 8. **Personal data in sources** (must not be stored, per CLAUDE.md):
    - de minimis: `person_title` "vārds un uzvārds" and `person_reg_nr` "personas kods";
    - UR `sanctions`: `name`, `birth_date`;
@@ -416,6 +416,14 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
   - All 142,919 rows dated 06.10.2026. Description: updated at least four times a year.
 - **Tax debts: NOT FOUND.** Searched "nodokļu parādi", "nodokļu parādnieki", "VID nodokļu parādnieki", "parādi", "nodokļu parāds". Other VID datasets found: `pvn-maksataji`, `saimnieciskas-darbibas-apturesana`, paid-tax totals. **PLAN's "freshness ≤ 1 day" for module 10 cannot be met**; the rating is quarterly at best.
 
+**Phase 8b check (2026-10-13; `package_show`, the file streamed and counted, no values printed from name columns):**
+- Resource `acd4c6f9-5123-46a5-80f6-1f44b4517f58` (`Reitings_uznemumi.csv`, CSV, `,`-separated, UTF-8 with BOM, 14.1 MB), CKAN `last_modified` 2026-10-06, frequency IRREG, CC0-1.0.
+- 142,919 rows; columns `Registracijas_kods, Nosaukums, Reitings, Skaidrojums, Informacijas_atjaunosanas_datums` (`config/schemas.yaml` `vid_rating`).
+- `Registracijas_kods`: 142,917 with the legal-entity pattern, **2 other 11-digit values** (not imported: possible personal codes).
+- `Reitings` / `Skaidrojums` pairs: A "Laba saistību izpilde" 24,718, B "Jāuzlabo saistību izpilde" 63,819, C "Pārkāpumi saistību izpildē" 9,323, J "Jaunreģistrēts nodokļu maksātājs" 4,775, N "Neaktīvs nodokļu maksātājs" 40,284.
+- `Informacijas_atjaunosanas_datums` `DD.MM.YYYY`, one value (06.10.2026) in every row.
+- **Imported:** reg. no., rating, explanation, date. **`Nosaukums` is never stored** (an IK's name is its owner's name; the name shown comes from UR, D10).
+
 ### 3.11 De minimis
 - [`pieskirtais-de-minimis-atbalsts-latvija`](https://data.gov.lv/dati/lv/dataset/pieskirtais-de-minimis-atbalsts-latvija) (FM, CC0).
   - Resources are live exports on **deminimis.fm.gov.lv** (HTML search, XLSX, CSV; the CSV HEAD answers 200, `deminimis.csv`).
@@ -424,11 +432,35 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
   - `person_reg_nr` can be a personal code and `person_title` a person's name: **personal data**.
   - CKAN metadata last touched 2023-01-26.
 
+**Phase 8b check (2026-10-13; counts and pattern checks only, the sample deleted the same day):**
+- Resource `6253edd2-17d1-4a9a-bd48-3dd5b9ce5ff4` (CSV) → `https://deminimis.fm.gov.lv/public/mekletajs/export_csv` (D1 E1). A **live export**: the response is generated on request (`Last-Modified` = the request time, `Content-Disposition: attachment; filename=deminimis.csv`), and the CKAN resource has **no `last_modified`** (package `metadata_modified` 2023-01-26). Freshness therefore uses the "live export" model (D11).
+- **TLS (fixes §2 item 7):** the server sends only its own certificate (`CN=*.fm.gov.lv`, valid to 2027-02-17) and not the intermediate **"Sectigo Public Server Authentication CA DV R36"** (issuer "Sectigo Public Server Authentication Root R46"; AIA `http://crt.sectigo.com/SectigoPublicServerAuthenticationCADVR36.crt`; SHA-256 of the DER file `8c54c334b66ba4e426772af4a3f9136c19a1aec729fdb28c535c07a5a4ef22e0`; valid to 2036-03-21). With that intermediate added to the CA bundle the download verifies (HTTP 200, 25.1 MB). `open.iub.gov.lv` now sends its full chain (verify OK).
+- `,`-separated, UTF-8 without BOM, 76,021 rows; columns `assign_date, person_reg_nr, person_title, project_title, assigner_title, program_title, assigned_amount, regul_title, instrument_title` (`config/schemas.yaml` `deminimis`).
+- `assign_date` ISO, 2023-01-01 … 2026-10-13 (2023: 16,528, 2024: 18,612, 2025: 24,357, 2026: 16,524).
+- `person_reg_nr`: 66,305 legal-entity pattern (17,043 distinct), **9,709 with the personal-code shape `DDMMYY-NNNNN`**, 7 of the shape `A99999-99999`: only the legal-entity rows are imported.
+- `assigned_amount`: decimal point, no thousands separator. `regul_title` 7 values (2023/2831 general 32,495; 1408/2013 agriculture 31,369; 1407/2013 general 12,040; 1407/2013 road freight 86; 717/2014 fisheries 19; 2023/2832 and 360/2012 SGEI 6 each). `instrument_title` 12 values. 129 granting bodies.
+- **Imported:** reg. no., date, granting body, programme, amount, regulation, instrument. **Never:** `person_title` (a natural person's or an IK owner's name) and `project_title` (may name the person).
+
 ### 3.12 EU co-financed projects
 - Three CFLA datasets (daily, CC0, on data.gov.lv): 2021–27, 2014–20, RRF.
 - Project list fields include `ProjektaNumurs, IesniedzejaNosaukums, IesniedzejaRegNo, IesniedzejaJuridiskaAdrese, ProjektaStatuss, …`.
 - **Locations:** "īstenošanas vietas" resource with `ProjektaNumurs, Adrese, KadastraNumurs, Regions`. Fill rates are in §1. Sample values are 11 digits (e.g. `05000050004`); whether they are property numbers or parcel designations is not stated.
 - Partners (`RegNr`) and procurement contracts (`IzpilditajaRegNo`) are also published.
+
+**Phase 8b check (2026-10-13; counts and pattern checks only; samples deleted):** all files CSV, `,`-separated, CC0-1.0, daily (CKAN `last_modified` 2026-10-12).
+
+| Period | Dataset | Project list | Locations | Partners |
+|---|---|---|---|---|
+| 2021–27 | `eiropas-savienibas-fondu-21-27-perioda-lidzfinansetie-projekti` | `80aca232-54ad-4a9e-b1e3-c06623c1020b` (2,514 rows) | `27733f45-ef48-41bf-9a9c-cc818ed9f32f` (7,642) | `5d9b36b2-6ff4-44b7-8bb3-d99d8043a271` (1,244) |
+| 2014–20 | `es-lidzfinansetie-projekti` | `9c2d6bf2-41a4-4a58-a5ba-3a4ad6d7e79f` (2,449) | `35da9d99-7750-4be8-85d9-4aaa920d4583` (7,864) | `12f8a44f-e1a9-4f7e-8a32-7f472ac28de8` |
+| RRF | `eiropas-savienibas-atveselosanas-fonda-lidzfinansetie-projekti` | `bfcae357-328c-423f-9835-215e7fd3db4e` (465) | `fec77132-7058-4e28-b4fc-0772454b8041` (1,371) | `ad29f6bb-4183-4dd3-9b81-eb62c8959c92` |
+
+- **Project lists** differ per period (`config/schemas.yaml` `eu_projects_2127`, `eu_projects_1420`, `eu_projects_rrf`): common fields `ProjektaNumurs, ProjektaNosaukums, IesniedzejaNosaukums, IesniedzejaRegNo, IesniedzejaJuridiskaAdrese, FinansejumaSanemejaEpasts, ProjektaIesniedzejaTips, ProjektaStatuss, LigumaNoslegsanasDatums, PecuzraudzibasPeriodsGados, PedejasDatuAtjauninasanasDatums`; start/end `SakumaDatums`/`BeiguDatums` (14–20, RRF) or `ProjektaIeviesanasSakumaDatums`/`…BeiguDatums` (21–27); fund `Fonds` / `EsFonds`; measure `PasakumaNumurs`/`PasakumaNosaukums`; amounts `ProjektaKopejasIzmaksas` / `KopejaisFinansejums` and `ProjektamPieskirtaisESFonduLidzfinansejums` / `EsFonduLidzfinansejums`. 2014–20 and 2021–27 are UTF-8 without BOM, with line breaks inside quoted fields.
+- `ProjektaStatuss`: `Līgums` (ongoing) or `Pabeigts`. `IesniedzejaRegNo` always has the legal-entity pattern when filled.
+- **Natural persons:** `ProjektaIesniedzejaTips` "Fiziska persona" (2021–27: 1,182 projects, **917 of them with the person's name in `IesniedzejaNosaukums`**, no reg. no.; 2014–20: 102, no name), "Fiziska persona, kas ir reģistrējusies kā saimnieciskās darbības veicēja" (6) and "Individuālais komersants" (2021–27: 1, 2014–20: 7). RRF has none.
+- **Locations** `ProjektaNumurs, Adrese, KadastraNumurs, Regions`; one number per cell (no lists). `KadastraNumurs` shapes: 2021–27 11 digits 4,987, empty 2,655; 2014–20 11 digits 5,576, 14 digits 1,127, 17 digits 37, 12 digits 28, empty 1,015; RRF 11 digits 837, 14 digits 241, 17 digits 15, 10 digits 6, empty 262. `Adrese` is often only a city ("Rīga"): **not usable for matching**. Rows with a cadastre number: 2021–27 65 %, 2014–20 87 %, RRF 81 % (the coverage reported by module 12).
+- **Pilot join (2026-10-13, against the live cadastre text):** 1,038 distinct pilot numbers (prefix 0500/0900/1300). 11 digits: 916, of which 797 are property numbers and 106 parcels only (13 not found); 14 digits: 106, 102 buildings; 17 digits: 11 (premise groups); 13 and 15 digits: 2 each. Natural-person projects with a cadastre number: 2014–20 116 rows (11 in the pilot), 2021–27 2.
+- **Imported (D11):** project number, period, title, status, dates, monitoring years, fund, measure, amounts, applicant type, applicant reg. no.; applicant name only for legal-entity applicants that are not IK; locations with the cadastre number (text, E2 leading zero) and, for those applicants, the address; partners' reg. no. (legal-entity pattern) only. **Natural-person and IK projects:** only project number, period, status, dates, amounts, measure, type and cadastre numbers. **Never:** e-mail, web site, legal address, natural persons' names, partner names.
 
 ### 3.13 Procurement
 - [`iepirkumu-rezultatu-datu-grupa`](https://data.gov.lv/dati/lv/dataset/iepirkumu-rezultatu-datu-grupa) (VDAA, EIS e-konkursi, daily, CC0): yearly CSVs 2018–2026 on data.gov.lv. Includes `Pasutitaja_registracijas_numurs, Uzvaretaja_registracijas_numurs, Aktuala_liguma_summa, …`.
@@ -436,6 +468,13 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
   - JSON at `https://open.iub.gov.lv/data/notice` (external; TLS chain issue, see §2.7), notices since 2023-10-25.
   - `ligumi` CKAN metadata last modified 2025-01-10.
   - JSON structure not inspected.
+
+**Phase 8b check (2026-10-13; counts only):**
+- EIS yearly files, all CSV in `iepirkumu-rezultatu-datu-grupa` (CC0-1.0): 2018 `cecd0be7-c8e0-451a-8314-f1d806db3bc1`, 2019 `1d37ba16-4d7b-4c1e-9650-1ee9b6a32666`, 2020 `abf811a3-26e8-48c2-bc86-e9b74ca0b385`, 2021 `a1342945-ce4b-480b-abb5-b74d43c41534`, 2022 `97a7c410-60c0-4d08-b554-4d1abb9092da`, 2023 `71f88053-97c1-4928-93c3-8d83d714f27f`, 2024 `3a02a1a7-0322-4c0d-9700-8af9832f0f91`, 2025 `79b34e1c-8989-4984-816a-8e8f92b701f3`, 2026 `c4007411-1ba5-40f3-9b50-f25881c93f51` (`last_modified` 2026-10-12; the earlier years 2024-11 to 2026-07). A new year is a new resource: add its id to `config/sources.yaml` and `config/etl.yaml`.
+- 2026 file: `,`-separated, UTF-8 with BOM, 34,086 rows, 36 columns (`config/schemas.yaml` `eis_results`): `Iepirkuma_ID, Iepirkuma_nosaukums, Iepirkuma_identifikacijas_numurs, Pasutitaja_nosaukums, Pasutitaja_registracijas_numurs, …, Iepirkuma_statuss, Regulejosais_tiesibu_akts, Proceduras_veids, Hipersaite_EIS_kura_pieejams_zinojums, Hipersaite_uz_IUB_publikaciju, …, Iepirkuma_dalas_nr, Iepirkuma_dalas_nosaukums, Iepirkuma_dalas_statuss, Uzvaretaja_nosaukums, Uzvaretaja_registracijas_numurs, Uzvaretaja_registracijas_numura_veids, Uzvaretaja_valsts, …, Aktuala_liguma_summa, Aktuala_liguma_summas_valuta, …, Liguma_dok_noslegsanas_datums, …, Izbeigsanas_datums, Izbeigsanas_iemesls`. Dates `DD.MM.YYYY`.
+- One row per contract (and lot). Buyer reg. no. always has the legal-entity pattern. **Winner reg. no.: legal-entity pattern 32,597, 16 other 11-digit values (possible personal codes), 860 text, 45 / 23 of 9 / 8 digits (foreign), 502 empty.**
+- **Imported:** the columns module 13 needs except the winner's name; winner reg. no. only with the legal-entity pattern (else only its country). Coverage: **only procurements run in the EIS e-konkursi subsystem** ("tikai EIS e-konkursu iepirkumi", D11).
+- IUB `open.iub.gov.lv/data/notice` (E2) answers with an HTML page of archives (2026-10-13), not JSON; not used in Phase 8b.
 
 ### 3.14 Cultural heritage
 - [`valsts-aizsargajamo-nekustamo-piemineklu-saraksts`](https://data.gov.lv/dati/lv/dataset/valsts-aizsargajamo-nekustamo-piemineklu-saraksts) (KISC, irregular, CC0): 6,250 monuments.
@@ -464,6 +503,11 @@ Not relevant here: their LAD (field blocks), forest register, NĪTIS (market tra
   - Column 2 "Dzimšanas datums / reģistrācijas Nr." holds a Latvian legal-entity reg. no. (26 rows), a birth date (20), a foreign number (127) or nothing. **Column 6 names the sanctioned (often natural) person** and column 1 is a person's name when the subject is a person.
   - **Imported:** rows whose column 2 is a Latvian legal-entity reg. no.; columns 1 (the entity's name), 2, 3, 4, 5, 7, 8, 10. Column 6 and every other row are never stored (D10).
   - The register-specific files (UR, TA/VZD, PV, LDC, CSDD…) repeat these subjects per register. The **TA, VZD** file (`f8dd1178-…`) lists **cadastre numbers of frozen real estate** (14-digit building and 11-digit property numbers): a candidate object check for later, not imported.
+  - **Phase 8b check of the TA, VZD file (2026-10-13; column titles, counts and pattern checks only; sample deleted):** resource `f8dd1178-da14-4009-8620-d871f79fb936` (CKAN `last_modified` 2026-10-09), sheets `Dati` and `Informācija par datiem`. **Two header rows:** row 1 groups, row 2 the 18 numbered column titles (`config/schemas.yaml` `fid_ta_vzd`); 111 data rows.
+    - Columns 1 (the subject's name: a person or an entity), 2 (birth date or reg. no.: 72 legal-entity numbers, 39 other), 3 (nationality / country), 7 (address), 13 and 14 (the sanctioned person and their birth data or reg. no.): **never stored**, except column 2 when it has the legal-entity pattern (the holder's reg. no.).
+    - Column 6 "Kadastra numurs": 11 digits (property number) 79, 14 digits (building) 30, empty 2; written as numbers in the sheet, so read as text with the E2 leading-zero rule. 62 rows have a pilot prefix.
+    - Column 4 asset type: "nekustamais īpašums" 81, "inženierbūve" 30. Column 5 link to the subject (4 values), 10 / 11 register marks (`x` or empty), 12 basis (3 values), 15 sanctions from, 16 legal act, 17 FID checked, 18 published (`DD.MM.YYYY`).
+    - **Imported (module 18, D11):** columns 4, 5, 6, 10, 11, 12, 15, 16, 17, 18 and the holder's reg. no. (column 2, legal-entity pattern only).
 - EU/UN consolidated lists themselves: **NOT FOUND** on data.gov.lv (searched "sankcijas", "sankciju saraksts").
 
 ---
